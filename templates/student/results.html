@@ -18,8 +18,14 @@
           <div class="card-body d-flex flex-column">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
-                <div class="text-muted small">{{ attempt.test.section.subject.name }} · {{ attempt.test.section.title }}</div>
-                <h5 class="card-title mb-1">{{ attempt.test.title }}</h5>
+                <div class="text-muted small">
+                  {% if attempt.test and attempt.test.section and attempt.test.section.subject %}
+                    {{ attempt.test.section.subject.name }} · {{ attempt.test.section.title }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+                <h5 class="card-title mb-1">{{ attempt.test.title if attempt.test else 'اختبار غير متوفر' }}</h5>
               </div>
               <span class="badge text-bg-primary">{{ attempt.score }}/{{ attempt.total }}</span>
             </div>
@@ -48,8 +54,14 @@
             <div class="card-body d-flex flex-column">
               <div class="d-flex justify-content-between align-items-start mb-2">
                 <div>
-                  <div class="text-muted small">{{ attempt.test.section.subject.name }} · {{ attempt.test.section.title }}</div>
-                  <h5 class="card-title mb-1">{{ attempt.test.title }}</h5>
+                  <div class="text-muted small">
+                    {% if attempt.test and attempt.test.section and attempt.test.section.subject %}
+                      {{ attempt.test.section.subject.name }} · {{ attempt.test.section.title }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                  <h5 class="card-title mb-1">{{ attempt.test.title if attempt.test else 'اختبار غير متوفر' }}</h5>
                   <div class="text-muted small">الطالب: {{ attempt.student.username }}</div>
                 </div>
                 <span class="badge text-bg-primary">{{ attempt.score }}/{{ attempt.total }}</span>

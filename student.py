@@ -511,11 +511,12 @@ def test_result(attempt_id):
         flash("غير مسموح", "error")
         return redirect(url_for("student.subjects"))
     questions = attempt.test.questions
-    answers_map = {a.question_id: a for a in attempt.answers}
+    answers = AttemptAnswer.objects(attempt_id=attempt.id).all()
+    answers_map = {str(a.question_id.id): a for a in answers if a.question_id}
 
     review = []
     for q in questions:
-        ans = answers_map.get(q.id)
+        ans = answers_map.get(str(q.id))
         selected_choice = None
         if ans and ans.choice_id:
             selected_choice = next((c for c in q.choices if c.choice_id == ans.choice_id), None)
@@ -579,7 +580,7 @@ def custom_test_new():
             if count > max_available:
                 flash(f"تم طلب {count} أسئلة لـ {lesson.title}، ولكن {max_available} فقط متاحة.", "error")
                 return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
-            selections.append({"lesson_id": lesson.id, "count": count})
+            selections.append({"lesson_id": str(lesson.id), "count": count})
             total_questions += count
 
         if total_questions == 0:
@@ -599,7 +600,7 @@ def custom_test_new():
         for sel in selections:
             tests = Test.objects(lesson_id=sel["lesson_id"]).all()
             test_ids = [t.id for t in tests]
-            lesson_questions = Question.objects(test_id__in=test_ids).all() if test_ids else []
+            lesson_questions = list(Question.objects(test_id__in=test_ids)) if test_ids else []
             if len(lesson_questions) < sel["count"]:
                 flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
                 return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))

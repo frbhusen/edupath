@@ -58,7 +58,7 @@
           <div class="list-group">
             {% for c in choices %}
               <label class="list-group-item d-flex align-items-center gap-2">
-                <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.id }}">
+                <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.choice_id }}">
                 <span>{{ c.text }}</span>
               </label>
             {% endfor %}

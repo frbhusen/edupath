@@ -5,6 +5,7 @@ from mongoengine import (
     ReferenceField, ListField, EmbeddedDocument, EmbeddedDocumentField,
     ObjectIdField
 )
+from mongoengine.errors import DoesNotExist
 from bson import ObjectId
 
 class User(Document, UserMixin):
@@ -212,7 +213,10 @@ class Attempt(Document):
 
     @property
     def test(self):
-        return self.test_id
+        try:
+            return self.test_id
+        except DoesNotExist:
+            return None
 
     @property
     def student(self):
