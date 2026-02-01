@@ -41,7 +41,6 @@
     line-height: 20px;
 }
 .col-2 {
-    flex-basis: 15%;
     padding: 10px;
     margin-bottom: 20px;
 
@@ -78,6 +77,26 @@
     margin-bottom: 10px;
 }
 .col-3 ul li a {
+    color: #fff;
+    text-decoration: none;
+}
+
+.col-3-f {
+    padding: 10px;
+    margin-bottom: 20px;
+}
+.col-3-f h3 {
+    color: #fff;
+    font-size: 20px;
+    margin-bottom: 15px;
+}
+.col-3-f ul {
+    list-style: none;
+}
+.col-3-f ul li {
+    margin-bottom: 10px;
+}
+.col-3-f ul li a {
     color: #fff;
     text-decoration: none;
 }
