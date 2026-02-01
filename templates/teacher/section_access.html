@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة الوصول: {{ section.title }}</h1>
+    <p class="mb-0">إنشاء الرموز والتحكم في التفعيل لكل طالب.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">رجوع</a>
+</div>
+
+<div class="alert alert-light d-flex justify-content-between align-items-center">
+  <div>
+    {% if section.requires_code %}
+      يتطلب هذا القسم حالياً رمز تفعيل.
+    {% else %}
+      هذا القسم مفتوح؛ الرموز اختيارية.
+    {% endif %}
+  </div>
+  <form method="post" class="m-0">
+    <input type="hidden" name="action" value="toggle_requires_code" />
+    <button type="submit" class="btn btn-outline-primary btn-sm">
+      {% if section.requires_code %}جعل القسم مفتوح{% else %}طلب تفعيل{% endif %}
+    </button>
+  </form>
+</div>
+
+{% if students %}
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Codes</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+          {% set active = activations.get(student.id) %}
+          {% set codes = codes_by_student.get(student.id, []) %}
+          <tr>
+            <td>{{ student.username }}</td>
+            <td class="text-muted small">{{ student.email }}</td>
+            <td>
+              {% if active %}
+                <span class="badge text-bg-success">Activated</span>
+              {% else %}
+                <span class="badge text-bg-warning">Locked</span>
+              {% endif %}
+            </td>
+            <td class="small">
+              {% if codes %}
+                {% set has_unused = (codes | selectattr('is_used', 'equalto', False) | list) | length > 0 %}
+                {% for c in codes %}
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge {% if c.is_used %}text-bg-secondary{% else %}text-bg-info{% endif %}">{{ c.code }}</span>
+                    <span class="text-muted">{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '' }}</span>
+                    {% if c.is_used %}<span class="text-muted">(used)</span>{% endif %}
+                    <form method="post" class="d-inline">
+                      <input type="hidden" name="student_id" value="{{ student.id }}" />
+                      <input type="hidden" name="action" value="delete_code" />
+                      <input type="hidden" name="code_id" value="{{ c.id }}" />
+                      <button class="btn btn-link btn-sm text-danger p-0" type="submit">Remove</button>
+                    </form>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <span class="text-muted">No codes</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <form method="post" class="d-inline">
+                <input type="hidden" name="student_id" value="{{ student.id }}" />
+                <input type="hidden" name="action" value="generate_code" />
+                {% set has_unused = (codes | selectattr('is_used', 'equalto', False) | list) | length > 0 %}
+                <button class="btn btn-outline-primary btn-sm" type="submit" {% if has_unused %}disabled{% endif %}>Generate Code</button>
+              </form>
+              {% if active %}
+                <form method="post" class="d-inline ms-1">
+                  <input type="hidden" name="student_id" value="{{ student.id }}" />
+                  <input type="hidden" name="action" value="revoke" />
+                  <button class="btn btn-outline-danger btn-sm" type="submit">Revoke</button>
+                </form>
+              {% else %}
+                <form method="post" class="d-inline ms-1">
+                  <input type="hidden" name="student_id" value="{{ student.id }}" />
+                  <input type="hidden" name="action" value="activate" />
+                  <button class="btn btn-cta btn-sm" type="submit">Activate</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-light">No students found.</div>
+{% endif %}
+{% endblock %}

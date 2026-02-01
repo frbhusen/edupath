@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-3">الجدول: {{ table_name }}</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="text-muted small">عرض حتى 100 صف.</div>
+  <div>
+    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('admin.dashboard') }}">جميع الجداول</a>
+    <a class="btn btn-primary btn-sm" href="{{ url_for('admin.table_new', table_name=table_name) }}">سجل جديد</a>
+  </div>
+</div>
+<div class="table-responsive">
+  <table class="table table-striped table-sm align-middle">
+    <thead>
+      <tr>
+        {% for col in columns %}<th class="text-nowrap">{{ col }}</th>{% endfor %}
+        <th class="text-end">الإجراءات</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        {% for col in columns %}
+          {% set val = row|attr(col) %}
+          <td class="small" style="max-width:240px;">{{ val }}</td>
+        {% endfor %}
+        <td class="text-end">
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('admin.table_edit', table_name=table_name, row_id=row.id) }}">تعديل</a>
+          <form method="post" action="{{ url_for('admin.table_delete', table_name=table_name, row_id=row.id) }}" class="d-inline" onsubmit="return confirm('حذف السجل {{ row.id }}؟');">
+            <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="{{ columns|length + 1 }}" class="text-muted">لم يتم العثور على صفوف.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

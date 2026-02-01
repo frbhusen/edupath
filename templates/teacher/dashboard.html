@@ -1,0 +1,284 @@
+{% extends 'base.html' %} {% block content %}
+<div
+  class="dashboard-hero mb-3 d-flex justify-content-between align-items-center"
+>
+  <div>
+    <h1 class="h4 mb-1">لوحة تحكم المعلم</h1>
+    <p class="mb-0">
+      إدارة المواد والأقسام والدروس والاختبارات في مكان واحد.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a
+      class="btn btn-outline-light btn-sm"
+      href="{{ url_for('teacher.students') }}"
+      >الطلاب</a
+    >
+    <a
+      class="btn btn-outline-light btn-sm"
+      href="{{ url_for('teacher.results_overview') }}"
+      >النتائج</a
+    >
+    <a
+      class="btn btn-outline-warning btn-sm"
+      href="{{ url_for('admin.dashboard') }}"
+      >قاعدة البيانات</a
+    >
+    <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.new_subject') }}"
+      >+ إنشاء مادة</a
+    >
+  </div>
+</div>
+
+{% if subjects %}
+<div class="row g-3">
+  {% for subject in subjects %}
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <h5 class="card-title mb-1">{{ subject.name }}</h5>
+            <p class="card-text text-muted mb-2">{{ subject.description }}</p>
+            <div class="small text-muted">
+              الأقسام: {{ subject.sections|length }}
+            </div>
+          </div>
+          <div class="text-nowrap d-flex gap-2">
+            <a
+              class="btn btn-sm btn-outline-primary"
+              href="{{ url_for('teacher.new_section', subject_id=subject.id) }}"
+              >إضافة قسم</a
+            >
+            <a
+              class="btn btn-sm btn-outline-secondary"
+              href="{{ url_for('teacher.edit_subject', subject_id=subject.id) }}"
+              >تعديل</a
+            >
+            <form
+              class="d-inline"
+              action="{{ url_for('teacher.delete_subject', subject_id=subject.id) }}"
+              method="post"
+            >
+              <button type="submit" class="btn btn-sm btn-outline-danger">
+                حذف
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {% if subject.sections %}
+        <div class="row g-2 mt-3">
+          {% for section in subject.sections %}
+          <div class="col-12">
+            <div class="card border-0 bg-light">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>{{ section.title }}</strong>
+                    <div class="text-muted small">
+                      الدروس: {{ section.lessons|length }} | الاختبارات: {{
+                      section.tests|length }}
+                    </div>
+                  </div>
+                  <div class="text-nowrap d-flex gap-2">
+                    <a
+                      class="btn btn-sm btn-outline-primary"
+                      href="{{ url_for('teacher.new_lesson', section_id=section.id) }}"
+                      >إضافة درس</a
+                    >
+                    <a
+                      class="btn btn-sm btn-outline-success"
+                      href="{{ url_for('teacher.new_test', section_id=section.id) }}"
+                      >إضافة اختبار</a
+                    >
+                    <a
+                      class="btn btn-sm btn-outline-secondary"
+                      href="{{ url_for('teacher.edit_section', section_id=section.id) }}"
+                      >تعديل القسم</a
+                    >
+                  </div>
+                </div>
+                {% if section.lessons %} {% set meta =
+                sections_meta.get(section.id) %}
+                <div class="mt-2">
+                  <div class="small text-muted mb-1">الدروس</div>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                      <thead>
+                        <tr>
+                          <th>الدرس</th>
+                          <th>الموارد</th>
+                          <th>الاختبارات</th>
+                          <th>الحالة</th>
+                          <th class="text-end">الإجراءات</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for lesson in section.lessons|sort(attribute='title')
+                        %} {% set locked_by_section = section.requires_code and
+                        (not meta.first_lesson_id or lesson.id !=
+                        meta.first_lesson_id) %}
+                        <tr>
+                          <td class="fw-semibold">{{ lesson.title }}</td>
+                          <td class="text-muted small">
+                            {{ (lesson.resources|length) + (1 if
+                            lesson.link_label and lesson.link_url else 0) }}
+                          </td>
+                          <td class="text-muted small">
+                            {{ lesson.tests|length }}
+                          </td>
+                          <td>
+                            {% if locked_by_section %}
+                            <span class="badge text-bg-warning"
+                              >مقفل (قسم)</span
+                            >
+                            {% else %}
+                            <span
+                              class="badge {% if lesson.requires_code %}text-bg-warning{% else %}text-bg-success{% endif %}"
+                            >
+                              {% if lesson.requires_code %}يتطلب رمز{% else
+                              %}مفتوح{% endif %}
+                            </span>
+                            {% endif %}
+                          </td>
+                          <td class="text-end">
+                            <a
+                              class="btn btn-outline-primary btn-sm"
+                              href="{{ url_for('teacher.edit_lesson', lesson_id=lesson.id) }}"
+                              >تعديل</a
+                            >
+                            <a
+                              class="btn btn-outline-secondary btn-sm"
+                              href="{{ url_for('teacher.manage_lesson_access', lesson_id=lesson.id) }}"
+                              >الوصول</a
+                            >
+                            <form
+                              class="d-inline"
+                              action="{{ url_for('teacher.delete_lesson', lesson_id=lesson.id) }}"
+                              method="post"
+                              onsubmit="
+                                return confirm(
+                                  'هل أنت متأكد من حذف هذا الدرس؟ سيتم حذف جميع الاختبارات المرتبطة أيضاً.',
+                                );
+                              "
+                            >
+                              <button
+                                type="submit"
+                                class="btn btn-outline-danger btn-sm"
+                              >
+                                حذف
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {% endif %} {% if section.tests %} {% set meta =
+                sections_meta.get(section.id) %}
+                <div class="mt-3">
+                  <div class="small text-muted mb-1">الاختبارات</div>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                      <thead>
+                        <tr>
+                          <th>الاختبار</th>
+                          <th>مرتبط بـ</th>
+                          <th>الحالة</th>
+                          <th class="text-end">الإجراءات</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for test in section.tests|sort(attribute='title') %}
+                        {% set unlocked_by_section_freebie = (test.lesson_id and
+                        meta.first_lesson_id and test.lesson_id ==
+                        meta.first_lesson_id) or (not test.lesson_id and
+                        meta.first_section_test_id and test.id ==
+                        meta.first_section_test_id) %} {% set locked_by_section
+                        = section.requires_code and (not
+                        unlocked_by_section_freebie) %}
+                        <tr>
+                          <td class="fw-semibold">{{ test.title }}</td>
+                          <td class="text-muted small">
+                            {{ test.lesson.title if test.lesson else
+                            'على مستوى القسم' }}
+                          </td>
+                          <td>
+                            {% if not section.requires_code %}
+                            <span class="badge text-bg-success"
+                              >مفتوح (القسم مفتوح)</span
+                            >
+                            {% elif locked_by_section %}
+                            <span class="badge text-bg-warning"
+                              >مقفل (قسم)</span
+                            >
+                            {% else %}
+                            <span
+                              class="badge {% if test.requires_code %}text-bg-warning{% else %}text-bg-success{% endif %}"
+                            >
+                              {% if test.requires_code %}يتطلب رمز{% else
+                              %}مفتوح{% endif %}
+                            </span>
+                            {% endif %}
+                          </td>
+                          <td class="text-end">
+                            <a
+                              class="btn btn-outline-primary btn-sm"
+                              href="{{ url_for('teacher.edit_test', test_id=test.id) }}"
+                              >تعديل</a
+                            >
+                            <a
+                              class="btn btn-outline-secondary btn-sm"
+                              href="{{ url_for('teacher.manage_test_access', test_id=test.id) }}"
+                              >الوصول</a
+                            >
+                            <form
+                              class="d-inline"
+                              action="{{ url_for('teacher.delete_test', test_id=test.id) }}"
+                              method="post"
+                            >
+                              <button
+                                type="submit"
+                                class="btn btn-sm btn-outline-danger"
+                              >
+                                حذف
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {% endif %}
+                <div class="mt-2">
+                  <span
+                    class="badge {% if section.requires_code %}text-bg-warning{% else %}text-bg-success{% endif %}"
+                  >
+                    {% if section.requires_code %}يتطلب رمز تفعيل{%
+                    else %}مفتوح{% endif %}
+                  </span>
+                  <a
+                    class="btn btn-sm btn-outline-secondary ms-2"
+                    href="{{ url_for('teacher.manage_section_access', section_id=section.id) }}"
+                    >إدارة الوصول</a
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">لا توجد مواد حتى الآن. قم بإنشاء مادة للبدء.</div>
+{% endif %} {% endblock %}

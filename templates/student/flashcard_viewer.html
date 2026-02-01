@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- Header -->
+    <div class="mb-5">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <a href="{{ url_for('student.lesson_detail', lesson_id=lesson.id) }}" class="btn btn-sm btn-outline-secondary">
+                ← العودة إلى الدرس
+            </a>
+            <h1 class="mb-0">📇 {{ resource.label }}</h1>
+        </div>
+        <p class="text-muted mb-0">
+            <strong>الدرس:</strong> {{ lesson.title }} | 
+            <strong>إجمالي البطاقات:</strong> {{ total_cards }}
+        </p>
+    </div>
+
+    <!-- Flashcards Grid -->
+    <div class="flashcards-grid">
+        {% for card in flashcards %}
+            <div class="flashcard-item">
+                <div class="card-number">
+                    بطاقة {{ (page - 1) * 6 + loop.index }} / {{ total_cards }}
+                </div>
+                <div class="flashcard-wrapper">
+                    <div class="flashcard-inner">
+                        <!-- Front -->
+                        <div class="flashcard-face flashcard-front">
+                            <div class="flashcard-side-label">سؤال</div>
+                            <div class="flashcard-content">
+                                {{ card.f }}
+                            </div>
+                            <div class="flashcard-hint">انقر لإظهار الإجابة</div>
+                        </div>
+                        <!-- Back -->
+                        <div class="flashcard-face flashcard-back">
+                            <div class="flashcard-side-label">الإجابة</div>
+                            <div class="flashcard-content">
+                                {{ card.b }}
+                            </div>
+                            <div class="flashcard-hint">انقر لإظهار السؤال</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Empty State -->
+    {% if not flashcards %}
+        <div class="alert alert-info text-center py-5">
+            <p class="mb-0">لم يتم العثور على بطاقات في هذه الصفحة.</p>
+        </div>
+    {% endif %}
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+        <nav aria-label="Pagination" class="mt-5">
+            <ul class="pagination justify-content-center">
+                <!-- Previous Page -->
+                <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('student.view_flashcards', resource_id=resource.id, page=page-1) if page > 1 else '#' }}">
+                        السابق
+                    </a>
+                </li>
+
+                <!-- Page Numbers -->
+                {% set start_page = max(1, page - 2) %}
+                {% set end_page = min(total_pages, page + 2) %}
+
+                {% if start_page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('student.view_flashcards', resource_id=resource.id, page=1) }}">1</a>
+                    </li>
+                    {% if start_page > 2 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endif %}
+
+                {% for p in range(start_page, end_page + 1) %}
+                    <li class="page-item {% if p == page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('student.view_flashcards', resource_id=resource.id, page=p) }}">
+                            {{ p }}
+                        </a>
+                    </li>
+                {% endfor %}
+
+                {% if end_page < total_pages %}
+                    {% if end_page < total_pages - 1 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('student.view_flashcards', resource_id=resource.id, page=total_pages) }}">{{ total_pages }}</a>
+                    </li>
+                {% endif %}
+
+                <!-- Next Page -->
+                <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('student.view_flashcards', resource_id=resource.id, page=page+1) if page < total_pages else '#' }}">
+                        التالي
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Page Info -->
+        <div class="text-center text-muted mt-3">
+            الصفحة {{ page }} من {{ total_pages }}
+        </div>
+    {% endif %}
+</div>
+
+<!-- Styles -->
+<style>
+    .flashcards-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(220px, 1fr));
+        gap: 18px;
+        margin-bottom: 40px;
+    }
+
+    .flashcard-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .card-number {
+        font-size: 0.85rem;
+        color: #6c757d;
+        font-weight: 500;
+        text-align: center;
+    }
+
+    .flashcard-wrapper {
+        perspective: 1000px;
+        cursor: pointer;
+        width: 100%;
+        min-height: 240px;
+    }
+
+    .flashcard-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        min-height: 240px;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+    }
+
+    .flashcard-inner.flipped {
+        transform: rotateY(180deg);
+    }
+
+    .flashcard-face {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        min-height: 240px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+        border-radius: 14px;
+        backface-visibility: hidden;
+        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18);
+    }
+
+    .flashcard-front {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        transform: rotateY(0deg);
+    }
+
+    .flashcard-back {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        transform: rotateY(180deg);
+    }
+
+    .flashcard-side-label {
+        font-size: 0.85rem;
+        opacity: 0.85;
+        margin-bottom: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .flashcard-content {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        direction: rtl;
+        font-size: 1.02rem;
+        line-height: 1.7;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .flashcard-content .MathJax,
+    .flashcard-content mjx-container {
+        direction: ltr;
+        unicode-bidi: isolate;
+        display: inline-block;
+        text-align: center;
+        margin: 0 4px;
+    }
+    .flashcard-content mjx-container[display="true"] {
+        display: block;
+        text-align: center;
+        margin: 8px 0 0;
+    }
+
+    .flashcard-hint {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        margin-top: 10px;
+        font-style: italic;
+    }
+
+    @media (max-width: 992px) {
+        .flashcards-grid {
+            grid-template-columns: repeat(2, minmax(220px, 1fr));
+        }
+    }
+
+    @media (max-width: 768px) {
+        .flashcards-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .flashcard-face,
+        .flashcard-wrapper,
+        .flashcard-inner {
+            min-height: 220px;
+        }
+
+        .flashcard-content {
+            font-size: 0.98rem;
+        }
+    }
+
+    /* Math support */
+    .math {
+        margin: 10px 0;
+    }
+
+    .inline-math {
+        display: inline;
+    }
+</style>
+
+<script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            processEscapes: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        startup: {
+            typeset: false
+        }
+    };
+</script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Flashcard flip functionality
+        const flashcards = document.querySelectorAll('.flashcard-wrapper');
+
+        function typesetMath(rootElement) {
+            if (!window.MathJax) {
+                return;
+            }
+
+            if (MathJax.typesetPromise) {
+                MathJax.typesetPromise(rootElement ? [rootElement] : undefined);
+                return;
+            }
+
+            if (MathJax.startup && MathJax.startup.promise) {
+                MathJax.startup.promise.then(() => {
+                    if (MathJax.typesetPromise) {
+                        MathJax.typesetPromise(rootElement ? [rootElement] : undefined);
+                    }
+                });
+            }
+        }
+
+        flashcards.forEach(card => {
+            card.addEventListener('click', function(e) {
+                e.preventDefault();
+                this.querySelector('.flashcard-inner').classList.toggle('flipped');
+                // Re-render math when card is flipped to show answer
+                setTimeout(() => {
+                    typesetMath(this.querySelector('.flashcard-inner'));
+                }, 50);
+            });
+        });
+
+        // Initial render of all math
+        typesetMath(document.body);
+    });
+</script>
+{% endblock %}

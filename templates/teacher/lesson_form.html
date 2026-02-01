@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">{{ 'تعديل الدرس' if lesson else 'درس جديد' }}</h1>
+    <p class="mb-0">إضافة محتوى وروابط موارد.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">رجوع</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      {{ form.hidden_tag() }}
+      <div class="mb-3">
+        {{ form.title.label(class="form-label") }}
+        {{ form.title(class="form-control") }}
+      </div>
+      <div class="mb-3">
+        {{ form.content.label(class="form-label") }}
+        {{ form.content(class="form-control", rows=8) }}
+      </div>
+      <div class="form-check mb-3">
+        {{ form.requires_code(class="form-check-input", id="lesson_requires_code") }}
+        <label for="lesson_requires_code" class="form-check-label">يتطلب رمز تفعيل</label>
+      </div>
+      
+      <div class="mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label mb-0">موارد الدرس</label>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="add-resource">إضافة مورد</button>
+        </div>
+        <div id="resource-list">
+          {% set existing = lesson.resources if lesson else [] %}
+          {% if existing %}
+            {% for res in existing %}
+              <div class="resource-entry row g-2 mb-2">
+                <div class="col-md-3">
+                  <input class="form-control" name="resource_label[]" value="{{ res.label }}" placeholder="e.g. Lesson PDF" />
+                </div>
+                <div class="col-md-5">
+                  <input class="form-control" name="resource_url[]" value="{{ res.url }}" placeholder="https://..." />
+                </div>
+                <div class="col-md-2">
+                  <select class="form-select" name="resource_type[]">
+                    <option value="">Auto</option>
+                    <option value="pdf" {% if res.resource_type == 'pdf' %}selected{% endif %}>PDF</option>
+                    <option value="slides" {% if res.resource_type == 'slides' %}selected{% endif %}>Slides</option>
+                    <option value="video" {% if res.resource_type == 'video' %}selected{% endif %}>Video (YouTube)</option>
+                    <option value="audio" {% if res.resource_type == 'audio' %}selected{% endif %}>Audio</option>
+                    <option value="flashcards" {% if res.resource_type == 'flashcards' %}selected{% endif %}>Flash Cards (JSON)</option>
+                    <option value="link" {% if res.resource_type == 'link' %}selected{% endif %}>Link</option>
+                  </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-center">
+                  <button type="button" class="btn btn-link text-danger p-0 remove-row">Remove</button>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="resource-entry row g-2 mb-2">
+              <div class="col-md-3">
+                <input class="form-control" name="resource_label[]" placeholder="e.g. Lesson PDF" />
+              </div>
+              <div class="col-md-5">
+                <input class="form-control" name="resource_url[]" placeholder="https://..." />
+              </div>
+              <div class="col-md-2">
+                <select class="form-select" name="resource_type[]">
+                  <option value="">Auto</option>
+                  <option value="pdf">PDF</option>
+                  <option value="slides">Slides</option>
+                  <option value="video">Video (YouTube)</option>
+                  <option value="audio">Audio</option>
+                  <option value="flashcards">Flash Cards (JSON)</option>
+                  <option value="mindmap">Mind Map (HTML)</option>
+                  <option value="link">Link</option>
+                </select>
+              </div>
+              <div class="col-md-2 d-flex align-items-center">
+                <button type="button" class="btn btn-link text-danger p-0 remove-row">Remove</button>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="mt-3">
+        {{ form.submit(class="btn btn-cta") }}
+      </div>
+    </form>
+  </div>
+</div>
+{% if lesson %}
+  <div class="mt-3">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.manage_lesson_access', lesson_id=lesson.id) }}">إدارة الوصول للدرس</a>
+  </div>
+{% endif %}
+<template id="resource-template">
+  <div class="resource-entry row g-2 mb-2">
+    <div class="col-md-3">
+      <input class="form-control" name="resource_label[]" placeholder="e.g. Lesson PDF" />
+    </div>
+    <div class="col-md-5">
+      <input class="form-control" name="resource_url[]" placeholder="https://..." />
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="resource_type[]">
+        <option value="">Auto</option>
+        <option value="pdf">PDF</option>
+        <option value="slides">Slides</option>
+        <option value="video">Video (YouTube)</option>
+        <option value="audio">Audio</option>
+        <option value="flashcards">Flash Cards (JSON)</option>
+        <option value="mindmap">Mind Map (HTML)</option>
+        <option value="link">Link</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-flex align-items-center">
+      <button type="button" class="btn btn-link text-danger p-0 remove-row">Remove</button>
+    </div>
+  </div>
+</template>
+<script>
+document.getElementById('add-resource')?.addEventListener('click', () => {
+  const tpl = document.getElementById('resource-template');
+  const list = document.getElementById('resource-list');
+  if (tpl && list) {
+    list.insertAdjacentHTML('beforeend', tpl.innerHTML);
+  }
+});
+document.getElementById('resource-list')?.addEventListener('click', (e) => {
+  if (e.target.classList.contains('remove-row')) {
+    const entry = e.target.closest('.resource-entry');
+    if (entry) entry.remove();
+  }
+});
+</script>
+{% endblock %}

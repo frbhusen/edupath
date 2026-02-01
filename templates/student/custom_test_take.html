@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">اختبار مخصص</h1>
+    <p class="mb-0">أجب عن جميع الأسئلة أدناه.</p>
+  </div>
+  <div class="text-end">
+    <div class="small text-muted">الوقت المتبقي</div>
+    <div id="test-timer" class="badge text-bg-warning fs-6" data-duration="{{ time_limit_seconds }}">--:--</div>
+  </div>
+</div>
+
+<form method="post" id="custom-test-form" action="{{ url_for('student.custom_test_submit', attempt_id=attempt.id) }}">
+  <input type="hidden" name="time_expired" id="custom-time-expired" value="0" />
+  {% for item in ordered_questions %}
+    {% set q = item.question %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
+        <div class="list-group">
+          {% for c in item.choices %}
+            <label class="list-group-item d-flex align-items-center gap-2">
+              <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.id }}">
+              <span>{{ c.text }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+  <div class="d-grid">
+    <button type="submit" class="btn btn-cta btn-lg">إرسال الإجابات</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // New timer system - pure JavaScript countdown
+  (function() {
+    const timerElement = document.getElementById('test-timer');
+    const testForm = document.getElementById('custom-test-form');
+    const expiredInput = document.getElementById('custom-time-expired');
+    
+    if (!timerElement || !testForm) return;
+    
+    const totalSeconds = parseInt(timerElement.dataset.duration, 10);
+    if (!totalSeconds || totalSeconds <= 0) return;
+    
+    let remainingSeconds = totalSeconds;
+    
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+    
+    function updateTimer() {
+      timerElement.textContent = formatTime(remainingSeconds);
+      
+      if (remainingSeconds <= 0) {
+        if (expiredInput) {
+          expiredInput.value = '1';
+        }
+        testForm.submit();
+        return;
+      }
+      
+      remainingSeconds--;
+      setTimeout(updateTimer, 1000);
+    }
+    
+    // Start the timer immediately
+    updateTimer();
+  })();
+</script>
+{% endblock %}

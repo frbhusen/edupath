@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">تفعيل الدرس</h1>
+    <p class="mb-0">{{ lesson.title }} · {{ section.title }}</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.section_detail', section_id=section.id) }}">العودة للقسم</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <p class="text-muted">أدخل رمز التفعيل المكون من 6 أحرف المقدم لهذا الدرس. إذا قمت بتفعيل القسم، فلن تحتاج إلى هذا.</p>
+    <form method="post">
+      {{ form.hidden_tag() }}
+      <div class="mb-3">
+        {{ form.code.label(class="form-label") }}
+        {{ form.code(class="form-control", maxlength=6, placeholder="e.g. A1B2C3") }}
+      </div>
+      <div class="d-grid">
+        {{ form.submit(class="btn btn-cta") }}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

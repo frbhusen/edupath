@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EduPath</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-T2ZyXj0Rz1K1Hn8q3gqD6G3b4H7rX3gY8gqX1kQWmG6hQYt9t4L0R7E9V3fYQ1n9f2+0vX2t2bM0tJ2Z6i8A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='footer.css') }}">
+
+</head>
+<body class="d-flex flex-column min-vh-100">
+  <div id="navOverlay" class="nav-overlay" onclick="toggleNav(event)"></div>
+  <nav class="navbar navbar-expand-lg navbar-dark site-nav">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('index') }}">
+        <img src="{{ url_for('static', filename='edupath-logo.png') }}" alt="EduPath logo" class="brand-logo" />
+        <span>EduPath</span>
+      </a>
+      <button class="navbar-toggler" type="button" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" onclick="toggleNav(event)">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse offcanvas-collapse" id="navbarNav">
+        <div class="offcanvas-header d-lg-none d-flex align-items-center justify-content-between mb-3">
+          <div class="fw-semibold text-dark">القائمة</div>
+        </div>
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">الرئيسية</a></li>
+          {% if current_user.is_authenticated %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('student.subjects') }}">المواد</a></li>
+            {% if current_user.role|lower == 'student' %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('student.results') }}">النتائج</a></li>
+            {% endif %}
+            {% if current_user.role|lower in ['teacher', 'admin'] %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.dashboard') }}">لوحة المعلم</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.results_overview') }}">النتائج</a></li>
+            {% endif %}
+            {% if current_user.role|lower in ['teacher', 'admin'] %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}">الإدارة</a></li>
+            {% endif %}
+          {% endif %}
+        </ul>
+        <ul class="navbar-nav align-items-center gap-2">
+          {% if current_user.is_authenticated %}
+            <li class="nav-item"><span class="navbar-text me-2">{{ current_user.username }} ({{ current_user.role }})</span></li>
+            <li class="nav-item"><a class="btn btn-light btn-sm" href="{{ url_for('auth.logout') }}">تسجيل الخروج</a></li>
+          {% else %}
+            <li class="nav-item"><a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.login') }}">تسجيل الدخول</a></li>
+            <li class="nav-item"><a class="btn btn-light btn-sm" href="{{ url_for('auth.register') }}">إنشاء حساب</a></li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-4 flex-grow-1">
+    {% set hide_back = request.endpoint in ['index', 'auth.login', 'auth.register'] or request.path == '/' %}
+    {% if not hide_back %}
+      <div class="d-flex justify-content-start mb-3">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="upNavigate()">رجوع</button>
+      </div>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          {% set bs = 'danger' if category == 'error' else category %}
+          <div class="alert alert-{{ bs }}" role="alert">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="custom-footer footer">
+        <div class="container">
+            <div class="col-2">
+                <h3>روابط</h3>
+                <ul>
+                    <li><a href="{{ url_for('index') }}">الرئيسية</a></li>
+                    <li><a href="{{ url_for('pages', filename='about.html') }}">حول</a></li>
+                    <li><a href="{{ url_for('pages', filename='blog.html') }}">المدونة</a></li>
+                    <li><a href="{{ url_for('pages', filename='contact.html') }}">اتصل بنا</a></li>
+                    <li><a href="{{ url_for('pages', filename='services.html') }}">الخدمات</a></li>
+                </ul>
+            </div>
+            <div class="col-3">
+                <h3>الخدمات</h3>
+                <ul>
+                    <li><a href="{{url_for('index')}}">أسئلة مؤتمتة</a></li>
+                    <li><a href="{{url_for('index')}}">بطاقات تذكيرية</a></li>
+                    <li><a href="{{url_for('index')}}">عروض تقديمية</a></li>
+                    <li><a href="{{url_for('index')}}">شروحات صوتية</a></li>
+                    <li><a href="{{url_for('index')}}">شروحات بصرية</a></li>
+                </ul>
+            </div>
+            <div class="col-3">
+                <h3>الدعم</h3>
+                <div class="social-icons">
+                  <a href="#" aria-label="Facebook">
+                    <i class="bi bi-facebook"></i>
+                  </a>
+                  <a href="#" aria-label="Instagram">
+                    <i class="bi bi-instagram"></i>
+                  </a>
+                  <a href="#" aria-label="Whatsapp">
+                    <i class="bi bi-whatsapp"></i>
+                  </a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-2">
+            <p>© 2026 | جميع الحقوق محفوظة لمنصة edupath</p>
+        </div>
+    </footer>
+
+
+
+
+
+
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-facebook" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M13.5 9H16V6h-2.5C11.57 6 10 7.57 10 9.5V12H8v3h2v6h3v-6h2.1l.5-3H13V9.5c0-.28.22-.5.5-.5Z"/>
+    </symbol>
+    <symbol id="icon-twitter" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M19.46 7.45c.01.17.01.35.01.52 0 5.33-4.06 11.47-11.47 11.47-2.28 0-4.4-.66-6.18-1.8.32.04.63.05.96.05 1.89 0 3.63-.64 5.02-1.72-1.76-.03-3.24-1.2-3.75-2.8.24.05.48.08.74.08.35 0 .7-.05 1.02-.14-1.84-.37-3.23-1.99-3.23-3.94v-.05c.55.3 1.18.48 1.85.5-1.08-.72-1.79-1.95-1.79-3.35 0-.74.2-1.43.55-2.03 2.01 2.47 5.02 4.09 8.41 4.26-.06-.3-.1-.6-.1-.92 0-2.2 1.79-3.99 3.99-3.99 1.15 0 2.2.49 2.93 1.27.91-.18 1.76-.51 2.53-.97-.3.93-.92 1.71-1.73 2.2.81-.09 1.58-.31 2.3-.63-.54.8-1.22 1.51-2 2.08Z"/>
+    </symbol>
+    <symbol id="icon-instagram" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm10 2H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm-5 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2.2A2.8 2.8 0 1 0 12 16a2.8 2.8 0 0 0 0-5.6ZM17.5 6.2a1 1 0 1 1-1 1 1 1 0 0 1 1-1Z"/>
+    </symbol>
+    <symbol id="icon-linkedin" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M6.94 8.5H4.5V19h2.44Zm-1.22-1.2a1.4 1.4 0 1 0 0-2.8 1.4 1.4 0 0 0 0 2.8ZM19.5 19h-2.44v-5.2c0-1.24-.02-2.83-1.73-2.83-1.73 0-2 1.35-2 2.74V19H10.9V8.5h2.35v1.43h.03c.33-.62 1.14-1.27 2.35-1.27 2.51 0 2.97 1.65 2.97 3.8Z"/>
+    </symbol>
+    <symbol id="icon-youtube" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M22 12s0-3.3-.42-4.8a3 3 0 0 0-2.1-2.1C17.98 4.7 12 4.7 12 4.7s-5.98 0-7.48.4a3 3 0 0 0-2.1 2.1C2 8.7 2 12 2 12s0 3.3.42 4.8a3 3 0 0 0 2.1 2.1c1.5.4 7.48.4 7.48.4s5.98 0 7.48-.4a3 3 0 0 0 2.1-2.1C22 15.3 22 12 22 12Zm-12 3V9l5 3-5 3Z"/>
+    </symbol>
+    <symbol id="icon-github" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.36-1.19-3.36-1.19-.46-1.16-1.12-1.47-1.12-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.94.84.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.02-2.68-.1-.25-.44-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.75-1.02 2.75-1.02.54 1.38.2 2.4.1 2.65.63.7 1.02 1.59 1.02 2.68 0 3.85-2.35 4.7-4.58 4.95.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/>
+    </symbol>
+  </svg>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jK8Gk5fucs5l7Hc" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function upNavigate() {
+      history.back();
+    }
+
+    function toggleNav(e) {
+      if (e) e.preventDefault();
+      const navCollapse = document.getElementById('navbarNav');
+      const navToggler = document.querySelector('.navbar-toggler');
+      if (!navCollapse) return;
+      document.body.classList.toggle('offcanvas-open');
+      const expanded = document.body.classList.contains('offcanvas-open');
+      navCollapse.classList.toggle('show', expanded);
+      navCollapse.style.display = 'block';
+      if (navToggler) {
+        navToggler.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      }
+    }
+
+    function renderMath(root) {
+      if (window.MathJax) {
+        return false;
+      }
+      const target = root || document.body;
+      if (window.renderMathInElement) {
+        renderMathInElement(target, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '$', right: '$', display: false},
+          ],
+          throwOnError: false
+        });
+        return true;
+      }
+      return false;
+    }
+
+    window.renderMath = renderMath;
+
+    (function initNavAndMath() {
+      const navCollapse = document.getElementById('navbarNav');
+      if (navCollapse) {
+        navCollapse.style.display = 'block';
+      }
+    })();
+
+    window.addEventListener('load', function() {
+      if (!renderMath()) {
+        const retry = setInterval(() => {
+          if (renderMath()) {
+            clearInterval(retry);
+          }
+        }, 100);
+        setTimeout(() => clearInterval(retry), 3000);
+      }
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

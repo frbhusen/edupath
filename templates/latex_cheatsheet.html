@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="h4 mb-3">LaTeX Math Cheat Sheet</h1>
+<p class="text-muted">Wrap inline math with <code>$ ... $</code> and display math with <code>$$ ... $$</code>. Common patterns below:</p>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">Inline vs Display</h5>
+        <p>Inline: $a^2 + b^2 = c^2$</p>
+        <p>Display:</p>
+        $$a^2 + b^2 = c^2$$
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">Fractions & Roots</h5>
+        <p>Fraction: $\frac{a}{b}$</p>
+        <p>Nested: $\frac{x+1}{y-2}$</p>
+        <p>Square root: $\sqrt{x}$</p>
+        <p>n-th root: $\sqrt[n]{x}$</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">Superscripts & Subscripts</h5>
+        <p>Power: $x^{n+1}$</p>
+        <p>Subscript: $a_{ij}$</p>
+        <p>Combined: $x_{i}^{2}$</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">Sums & Products</h5>
+        <p>Sum: $\sum_{i=1}^{n} i$</p>
+        <p>Product: $\prod_{k=1}^{n} k$</p>
+        <p>Integral: $\int_0^1 x^2\,dx$</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">Greek Letters</h5>
+        <p>$\alpha, \beta, \gamma, \theta, \lambda, \pi, \sigma, \Omega$</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">Common Symbols</h5>
+        <p>Infinity: $\infty$</p>
+        <p>Approx: $\approx$</p>
+        <p>Not equal: $\neq$</p>
+        <p>Greater/less or equal: $\geq, \leq$</p>
+        <p>Element / not element: $\in, \notin$</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="alert alert-light border mt-3 mb-0">
+  <div class="fw-semibold">Tips</div>
+  <ul class="mb-0">
+    <li>Inline math: <code>$E = mc^2$</code>. Display math: <code>$$E = mc^2$$</code>.</li>
+    <li>Escape backslashes in some editors with double <code>\\</code> if needed.</li>
+    <li>Use braces <code>{ }</code> to group exponents and subscripts: <code>x^{10}</code>, <code>a_{ij}</code>.</li>
+  </ul>
+</div>
+{% endblock %}

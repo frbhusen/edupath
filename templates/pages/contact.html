@@ -1,0 +1,76 @@
+{% extends 'base.html' %} {% block content %}
+<div
+  class="dashboard-hero mb-4 d-flex justify-content-between align-items-center"
+>
+  <div>
+    <h1 class="h4 mb-1">مرحباً بك في EduPath</h1>
+    <p class="mb-0">تعلم من خلال دروس منظمة، مارس الاختبارات، وتتبع تقدمك.</p>
+  </div>
+  <div class="d-flex gap-2"></div>
+</div>
+
+<div class="container">
+  <div class="row g-3" id="teamContainer"></div>
+</div>
+
+<div class="container">
+  <div class="row g-3" id="teamContainer"></div>
+</div>
+
+<script>
+  const people = [
+    {
+      name: "د. محمد سامح منلا",
+      role: "المؤسس والمدير الأكاديمي",
+      phone: "0988349910",
+      email: "",
+      image: "https://ui-avatars.com/api/?name=SM&background=7d7d7d",
+      socials: {
+        facebook: "https://www.facebook.com/sameh.monlla",
+      },
+    },
+    {
+      name: "حسين رجب",
+      role: "المبرمج والمطور",
+      phone: "0950052045",
+      email: "husen_rajb@outlook.com",
+      image: "https://ui-avatars.com/api/?name=HR&background=7d7d7d",
+      socials: {
+        instagram: "https://www.instagram.com/husr0/",
+        github: "https://github.com/frbhusen",
+      },
+    },
+
+  ];
+
+  const container = document.getElementById("teamContainer");
+
+  people.forEach((p) => {
+    container.innerHTML += `
+    <div class="col-12">
+      <div class="profile-card d-flex flex-column flex-md-row align-items-center justify-content-between">
+
+        <div class="d-flex align-items-center">
+          <img src="${p.image}" class="profile-img" alt="profile">
+
+          <div class="text-end me-3">
+            <h5 class="mb-1">${p.name}</h5>
+            <small class="text-muted">${p.role}</small><br>
+            <small>${p.phone}</small><br>
+            <small>${p.email}</small>
+
+            <div class="social mt-2">
+              ${p.socials.instagram ? `<a href="${p.socials.instagram}"><i class="bi bi-instagram"></i></a>` : ""}
+              ${p.socials.github ? `<a href="${p.socials.github}"><i class="bi bi-github"></i></a>` : ""}
+              ${p.socials.facebook ? `<a href="${p.socials.facebook}"><i class="bi bi-facebook"></i></a>` : ""}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+  });
+</script>
+
+{% endblock %}

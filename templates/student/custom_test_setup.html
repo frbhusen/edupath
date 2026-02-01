@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">اختبار مخصص</h1>
+    <p class="mb-0">{% if selected_subject_id %}اختر عدد الأسئلة من كل درس مفتوح.{% else %}اختر مادة للبدء.{% endif %}</p>
+  </div>
+</div>
+
+{% if not selected_subject_id %}
+  <div class="mb-4">
+    <h5 class="mb-3">اختر مادة</h5>
+    <div class="row g-3">
+      {% for subject in subjects %}
+        <div class="col-12 col-md-6 col-lg-4">
+          <a href="?subject_id={{ subject.id }}" class="text-decoration-none">
+            <div class="card shadow-sm h-100 border-0 cursor-pointer subject-card">
+              <div class="card-body text-center">
+                <h6 class="card-title mb-0">{{ subject.title }}</h6>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+<form method="post">
+  <input type="hidden" name="subject_id" value="{{ selected_subject_id or '' }}" />
+  {% if not selected_subject_id %}
+    <div class="alert alert-info">اختر مادة لعرض الدروس المفتوحة.</div>
+  {% elif lessons %}
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="alert alert-info mb-3">اختر إجمالي من 10 إلى 50 سؤال عبر الدروس.</div>
+        <div class="row g-3">
+          {% for lesson in lessons %}
+            <div class="col-12 col-md-6">
+              <div class="border rounded p-3 h-100">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="fw-semibold">{{ lesson.title }}</div>
+                    <div class="text-muted small">القسم: {{ lesson.section.title }}</div>
+                  </div>
+                  <span class="badge text-bg-secondary">{{ lesson_question_counts[lesson.id] }} أسئلة</span>
+                </div>
+                <div class="mt-3">
+                  <label class="form-label">الأسئلة المطلوبة</label>
+                  <input type="number" class="form-control lesson-count-input" min="0" max="{{ lesson_question_counts[lesson.id] }}" name="lesson_{{ lesson.id }}" value="0" />
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="mt-3 small text-muted">الأسئلة المتاحة: {{ total_available_questions }}</div>
+        <div class="mt-1 fw-semibold">الإجمالي المختار: <span id="selectedTotal">0</span></div>
+        <div class="d-flex justify-content-end mt-4">
+          <button type="submit" class="btn btn-cta">إنشاء اختبار مخصص</button>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-info">لا توجد دروس مفتوحة حتى الآن.</div>
+  {% endif %}
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const inputs = document.querySelectorAll('.lesson-count-input');
+    const totalEl = document.getElementById('selectedTotal');
+    if (!inputs.length || !totalEl) return;
+    const update = () => {
+      let total = 0;
+      inputs.forEach((input) => {
+        const val = parseInt(input.value || '0', 10);
+        total += Number.isNaN(val) ? 0 : val;
+      });
+      totalEl.textContent = total;
+    };
+    inputs.forEach((input) => input.addEventListener('input', update));
+    update();
+  });
+</script>
+{% endblock %}

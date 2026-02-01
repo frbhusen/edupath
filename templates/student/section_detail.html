@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <h2 class="h4 mb-1">{{ section.title }}</h2>
+        <p class="text-muted mb-0">{{ section.description or 'لا يوجد وصف.' }}</p>
+      </div>
+      <div class="d-flex gap-2">
+        {% if section_requires_code and not section_open %}
+          <a class="btn btn-cta btn-sm" href="{{ url_for('student.activate_section', section_id=section.id) }}">تفعيل القسم</a>
+        {% endif %}
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.subject_detail', subject_id=section.subject.id) }}">العودة للمادة</a>
+      </div>
+    </div>
+    {% if section_requires_code and not section_open %}
+      <div id="section-lock-alert" class="alert alert-warning mt-3 mb-0">القسم مقفل. قم بتفعيل القسم لفتح جميع الدروس والاختبارات، أو قم بتفعيل الدروس بشكل فردي.</div>
+      <script>
+        setTimeout(function() {
+          var el = document.getElementById('section-lock-alert');
+          if (el) { el.classList.add('d-none'); }
+        }, 8000);
+      </script>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="card-title mb-0">الدروس</h5>
+      <span class="badge text-bg-secondary">{{ lessons_data|length }}</span>
+    </div>
+    {% if lessons_data %}
+      <div class="row g-3">
+        {% for item in lessons_data %}
+          {% set lesson = item.lesson %}
+          {% set locked = not item.is_open %}
+          <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+              <div class="card-body d-flex flex-column {% if locked %}opacity-50{% endif %}">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <h5 class="card-title mb-0">{{ lesson.title }}</h5>
+                  {% if locked %}<span class="text-muted small">&#128274;</span>{% endif %}
+                </div>
+                <div class="text-muted small mb-2">درس</div>
+                <div class="mt-auto d-flex justify-content-between align-items-center">
+                  {% if locked %}
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_lesson', lesson_id=lesson.id) }}">تفعيل</a>
+                  {% else %}
+                    <a class="btn btn-cta btn-sm" href="{{ url_for('student.lesson_detail', lesson_id=lesson.id) }}">فتح الدرس</a>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-light">لا توجد دروس بعد.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="card-title mb-0">الاختبارات</h5>
+      <span class="badge text-bg-secondary">{{ tests_data|length + 1 }}</span>
+    </div>
+    <div class="row g-3">
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <h5 class="card-title mb-0">اختبار مخصص</h5>
+              <span class="badge text-bg-secondary">10-50 أسئلة</span>
+            </div>
+            <p class="text-muted small mb-1">أنشئ اختبار مختلط من الدروس المفتوحة.</p>
+            <div class="text-muted small mb-2">اختبار مخصص على مستوى القسم</div>
+            <div class="mt-auto d-flex justify-content-between align-items-center">
+              <span class="chip">MCQ</span>
+              <a class="btn btn-cta btn-sm" href="{{ url_for('student.custom_test_new', subject_id=section.subject.id) }}">ابدأ</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% if tests_data %}
+        {% for item in tests_data %}
+          {% set test = item.test %}
+          {% set locked = not item.is_open %}
+          <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+              <div class="card-body d-flex flex-column {% if locked %}opacity-50{% endif %}">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <h5 class="card-title mb-0">{{ test.title }}</h5>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge text-bg-secondary">{{ test.questions|length }} أسئلة</span>
+                    {% if locked %}<span class="text-muted small">&#128274;</span>{% endif %}
+                  </div>
+                </div>
+                <p class="text-muted small mb-1">{{ test.description or 'اختبار MCQ' }}</p>
+                <div class="text-muted small mb-2">
+                  {% if test.lesson %}
+                    مرتبط بالدرس: {{ test.lesson.title }}
+                  {% else %}
+                    اختبار على مستوى القسم
+                  {% endif %}
+                </div>
+                <div class="mt-auto d-flex justify-content-between align-items-center">
+                  <span class="chip">MCQ</span>
+                  {% if locked %}
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_test', test_id=test.id) }}">تفعيل</a>
+                  {% else %}
+                    <a class="btn btn-cta btn-sm" href="{{ url_for('student.take_test', test_id=test.id) }}">ابدأ</a>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

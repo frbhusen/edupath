@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة المحاولة</h1>
+    <p class="mb-0">{{ student.username }} · {{ test.title }}</p>
+  </div>
+  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.student_results', student_id=student.id) }}">العودة لنتائج الطالب</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body d-flex justify-content-between align-items-center">
+    <div>
+      <div class="text-muted small">القسم: {{ test.section.title }}{% if test.lesson %} · الدرس: {{ test.lesson.title }}{% else %} · على مستوى القسم{% endif %}</div>
+      <div>الدرجة: {{ attempt.score }}/{{ attempt.total }}</div>
+    </div>
+    <form method="post" onsubmit="return confirm('حذف هذه المحاولة؟');">
+      <input type="hidden" name="action" value="delete" />
+      <button type="submit" class="btn btn-outline-danger btn-sm">حذف المحاولة</button>
+    </form>
+  </div>
+</div>
+
+<form method="post">
+  <input type="hidden" name="action" value="update" />
+  {% for q in questions %}
+    {% set ans = answers.get(q.id) %}
+    <div class="card mb-2">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Q{{ loop.index }}. {{ q.text }}</div>
+        {% for choice in q.choices %}
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="question_{{ q.id }}" id="q{{ q.id }}c{{ choice.id }}" value="{{ choice.id }}" {% if ans and ans.choice_id == choice.id %}checked{% endif %}>
+            <label class="form-check-label" for="q{{ q.id }}c{{ choice.id }}">{{ choice.text }}{% if choice.is_correct %} <span class="text-success small">(correct)</span>{% endif %}</label>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+  <button type="submit" class="btn btn-cta">حفظ التغييرات</button>
+</form>
+{% endblock %}

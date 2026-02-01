@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">نتائج {{ student.username }}</h1>
+    <p class="mb-0">عرض جميع المحاولات؛ الإجابات متاحة عبر تفاصيل المحاولة.</p>
+  </div>
+  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.results_overview') }}">العودة للنتائج</a>
+</div>
+
+{% if attempts %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>الاختبار</th>
+          <th>القسم / الدرس</th>
+          <th>الدرجة</th>
+          <th>تاريخ الأخذ</th>
+          <th class="text-end">الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for attempt in attempts %}
+          {% set pct = (attempt.score / attempt.total * 100) if attempt.total else 0 %}
+          <tr>
+            <td>{{ attempt.test.title }}</td>
+            <td class="text-muted small">{{ attempt.test.section.title }}{% if attempt.test.lesson %} · {{ attempt.test.lesson.title }}{% else %} · Section-wide{% endif %}</td>
+            <td><span class="badge text-bg-primary">{{ pct|round(0) }}%</span></td>
+            <td class="text-muted small">{{ attempt.started_at.strftime('%Y-%m-%d %H:%M') if attempt.started_at else 'Unknown' }}</td>
+            <td class="text-end">
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.test_result', attempt_id=attempt.id) }}">عرض الإجابات</a>
+              <a class="btn btn-outline-primary btn-sm ms-1" href="{{ url_for('teacher.manage_attempt', attempt_id=attempt.id) }}">إدارة</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-light">لا توجد محاولات لهذا الطالب.</div>
+{% endif %}
+{% endblock %}

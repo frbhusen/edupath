@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div>
+      <div class="text-muted small">{{ subject.name }}</div>
+      <h2 class="h5 mb-0">إضافة قسم</h2>
+    </div>
+    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.dashboard') }}">رجوع</a>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      {{ form.hidden_tag() }}
+      <div class="mb-3">
+        <label class="form-label">{{ form.title.label.text }}</label>
+        {{ form.title(class="form-control", placeholder="Section title") }}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">{{ form.description.label.text }}</label>
+        {{ form.description(class="form-control", rows=4, placeholder="Optional description") }}
+      </div>
+      <button type="submit" class="btn btn-cta">حفظ القسم</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

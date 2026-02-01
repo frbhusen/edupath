@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة الوصول للاختبار: {{ test.title }}</h1>
+    <p class="mb-0">القسم: {{ test.section.title }}</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.edit_test', test_id=test.id) }}">رجوع</a>
+</div>
+
+<div class="alert alert-light">
+  {% if test.requires_code %}
+    يتطلب هذا الاختبار تفعيل ما لم يتم فتحه عبر تفعيل القسم أو الدرس المرتبط.
+  {% else %}
+    هذا الاختبار مفتوح.
+  {% endif %}
+</div>
+
+{% if students %}
+  <div class="table-responsive">
+    <table class="table align-middle table-sm">
+      <thead>
+        <tr>
+          <th>الطالب</th>
+          <th>البريد الإلكتروني</th>
+          <th>الحالة</th>
+          <th>الرموز</th>
+          <th class="text-end">الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+          {% set active = activations.get(student.id) %}
+          {% set codes = codes_by_student.get(student.id, []) %}
+          <tr>
+            <td>{{ student.username }}</td>
+            <td class="text-muted small">{{ student.email }}</td>
+            <td>
+              {% if active %}
+                <span class="badge text-bg-success">مفعّل</span>
+              {% else %}
+                <span class="badge text-bg-warning">مقفل</span>
+              {% endif %}
+            </td>
+            <td class="small">
+              {% if codes %}
+                {% set has_unused = (codes | selectattr('is_used', 'equalto', False) | list) | length > 0 %}
+                {% for c in codes %}
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge {% if c.is_used %}text-bg-secondary{% else %}text-bg-info{% endif %}">{{ c.code }}</span>
+                    <span class="text-muted">{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '' }}</span>
+                    {% if c.is_used %}<span class="text-muted">(مستخدم)</span>{% endif %}
+                    <form method="post" class="d-inline">
+                      <input type="hidden" name="student_id" value="{{ student.id }}" />
+                      <input type="hidden" name="action" value="delete_code" />
+                      <input type="hidden" name="code_id" value="{{ c.id }}" />
+                      <button class="btn btn-link btn-sm text-danger p-0" type="submit">حذف</button>
+                    </form>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <span class="text-muted">لا توجد رموز</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <form method="post" class="d-inline">
+                <input type="hidden" name="student_id" value="{{ student.id }}" />
+                <input type="hidden" name="action" value="generate_code" />
+                {% set has_unused = (codes | selectattr('is_used', 'equalto', False) | list) | length > 0 %}
+                <button class="btn btn-outline-primary btn-sm" type="submit" {% if has_unused %}disabled{% endif %}>إنشاء رمز</button>
+              </form>
+              {% if active %}
+                <form method="post" class="d-inline ms-1">
+                  <input type="hidden" name="student_id" value="{{ student.id }}" />
+                  <input type="hidden" name="action" value="revoke" />
+                  <button class="btn btn-outline-danger btn-sm" type="submit">إلغاء</button>
+                </form>
+              {% else %}
+                <form method="post" class="d-inline ms-1">
+                  <input type="hidden" name="student_id" value="{{ student.id }}" />
+                  <input type="hidden" name="action" value="activate" />
+                  <button class="btn btn-cta btn-sm" type="submit">تفعيل</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-light">لم يتم العثور على طلاب.</div>
+{% endif %}
+{% endblock %}

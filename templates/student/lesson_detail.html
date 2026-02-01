@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">{{ lesson.title }}</h1>
+    <p class="mb-0">درس</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.section_detail', section_id=section.id) }}">العودة للقسم</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="text-muted small mb-2">القسم: {{ section.title }}</div>
+    {% if lesson.content %}
+      <div class="mb-3">{{ lesson.content|safe }}</div>
+    {% else %}
+      <div class="text-muted mb-3">لا يوجد محتوى.</div>
+    {% endif %}
+    <div class="d-flex flex-wrap gap-2">
+      {% if lesson.link_label and lesson.link_url %}
+        <a class="btn btn-cta btn-sm" href="{{ lesson.link_url }}" target="_blank" rel="noopener">{{ lesson.link_label }}</a>
+      {% endif %}
+      {% if lesson.link_label_2 and lesson.link_url_2 %}
+        <a class="btn btn-outline-primary btn-sm" href="{{ lesson.link_url_2 }}" target="_blank" rel="noopener">{{ lesson.link_label_2 }}</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if tests_data %}
+  <div class="mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0">اختبارات الدرس</h5>
+      <span class="badge text-bg-secondary">{{ tests_data|length }}</span>
+    </div>
+    <div class="row g-3">
+      {% for item in tests_data %}
+        {% set test = item.test %}
+        {% set locked = not item.is_open %}
+        <div class="col-12 col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column {% if locked %}opacity-50{% endif %}">
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <h5 class="card-title mb-0">{{ test.title }}</h5>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge text-bg-secondary">{{ test.questions|length }} أسئلة</span>
+                  {% if locked %}<span class="text-muted small">&#128274;</span>{% endif %}
+                </div>
+              </div>
+              <p class="text-muted small mb-1">{{ test.description or 'اختبار MCQ' }}</p>
+              <div class="mt-auto d-flex justify-content-end">
+                {% if locked %}
+                  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_test', test_id=test.id) }}">تفعيل</a>
+                {% else %}
+                  <a class="btn btn-cta btn-sm" href="{{ url_for('student.take_test', test_id=test.id) }}">ابدأ</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+{% if resources %}
+  <div class="mt-4">
+    {% set videos = resources|selectattr('resource_type', 'equalto', 'video')|list %}
+    {% set youtubes = resources|selectattr('resource_type', 'equalto', 'youtube')|list %}
+    {% set pdfs = resources|selectattr('resource_type', 'equalto', 'pdf')|list %}
+    {% set slides = resources|selectattr('resource_type', 'equalto', 'slides')|list %}
+    {% set audios = resources|selectattr('resource_type', 'equalto', 'audio')|list %}
+    {% set flashcards = resources|selectattr('resource_type', 'equalto', 'flashcards')|list %}
+    {% set mindmaps = resources|selectattr('resource_type', 'equalto', 'mindmap')|list %}
+    {% set links = resources|selectattr('resource_type', 'equalto', 'link')|list %}
+
+    {% set all_resources = videos + youtubes + pdfs + slides + audios + flashcards + mindmaps + links %}
+    {% if all_resources %}
+      <h5 class="mb-3">الموارد</h5>
+      <div class="resources-horizontal-scroll">
+        {% for res in videos %}
+          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-video text-decoration-none">
+            <div class="resource-icon">🎬</div>
+            <div class="resource-label">{{ res.label }}</div>
+            <div class="resource-action">فتح فيديو</div>
+          </a>
+        {% endfor %}
+
+        {% for res in youtubes %}
+          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-youtube text-decoration-none">
+            <div class="resource-icon">📺</div>
+            <div class="resource-label">{{ res.label }}</div>
+            <div class="resource-action">مشاهدة</div>
+          </a>
+        {% endfor %}
+
+        {% for res in (pdfs + slides) %}
+          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-pdf text-decoration-none">
+            <div class="resource-icon">{% if res.resource_type == 'slides' %}📊{% else %}📄{% endif %}</div>
+            <div class="resource-label">{{ res.label }}</div>
+            <div class="resource-action">عرض ملف</div>
+          </a>
+        {% endfor %}
+
+        {% for res in audios %}
+          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-audio text-decoration-none">
+            <div class="resource-icon">🎵</div>
+            <div class="resource-label">{{ res.label }}</div>
+            <div class="resource-action">تشغيل صوت</div>
+          </a>
+        {% endfor %}
+
+        {% for res in flashcards %}
+          <a href="{{ url_for('student.view_flashcards', resource_id=res.id) }}" class="resource-card resource-card-flashcard text-decoration-none">
+            <div class="resource-icon">📇</div>
+            <div class="resource-label">{{ res.label }}</div>
+            <div class="resource-action">دراسة البطاقات</div>
+          </a>
+        {% endfor %}
+
+        {% for res in mindmaps %}
+          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-mindmap text-decoration-none">
+            <div class="resource-icon">🗺️</div>
+            <div class="resource-label">{{ res.label }}</div>
+            <div class="resource-action">عرض خريطة</div>
+          </a>
+        {% endfor %}
+
+        {% for res in links %}
+          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-link text-decoration-none">
+            <div class="resource-icon">🔗</div>
+            <div class="resource-label">{{ res.label }}</div>
+            <div class="resource-action">فتح رابط</div>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      },
+      startup: {
+        typeset: false
+      }
+    };
+  </script>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@9.4.0/dist/panzoom.min.js"></script>
+  <script>
+    function normalizeGoogleDriveUrl(url) {
+      // Convert Google Drive sharing links to direct download links
+      if (url.includes('drive.google.com')) {
+        let fileId = null;
+        if (url.includes('/file/d/')) {
+          fileId = url.split('/file/d/')[1].split('/')[0];
+        } else if (url.includes('id=')) {
+          fileId = url.split('id=')[1].split('&')[0];
+        }
+        if (fileId) {
+          return `https://drive.google.com/uc?export=download&id=${fileId}`;
+        }
+      }
+      return url;
+    }
+
+    function typesetMath(rootElement) {
+      if (!window.MathJax) {
+        return;
+      }
+
+      if (MathJax.typesetPromise) {
+        MathJax.typesetPromise(rootElement ? [rootElement] : undefined);
+        return;
+      }
+
+      if (MathJax.startup && MathJax.startup.promise) {
+        MathJax.startup.promise.then(() => {
+          if (MathJax.typesetPromise) {
+            MathJax.typesetPromise(rootElement ? [rootElement] : undefined);
+          }
+        });
+      }
+    }
+
+    async function loadMindmap(container) {
+      const url = container.dataset.mindmapUrl;
+      if (!url) return;
+      try {
+        const response = await fetch(url, { credentials: 'same-origin' });
+        const html = await response.text();
+        container.innerHTML = html;
+        const svg = container.querySelector('svg');
+        if (svg) {
+          const panzoom = Panzoom(svg, { maxScale: 5, minScale: 0.5, contain: 'outside' });
+          container.addEventListener('wheel', panzoom.zoomWithWheel);
+        }
+      } catch (err) {
+        container.innerHTML = '<div class="text-muted">Unable to load mind map.</div>';
+      }
+    }
+
+    document.querySelectorAll('.mindmap-canvas').forEach(loadMindmap);
+  </script>
+{% endblock %}

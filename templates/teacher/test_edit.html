@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('teacher.dashboard') }}">لوحة التحكم</a></li>
+        <li class="breadcrumb-item active">تعديل الاختبار</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-11">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">تعديل الاختبار: {{ test.title }}</h4>
+        <div class="d-flex align-items-center gap-2">
+          <a class="btn btn-light btn-sm" href="{{ url_for('teacher.manage_test_access', test_id=test.id) }}">الوصول</a>
+          <span class="small">القسم: {{ test.section.title }}</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h5 class="card-title mb-0">تفاصيل الاختبار</h5>
+              <small class="text-muted">البيانات الوصفية</small>
+            </div>
+            <form method="post">
+              {{ meta_form.hidden_tag() }}
+              <input type="hidden" name="form_name" value="update_test" />
+              <div class="row g-3">
+                <div class="col-12 col-md-4">
+                  {{ meta_form.title.label(class="form-label") }}
+                  {{ meta_form.title(class="form-control") }}
+                </div>
+                <div class="col-12 col-md-4">
+                  {{ meta_form.lesson_id.label(class="form-label") }}
+                  {{ meta_form.lesson_id(class="form-select") }}
+                  <div class="form-text">ربط بدرس أو إبقاءه على مستوى القسم.</div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label">الوصول</label>
+                  <div class="form-check">
+                    {{ meta_form.requires_code(class="form-check-input", id="test_requires_code") }}
+                    <label class="form-check-label" for="test_requires_code">يتطلب رمز تفعيل</label>
+                  </div>
+                  <div class="form-text">أول اختبار على مستوى القسم يبقى مفتوح.</div>
+                </div>
+                <div class="col-12">
+                  {{ meta_form.description.label(class="form-label") }}
+                  {{ meta_form.description(class="form-control", rows=2) }}
+                </div>
+                <div class="col-12 col-md-4 ms-auto">
+                  {{ meta_form.submit(class="btn btn-cta w-100") }}
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="row justify-content-center">
+          <div class="col-12 col-lg-7">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h5 class="card-title mb-0">لوحة الأسئلة</h5>
+                  <small class="text-muted">إنشاء أو تعديل</small>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">اختر سؤال موجود</label>
+                  <select id="questionSelect" class="form-select">
+                    <option value="">سؤال جديد</option>
+                    {% for q in test.questions %}
+                      {% set choices = q.choices|list %}
+                      {% set c1 = choices[0] if choices|length > 0 else None %}
+                      {% set c2 = choices[1] if choices|length > 1 else None %}
+                      {% set c3 = choices[2] if choices|length > 2 else None %}
+                      {% set c4 = choices[3] if choices|length > 3 else None %}
+                      {% set correct_idx = 0 %}
+                      {% for ch in choices %}
+                        {% if ch.is_correct %}{% set correct_idx = loop.index %}{% endif %}
+                      {% endfor %}
+                      <option value="{{ q.id }}"
+                        data-text="{{ q.text }}"
+                        data-hint="{{ q.hint or '' }}"
+                        data-choice1="{{ c1.text if c1 else '' }}"
+                        data-choice2="{{ c2.text if c2 else '' }}"
+                        data-choice3="{{ c3.text if c3 else '' }}"
+                        data-choice4="{{ c4.text if c4 else '' }}"
+                        data-correct="{{ correct_idx }}">
+                        Q{{ loop.index }} - {{ q.text[:40] ~ ('...' if q.text|length > 40 else '') }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <form method="post" id="questionForm">
+                  <input type="hidden" name="form_name" value="upsert_question" />
+                  <input type="hidden" name="question_id" id="question_id" />
+                  <div class="mb-3">
+                    <label class="form-label">السؤال</label>
+                    <textarea class="form-control" id="question_text" name="question_text" rows="3" required></textarea>
+                  </div>
+                  <div class="mb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleHintBtn">إضافة تلميح</button>
+                  </div>
+                  <div class="mb-3 d-none" id="hintWrapper">
+                    <label class="form-label">التلميح</label>
+                    <textarea class="form-control" id="question_hint" name="question_hint" rows="2"></textarea>
+                  </div>
+                  {% for i in range(1,5) %}
+                  <div class="mb-2">
+                    <label class="form-label">الخيار {{ i }}</label>
+                    <div class="input-group">
+                      <div class="input-group-text">
+                        <input class="form-check-input mt-0" type="radio" name="correct_choice" id="correct_choice_{{ i }}" value="{{ i }}" aria-label="Correct choice">
+                      </div>
+                      <input type="text" class="form-control" name="choice_{{ i }}" id="choice_{{ i }}" placeholder="Answer option">
+                    </div>
+                  </div>
+                  {% endfor %}
+                  <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary w-100">حفظ</button>
+                    <button type="button" id="resetBtn" class="btn btn-outline-secondary">إعادة تعيين</button>
+                  </div>
+                  <div class="d-flex gap-2 mt-2">
+                    <button type="button" id="deleteBtn" class="btn btn-outline-danger w-100" disabled>حذف المختار</button>
+                  </div>
+                </form>
+
+                <div class="card border-0 bg-light mt-3">
+                  <div class="card-body">
+                    <h6 class="card-title mb-2">معاينة (MathJax)</h6>
+                    <div class="mb-2"><strong>السؤال:</strong> <span id="previewQuestion"></span></div>
+                    <div class="mb-2"><strong>التلميح:</strong> <span id="previewHint"></span></div>
+                    <div><strong>الخيارات:</strong>
+                      <ol class="mb-0" id="previewChoices"></ol>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card bg-light border-0 mt-3">
+                  <div class="card-body">
+                    <h6 class="card-title">LaTeX quick reference</h6>
+                    <ul class="small mb-0">
+                      <li>Inline: <code>$a^2 + b^2 = c^2$</code></li>
+                      <li>Display: <code>$$\int_0^1 x^2\,dx$$</code></li>
+                      <li>Fraction: <code>$\frac{a}{b}$</code></li>
+                      <li>Root: <code>$\sqrt{x}$</code></li>
+                      <li>Greek: <code>$\alpha, \beta, \pi$</code></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mt-4">
+          <div class="card-body">
+            <h5 class="card-title">الأسئلة الموجودة ({{ test.questions|length }})</h5>
+            {% if test.questions %}
+              <ul class="list-group list-group-flush">
+              {% for q in test.questions %}
+                {% set choices = q.choices|list %}
+                {% set correct_idx = 0 %}
+                {% for ch in choices %}
+                  {% if ch.is_correct %}{% set correct_idx = loop.index %}{% endif %}
+                {% endfor %}
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="fw-semibold">س{{ loop.index }}. {{ q.text }}</div>
+                    {% if q.hint %}
+                      <div class="small text-muted">التلميح: {{ q.hint }}</div>
+                    {% endif %}
+                    <div class="text-muted small">صحيح: {{ choices[correct_idx-1].text if correct_idx > 0 else 'غير محدد' }}</div>
+                  </div>
+                  <button class="btn btn-outline-primary btn-sm" type="button" onclick="selectQuestion('{{ q.id }}')">Load</button>
+                </li>
+              {% endfor %}
+              </ul>
+            {% else %}
+              <div class="alert alert-info mb-0">لا توجد أسئلة حتى الآن. قم بإضافة سؤالك الأول.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mt-4">
+          <div class="card-body">
+            <h5 class="card-title">استيراد الأسئلة من JSON</h5>
+            <p class="text-muted small">قم بتحميل ملف JSON أو لصق محتوى JSON. يدعم LaTeX.</p>
+            <form method="post" enctype="multipart/form-data">
+              <input type="hidden" name="form_name" value="import_json" />
+              <div class="mb-3">
+                <label class="form-label">ملف JSON</label>
+                <input type="file" class="form-control" name="questions_file" accept="application/json" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">أو لصق JSON</label>
+                <textarea class="form-control" name="questions_json" rows="6" placeholder='{"quiz": [...]}'></textarea>
+              </div>
+              <div class="mb-3">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleImportHintBtn">إضافة تلميح</button>
+              </div>
+              <div class="mb-3 d-none" id="importHintWrapper">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="includeHints" name="include_hints" value="1" checked>
+                  <label class="form-check-label" for="includeHints">تضمين التلميحات من JSON</label>
+                </div>
+              </div>
+              <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-cta">استيراد الأسئلة</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const selectEl = document.getElementById('questionSelect');
+  const idField = document.getElementById('question_id');
+  const questionField = document.getElementById('question_text');
+  const hintField = document.getElementById('question_hint');
+  const choiceFields = [1,2,3,4].map(i => document.getElementById(`choice_${i}`));
+  const correctRadios = [1,2,3,4].map(i => document.getElementById(`correct_choice_${i}`));
+  const resetBtn = document.getElementById('resetBtn');
+  const deleteBtn = document.getElementById('deleteBtn');
+  const toggleHintBtn = document.getElementById('toggleHintBtn');
+  const hintWrapper = document.getElementById('hintWrapper');
+  const toggleImportHintBtn = document.getElementById('toggleImportHintBtn');
+  const importHintWrapper = document.getElementById('importHintWrapper');
+  const previewQuestion = document.getElementById('previewQuestion');
+  const previewHint = document.getElementById('previewHint');
+  const previewChoices = document.getElementById('previewChoices');
+
+  function fillFormFromOption(opt){
+    if(!opt || !opt.value){
+      idField.value = '';
+      questionField.value = '';
+      hintField.value = '';
+      choiceFields.forEach(f => f.value='');
+      correctRadios.forEach(r => r.checked=false);
+      deleteBtn.disabled = true;
+      updatePreview();
+      return;
+    }
+    idField.value = opt.value;
+    questionField.value = opt.dataset.text || '';
+    hintField.value = opt.dataset.hint || '';
+    choiceFields.forEach((f, idx) => {
+      f.value = opt.dataset[`choice${idx+1}`] || '';
+    });
+    correctRadios.forEach(r => r.checked = false);
+    const cIdx = parseInt(opt.dataset.correct || '0');
+    if(cIdx >=1 && cIdx <=4){ correctRadios[cIdx-1].checked = true; }
+    deleteBtn.disabled = false;
+    updatePreview();
+  }
+
+  selectEl.addEventListener('change', (e)=>{
+    const opt = e.target.selectedOptions[0];
+    fillFormFromOption(opt);
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    selectEl.value = '';
+    fillFormFromOption(selectEl.selectedOptions[0]);
+  });
+
+  deleteBtn.addEventListener('click', ()=>{
+    const qid = idField.value;
+    if(!qid) return;
+    if(!confirm('Delete this question?')) return;
+    const form = document.createElement('form');
+    form.method = 'post';
+    form.innerHTML = `<input type="hidden" name="form_name" value="delete_question"/><input type="hidden" name="question_id" value="${qid}"/>`;
+    document.body.appendChild(form);
+    form.submit();
+  });
+
+  function updatePreview(){
+    if(previewQuestion) previewQuestion.textContent = questionField.value || '';
+    if(previewHint) previewHint.textContent = hintField.value || '';
+    if(previewChoices){
+      previewChoices.innerHTML = '';
+      choiceFields.forEach((field, idx) => {
+        if(!field.value) return;
+        const li = document.createElement('li');
+        const prefix = correctRadios[idx] && correctRadios[idx].checked ? '✅ ' : '';
+        li.textContent = `${prefix}${field.value}`;
+        previewChoices.appendChild(li);
+      });
+    }
+    if(window.MathJax && MathJax.typesetPromise){
+      MathJax.typesetPromise([previewQuestion, previewHint, previewChoices]);
+    }
+  }
+
+  [questionField, hintField, ...choiceFields].forEach(el => {
+    el.addEventListener('input', updatePreview);
+  });
+  correctRadios.forEach(r => r.addEventListener('change', updatePreview));
+
+  if(toggleHintBtn && hintWrapper){
+    toggleHintBtn.addEventListener('click', ()=>{
+      hintWrapper.classList.toggle('d-none');
+      toggleHintBtn.textContent = hintWrapper.classList.contains('d-none') ? 'Add hint' : 'Remove hint';
+      if(hintWrapper.classList.contains('d-none')){
+        hintField.value = '';
+        updatePreview();
+      }
+    });
+  }
+
+  if(toggleImportHintBtn && importHintWrapper){
+    toggleImportHintBtn.addEventListener('click', ()=>{
+      importHintWrapper.classList.toggle('d-none');
+      toggleImportHintBtn.textContent = importHintWrapper.classList.contains('d-none') ? 'Add hint' : 'Remove hint';
+    });
+  }
+
+  // helper to select question from list-group buttons
+  function selectQuestion(id){
+    const opt = Array.from(selectEl.options).find(o => o.value === String(id));
+    if(opt){
+      selectEl.value = String(id);
+      fillFormFromOption(opt);
+    }
+  }
+  window.selectQuestion = selectQuestion;
+
+  // default to new question
+  fillFormFromOption(selectEl.selectedOptions[0]);
+  updatePreview();
+</script>
+{% endblock %}

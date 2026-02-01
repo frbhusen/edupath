@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-4 d-flex justify-content-between align-items-center">
+	<div>
+		<h1 class="h4 mb-1">مرحباً بك في EduPath</h1>
+		<p class="mb-0">تعلم من خلال دروس منظمة، مارس الاختبارات، وتتبع تقدمك.</p>
+	</div>
+	<div class="d-flex gap-2">
+		{% if current_user.is_authenticated %}
+		  {% if current_user.role == 'teacher' %}
+		    <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.dashboard') }}">الذهاب إلى لوحة التحكم</a>
+		  {% else %}
+		    <a class="btn btn-light btn-sm" href="{{ url_for('student.subjects') }}">تصفح المواد</a>
+		    <a class="btn btn-cta btn-sm" href="{{ url_for('student.results') }}">عرض النتائج</a>
+		  {% endif %}
+		{% else %}
+		  <a class="btn btn-light btn-sm" href="{{ url_for('auth.login') }}">تسجيل الدخول</a>
+		  <a class="btn btn-cta btn-sm" href="{{ url_for('auth.register') }}">ابدأ الآن</a>
+		{% endif %}
+	</div>
+</div>
+
+<div class="row g-3">
+	<div class="col-12 col-md-4">
+		<div class="card h-100">
+			<div class="card-body">
+				<h5 class="card-title">مواد منظمة</h5>
+				<p class="text-muted">تصفح المواد والأقسام المنظمة بوضوح.</p>
+			</div>
+		</div>
+	</div>
+	<div class="col-12 col-md-4">
+		<div class="card h-100">
+			<div class="card-body">
+				<h5 class="card-title">دروس تفاعلية</h5>
+				<p class="text-muted">اقرأ الدروس بتصميم نظيف ومتسق.</p>
+			</div>
+		</div>
+	</div>
+	<div class="col-12 col-md-4">
+		<div class="card h-100">
+			<div class="card-body">
+				<h5 class="card-title">اختبارات سريعة</h5>
+				<p class="text-muted">أجب على الاختبارات وراجع الإجابات الصحيحة فوراً.</p>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
