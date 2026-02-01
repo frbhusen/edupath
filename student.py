@@ -4,7 +4,6 @@ import random
 from datetime import datetime
 from flask_login import login_required, current_user
 
-from .extensions import db
 from .models import Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer
 from .forms import ActivationForm, LessonActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
@@ -22,13 +21,13 @@ class AccessContext:
         
         # Check if entire subject is activated
         self.subject_active = bool(
-            SubjectActivation.query.filter_by(subject_id=self.subject.id, student_id=student_id, active=True).first()
+            SubjectActivation.objects(subject_id=self.subject.id, student_id=student_id, active=True).first()
         )
         
         # Check if section is activated
         self.section_requires_code = section.requires_code
         self.section_active = bool(
-            SectionActivation.query.filter_by(section_id=section.id, student_id=student_id, active=True).first()
+            SectionActivation.objects(section_id=section.id, student_id=student_id, active=True).first()
         )
         
         # Section is "open" if:
@@ -42,10 +41,10 @@ class AccessContext:
         if lesson_ids:
             self.lesson_activation_ids = {
                 la.lesson_id
-                for la in LessonActivation.query.filter(
-                    LessonActivation.lesson_id.in_(lesson_ids),
-                    LessonActivation.student_id == student_id,
-                    LessonActivation.active.is_(True),
+                for la in LessonActivation.objects(
+                    lesson_id__in=lesson_ids,
+                    student_id=student_id,
+                    active=True,
                 ).all()
             }
         else:
@@ -105,7 +104,7 @@ class AccessContext:
 
 def get_unlocked_lessons(student_id: int):
     lessons = []
-    sections = Section.query.all()
+    sections = Section.objects().all()
     for section in sections:
         access = AccessContext(section, student_id)
         for lesson in section.lessons:
@@ -116,12 +115,12 @@ def get_unlocked_lessons(student_id: int):
 @student_bp.route("/subjects")
 @login_required
 def subjects():
-    subs = Subject.query.all()
+    subs = Subject.objects().all()
     
     # Get activation status for each subject if student
     subject_activations = {}
     if current_user.role == "student":
-        activations = SubjectActivation.query.filter_by(
+        activations = SubjectActivation.objects(
             student_id=current_user.id, 
             active=True
         ).all()
@@ -138,12 +137,14 @@ def student_root():
 @student_bp.route("/subjects/<int:subject_id>")
 @login_required
 def subject_detail(subject_id):
-    subject = Subject.query.get_or_404(subject_id)
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        return "404", 404
     
     # Check if subject is activated for this student
     subject_activation = None
     if current_user.role == "student":
-        subject_activation = SubjectActivation.query.filter_by(
+        subject_activation = SubjectActivation.objects(
             subject_id=subject.id, 
             student_id=current_user.id, 
             active=True
@@ -154,7 +155,9 @@ def subject_detail(subject_id):
 @student_bp.route("/sections/<int:section_id>")
 @login_required
 def section_detail(section_id):
-    section = Section.query.get_or_404(section_id)
+    section = Section.objects(id=section_id).first()
+    if not section:
+        return "404", 404
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
         lessons_data = [
@@ -190,7 +193,9 @@ def section_detail(section_id):
 @student_bp.route("/lessons/<int:lesson_id>")
 @login_required
 def lesson_detail(lesson_id):
-    lesson = Lesson.query.get_or_404(lesson_id)
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        return "404", 404
     section = lesson.section
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
@@ -282,7 +287,9 @@ def lesson_detail(lesson_id):
 @student_bp.route("/tests/<int:test_id>", methods=["GET", "POST"])
 @login_required
 def take_test(test_id):
-    test = Test.query.get_or_404(test_id)
+    test = Test.objects(id=test_id).first()
+    if not test:
+        return "404", 404
     if current_user.role == "student":
         access = AccessContext(test.section, current_user.id)
         if not access.test_open(test):
@@ -311,7 +318,7 @@ def take_test(test_id):
         question_ids_raw = request.form.get("question_ids", "")
         if question_ids_raw:
             question_ids = [int(qid) for qid in question_ids_raw.split(",") if qid.strip().isdigit()]
-            questions = Question.query.filter(Question.id.in_(question_ids)).all()
+            questions = Question.objects(id__in=question_ids).all()
             questions_by_id = {q.id: q for q in questions}
             ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
         else:
@@ -319,15 +326,14 @@ def take_test(test_id):
         total = len(ordered_questions)
         score = 0
         attempt = Attempt(test_id=test.id, student_id=current_user.id, score=0, total=total)
-        db.session.add(attempt)
-        db.session.flush()  # get attempt id
+        attempt.save()
         for q in ordered_questions:
             selected_choice_id = request.form.get(f"question_{q.id}")
             if not selected_choice_id:
                 is_correct = False
                 choice_id = None
             else:
-                choice = Choice.query.get(int(selected_choice_id))
+                choice = Choice.objects(id=int(selected_choice_id)).first()
                 is_correct = bool(choice and choice.is_correct)
                 choice_id = choice.id if choice else None
             if is_correct:
@@ -339,9 +345,9 @@ def take_test(test_id):
                     choice_id=choice_id,
                     is_correct=is_correct,
                 )
-                db.session.add(ans)
+                ans.save()
         attempt.score = score
-        db.session.commit()
+        attempt.save()
         flash(f"حصلت على {score}/{total}", "success")
         return redirect(url_for("student.test_result", attempt_id=attempt.id))
 
@@ -377,11 +383,13 @@ def take_test(test_id):
 @student_bp.route("/subjects/<int:subject_id>/activate", methods=["GET", "POST"])
 @login_required
 def activate_subject(subject_id):
-    subject = Subject.query.get_or_404(subject_id)
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        return "404", 404
     form = ActivationForm()
     if request.method == "POST" and form.validate_on_submit():
         code_value = form.code.data.strip().upper()
-        ac = SubjectActivationCode.query.filter_by(subject_id=subject.id, student_id=current_user.id, code=code_value).first()
+        ac = SubjectActivationCode.objects(subject_id=subject.id, student_id=current_user.id, code=code_value).first()
         if not ac:
             flash("رمز غير صحيح لهذه المادة.", "error")
             return render_template("student/activate_subject.html", subject=subject, form=form)
@@ -391,11 +399,11 @@ def activate_subject(subject_id):
         # mark used and activate
         ac.is_used = True
         ac.used_at = datetime.utcnow()
-        existing = SubjectActivation.query.filter_by(subject_id=subject.id, student_id=current_user.id, active=True).first()
+        ac.save()
+        existing = SubjectActivation.objects(subject_id=subject.id, student_id=current_user.id, active=True).first()
         if not existing:
-            db.session.add(SubjectActivation(subject_id=subject.id, student_id=current_user.id))
+            SubjectActivation(subject_id=subject.id, student_id=current_user.id).save()
         cascade_subject_activation(subject, current_user.id)
-        db.session.commit()
         flash("تم تفعيل المادة بالكامل!", "success")
         return redirect(url_for("student.subject_detail", subject_id=subject.id))
     return render_template("student/activate_subject.html", subject=subject, form=form)
@@ -404,11 +412,13 @@ def activate_subject(subject_id):
 @student_bp.route("/sections/<int:section_id>/activate", methods=["GET", "POST"])
 @login_required
 def activate_section(section_id):
-    section = Section.query.get_or_404(section_id)
+    section = Section.objects(id=section_id).first()
+    if not section:
+        return "404", 404
     form = ActivationForm()
     if request.method == "POST" and form.validate_on_submit():
         code_value = form.code.data.strip().upper()
-        ac = ActivationCode.query.filter_by(section_id=section.id, student_id=current_user.id, code=code_value).first()
+        ac = ActivationCode.objects(section_id=section.id, student_id=current_user.id, code=code_value).first()
         if not ac:
             flash("رمز غير صحيح لهذا القسم.", "error")
             return render_template("student/activate_section.html", section=section, form=form)
@@ -418,11 +428,11 @@ def activate_section(section_id):
         # mark used and activate
         ac.is_used = True
         ac.used_at = datetime.utcnow()
-        existing = SectionActivation.query.filter_by(section_id=section.id, student_id=current_user.id, active=True).first()
+        ac.save()
+        existing = SectionActivation.objects(section_id=section.id, student_id=current_user.id, active=True).first()
         if not existing:
-            db.session.add(SectionActivation(section_id=section.id, student_id=current_user.id))
+            SectionActivation(section_id=section.id, student_id=current_user.id).save()
         cascade_section_activation(section, current_user.id)
-        db.session.commit()
         flash("تم تفعيل القسم!", "success")
         return redirect(url_for("student.section_detail", section_id=section.id))
     return render_template("student/activate_section.html", section=section, form=form)
@@ -431,12 +441,14 @@ def activate_section(section_id):
 @student_bp.route("/lessons/<int:lesson_id>/activate", methods=["GET", "POST"])
 @login_required
 def activate_lesson(lesson_id):
-    lesson = Lesson.query.get_or_404(lesson_id)
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        return "404", 404
     section = lesson.section
     form = LessonActivationForm()
     if request.method == "POST" and form.validate_on_submit():
         code_value = form.code.data.strip().upper()
-        ac = LessonActivationCode.query.filter_by(lesson_id=lesson.id, student_id=current_user.id, code=code_value).first()
+        ac = LessonActivationCode.objects(lesson_id=lesson.id, student_id=current_user.id, code=code_value).first()
         if not ac:
             flash("رمز غير صحيح لهذا الدرس.", "error")
             return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
@@ -445,11 +457,11 @@ def activate_lesson(lesson_id):
             return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
         ac.is_used = True
         ac.used_at = datetime.utcnow()
-        existing = LessonActivation.query.filter_by(lesson_id=lesson.id, student_id=current_user.id, active=True).first()
+        ac.save()
+        existing = LessonActivation.objects(lesson_id=lesson.id, student_id=current_user.id, active=True).first()
         if not existing:
-            db.session.add(LessonActivation(lesson_id=lesson.id, student_id=current_user.id))
+            LessonActivation(lesson_id=lesson.id, student_id=current_user.id).save()
         cascade_lesson_activation(lesson, current_user.id)
-        db.session.commit()
         flash("تم تفعيل الدرس!", "success")
         return redirect(url_for("student.lesson_detail", lesson_id=lesson.id))
     return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
@@ -460,13 +472,13 @@ def activate_lesson(lesson_id):
 def results():
     # Split own attempts and others for clearer presentation; answers still gated in test_result
     own_attempts = (
-        Attempt.query.filter_by(student_id=current_user.id)
-        .order_by(Attempt.started_at.desc())
+        Attempt.objects(student_id=current_user.id)
+        .order_by("-started_at")
         .all()
     )
     other_attempts = (
-        Attempt.query.filter(Attempt.student_id != current_user.id)
-        .order_by(Attempt.started_at.desc())
+        Attempt.objects(student_id__ne=current_user.id)
+        .order_by("-started_at")
         .all()
     )
     return render_template(
@@ -478,7 +490,9 @@ def results():
 @student_bp.route("/results/<int:attempt_id>")
 @login_required
 def test_result(attempt_id):
-    attempt = Attempt.query.get_or_404(attempt_id)
+    attempt = Attempt.objects(id=attempt_id).first()
+    if not attempt:
+        return "404", 404
     if attempt.student_id != current_user.id and current_user.role != "teacher":
         flash("غير مسموح", "error")
         return redirect(url_for("student.subjects"))
@@ -505,7 +519,7 @@ def test_result(attempt_id):
 @student_bp.route("/custom-tests/new", methods=["GET", "POST"])
 @login_required
 def custom_test_new():
-    subjects = Subject.query.all()
+    subjects = Subject.objects().all()
     selected_subject_id = request.args.get("subject_id") or request.form.get("subject_id")
     try:
         selected_subject_id = int(selected_subject_id) if selected_subject_id else None
@@ -515,7 +529,7 @@ def custom_test_new():
     if current_user.role == "student":
         unlocked_lessons = get_unlocked_lessons(current_user.id)
     else:
-        unlocked_lessons = Lesson.query.all()
+        unlocked_lessons = Lesson.objects().all()
     if selected_subject_id:
         unlocked_lessons = [
             lesson for lesson in unlocked_lessons
@@ -523,7 +537,7 @@ def custom_test_new():
         ]
 
     lesson_question_counts = {
-        lesson.id: Question.query.join(Test).filter(Test.lesson_id == lesson.id).count()
+        lesson.id: Question.objects(tests__lesson_id=lesson.id).count()
         for lesson in unlocked_lessons
     }
     total_available_questions = sum(lesson_question_counts.values())
@@ -567,7 +581,7 @@ def custom_test_new():
         # Build question pool
         selected_questions = []
         for sel in selections:
-            lesson_questions = Question.query.join(Test).filter(Test.lesson_id == sel["lesson_id"]).all()
+            lesson_questions = Question.objects(tests__lesson_id=sel["lesson_id"]).all()
             if len(lesson_questions) < sel["count"]:
                 flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
                 return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
@@ -601,8 +615,7 @@ def custom_test_new():
             question_order_json=json.dumps(question_order),
             answer_order_json=json.dumps(answer_order),
         )
-        db.session.add(attempt)
-        db.session.commit()
+        attempt.save()
 
         return redirect(url_for("student.custom_test_take", attempt_id=attempt.id))
 
@@ -619,14 +632,16 @@ def custom_test_new():
 @student_bp.route("/custom-tests/<int:attempt_id>")
 @login_required
 def custom_test_take(attempt_id):
-    attempt = CustomTestAttempt.query.get_or_404(attempt_id)
+    attempt = CustomTestAttempt.objects(id=attempt_id).first()
+    if not attempt:
+        return "404", 404
     if attempt.student_id != current_user.id:
         flash("غير مسموح.", "error")
         return redirect(url_for("student.subjects"))
 
     question_order = json.loads(attempt.question_order_json)
     answer_order = json.loads(attempt.answer_order_json)
-    questions = Question.query.filter(Question.id.in_(question_order)).all()
+    questions = Question.objects(id__in=question_order).all()
     questions_by_id = {q.id: q for q in questions}
 
     ordered_questions = []
@@ -651,7 +666,9 @@ def custom_test_take(attempt_id):
 @student_bp.route("/custom-tests/<int:attempt_id>/submit", methods=["POST"])
 @login_required
 def custom_test_submit(attempt_id):
-    attempt = CustomTestAttempt.query.get_or_404(attempt_id)
+    attempt = CustomTestAttempt.objects(id=attempt_id).first()
+    if not attempt:
+        return "404", 404
     if attempt.student_id != current_user.id:
         flash("غير مسموح.", "error")
         return redirect(url_for("student.subjects"))
@@ -659,7 +676,7 @@ def custom_test_submit(attempt_id):
         return redirect(url_for("student.custom_test_result", attempt_id=attempt.id))
 
     question_order = json.loads(attempt.question_order_json)
-    questions = Question.query.filter(Question.id.in_(question_order)).all()
+    questions = Question.objects(id__in=question_order).all()
     questions_by_id = {q.id: q for q in questions}
 
     score = 0
@@ -668,7 +685,7 @@ def custom_test_submit(attempt_id):
         selected_choice_id = request.form.get(f"question_{qid}")
         choice_id = int(selected_choice_id) if selected_choice_id else None
         q = questions_by_id.get(qid)
-        choice = Choice.query.get(choice_id) if choice_id else None
+        choice = Choice.objects(id=choice_id).first() if choice_id else None
         is_correct = bool(choice and choice.is_correct)
         if is_correct:
             score += 1
@@ -678,26 +695,28 @@ def custom_test_submit(attempt_id):
             choice_id=choice_id,
             is_correct=is_correct,
         )
-        db.session.add(ans)
+        ans.save()
 
     attempt.score = score
     attempt.total = total
     attempt.status = "submitted"
-    db.session.commit()
+    attempt.save()
     return redirect(url_for("student.custom_test_result", attempt_id=attempt.id))
 
 
 @student_bp.route("/custom-tests/<int:attempt_id>/result")
 @login_required
 def custom_test_result(attempt_id):
-    attempt = CustomTestAttempt.query.get_or_404(attempt_id)
+    attempt = CustomTestAttempt.objects(id=attempt_id).first()
+    if not attempt:
+        return "404", 404
     if attempt.student_id != current_user.id:
         flash("غير مسموح.", "error")
         return redirect(url_for("student.subjects"))
 
     question_order = json.loads(attempt.question_order_json)
     answer_order = json.loads(attempt.answer_order_json)
-    questions = Question.query.filter(Question.id.in_(question_order)).all()
+    questions = Question.objects(id__in=question_order).all()
     questions_by_id = {q.id: q for q in questions}
     answers_by_qid = {a.question_id: a for a in attempt.answers}
 
@@ -729,7 +748,9 @@ def view_flashcards(resource_id):
     """View flashcards from a JSON resource with pagination (6 cards per page)."""
     from .models import LessonResource
     
-    resource = LessonResource.query.get_or_404(resource_id)
+    resource = LessonResource.objects(id=resource_id).first()
+    if not resource:
+        return "404", 404
     lesson = resource.lesson
     section = lesson.section
     

@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 import json
 from flask_login import login_required, current_user
+from werkzeug.exceptions import NotFound
 
-from .extensions import db
 from .models import (
     User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, 
     ActivationCode, SectionActivation, LessonActivation, LessonActivationCode,
@@ -39,14 +39,16 @@ def role_required(role):
 @login_required
 @role_required("teacher")
 def dashboard():
-    subjects = Subject.query.filter_by(created_by=current_user.id).all()
+    subjects = Subject.objects(created_by=current_user.id).all()
     # Precompute first freebies per section for accurate status display
     sections_meta = {}
     for subj in subjects:
-        for sec in subj.sections:
-            first_lesson_id = min([l.id for l in sec.lessons], default=None)
-            first_section_test_id = min([t.id for t in sec.tests if t.lesson_id is None], default=None)
-            sections_meta[sec.id] = {
+        for sec in Section.objects(subject_id=subj.id).all():
+            lessons = Lesson.objects(section_id=sec.id).order_by('id').all()
+            tests_section_wide = Test.objects(section_id=sec.id, lesson_id=None).order_by('id').all()
+            first_lesson_id = lessons[0].id if lessons else None
+            first_section_test_id = tests_section_wide[0].id if tests_section_wide else None
+            sections_meta[str(sec.id)] = {
                 "first_lesson_id": first_lesson_id,
                 "first_section_test_id": first_section_test_id,
             }
@@ -65,246 +67,294 @@ def root():
 @login_required
 @role_required("teacher")
 def results_overview():
-    attempts = (
-        Attempt.query
-        .order_by(Attempt.started_at.desc())
-        .all()
-    )
+    attempts = Attempt.objects().order_by('-started_at').all()
     return render_template("teacher/results.html", attempts=attempts)
 
 
-@teacher_bp.route("/students/<int:student_id>/results")
+@teacher_bp.route("/students/<student_id>/results")
 @login_required
 @role_required("teacher")
 def student_results(student_id):
-    student = User.query.get_or_404(student_id)
-    attempts = Attempt.query.filter_by(student_id=student.id).order_by(Attempt.started_at.desc()).all()
+    student = User.objects(id=student_id).first()
+    if not student:
+        raise NotFound()
+    attempts = Attempt.objects(student_id=student.id).order_by('-started_at').all()
     return render_template("teacher/student_results.html", student=student, attempts=attempts)
 
 
-@teacher_bp.route("/attempts/<int:attempt_id>", methods=["GET", "POST"])
+@teacher_bp.route("/attempts/<attempt_id>", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def manage_attempt(attempt_id):
-    attempt = Attempt.query.get_or_404(attempt_id)
-    student = attempt.student
-    test = attempt.test
-    questions = test.questions
+    attempt = Attempt.objects(id=attempt_id).first()
+    if not attempt:
+        raise NotFound()
+    student = attempt.student_id
+    test = attempt.test_id
+    questions = Question.objects(test_id=test.id).all()
 
     if request.method == "POST":
         action = request.form.get("action")
         if action == "delete":
             # Delete answers then attempt
-            AttemptAnswer.query.filter_by(attempt_id=attempt.id).delete()
-            db.session.delete(attempt)
-            db.session.commit()
-            flash("تم حذف المحاولة", "info")
-            return redirect(url_for("teacher.student_results", student_id=student.id))
+            AttemptAnswer.objects(attempt_id=attempt.id).delete()
+            attempt.delete()
+            flash("تم حذف محاولة الاختبار بنجاح.", "success")
+            return redirect(url_for("teacher.results_overview"))
+        elif action == "save_scores":
+            # Update scores from form
+            for q in questions:
+                choice_id_val = request.form.get(f"question_{q.id}")
+                choice = None
+                if choice_id_val:
+                    choice = next((c for c in q.choices if str(c.choice_id) == choice_id_val), None)
+                
+                ans = AttemptAnswer.objects(attempt_id=attempt.id, question_id=q.id).first()
+                if not ans:
+                    ans = AttemptAnswer(attempt_id=attempt.id, question_id=q.id)
+                ans.choice_id = choice.choice_id if choice else None
+                ans.is_correct = choice.is_correct if choice else False
+                ans.save()
 
-        # Update answers
-        total = len(questions)
-        score = 0
-        for q in questions:
-            choice_id_val = request.form.get(f"question_{q.id}")
-            choice = Choice.query.get(int(choice_id_val)) if choice_id_val else None
-            is_correct = bool(choice and choice.is_correct)
-            ans = AttemptAnswer.query.filter_by(attempt_id=attempt.id, question_id=q.id).first()
-            if not ans:
-                ans = AttemptAnswer(attempt_id=attempt.id, question_id=q.id)
-                db.session.add(ans)
-            ans.choice_id = choice.id if choice else None
-            ans.is_correct = is_correct
-            if is_correct:
-                score += 1
-        attempt.score = score
-        attempt.total = total
-        db.session.commit()
-        flash("Attempt updated", "success")
-        return redirect(url_for("teacher.manage_attempt", attempt_id=attempt.id))
+            attempt.score = sum(1 for aa in AttemptAnswer.objects(attempt_id=attempt.id) if aa.is_correct)
+            attempt.save()
+            flash("تم حفظ الدرجات بنجاح.", "success")
 
-    answers = {a.question_id: a for a in attempt.answers}
+    answers = {aa.question_id: aa for aa in AttemptAnswer.objects(attempt_id=attempt.id).all()}
     return render_template("teacher/attempt_manage.html", attempt=attempt, student=student, test=test, questions=questions, answers=answers)
 
 
-@teacher_bp.route("/students")
+@teacher_bp.route("/students", methods=["GET"])
 @login_required
 @role_required("teacher")
 def students():
-    students = User.query.filter_by(role="student").order_by(User.created_at.desc()).all()
+    students = User.objects(role="student").order_by('-created_at').all()
     return render_template("teacher/students.html", students=students)
 
 
-@teacher_bp.route("/students/<int:user_id>/edit", methods=["GET", "POST"])
+@teacher_bp.route("/students/<user_id>/edit", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def edit_student(user_id):
-    student = User.query.get_or_404(user_id)
-    if student.role != "student":
-        flash("يمكن تعديل حسابات الطلاب فقط هنا.", "error")
-        return redirect(url_for("teacher.students"))
-
-    form = StudentEditForm(obj=student)
+    student = User.objects(id=user_id).first()
+    if not student:
+        raise NotFound()
+    form = StudentEditForm()
     if form.validate_on_submit():
         student.username = form.username.data
         student.email = form.email.data
         student.role = form.role.data
-        if form.password.data:
-            student.set_password(form.password.data)
-        db.session.commit()
-        flash("تم تحديث الطالب", "success")
+        student.save()
+        flash("تم تحديث بيانات الطالب بنجاح.", "success")
         return redirect(url_for("teacher.students"))
-
+    elif request.method == "GET":
+        form.username.data = student.username
+        form.email.data = student.email
+        form.role.data = student.role
     return render_template("teacher/student_form.html", form=form, student=student)
 
 
-@teacher_bp.route("/subjects/<int:subject_id>/access", methods=["GET", "POST"])
+@teacher_bp.route("/subjects/<subject_id>/access", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def manage_subject_access(subject_id):
-    subject = Subject.query.get_or_404(subject_id)
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        raise NotFound()
+    
     if request.method == "POST":
         action = request.form.get("action")
-        student_id = int(request.form.get("student_id"))
-        student = User.query.get_or_404(student_id)
-
         if action == "generate_code":
-            # Allow only one unused code at a time
-            existing_unused = SubjectActivationCode.query.filter_by(
-                subject_id=subject.id, student_id=student.id, is_used=False
-            ).first()
-            if existing_unused:
-                flash("الطالب لديه رمز غير مستخدم لهذه المادة. قم بإزالته أو استخدامه قبل إنشاء آخر.", "error")
-                return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
-            import random, string
-            def gen():
-                return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            code_value = gen()
-            while SubjectActivationCode.query.filter_by(code=code_value).first():
-                code_value = gen()
-            ac = SubjectActivationCode(subject_id=subject.id, student_id=student.id, code=code_value)
-            db.session.add(ac)
-            db.session.commit()
-            flash(f"تم إنشاء رمز لـ {student.username}: {code_value}", "success")
-        elif action == "activate":
-            existing = SubjectActivation.query.filter_by(
-                subject_id=subject.id, student_id=student.id, active=True
-            ).first()
-            if not existing:
-                db.session.add(SubjectActivation(subject_id=subject.id, student_id=student.id))
-            cascade_subject_activation(subject, student.id)
-            db.session.commit()
-            flash(f"تم تفعيل المادة لـ {student.username}", "success")
-        elif action == "revoke":
-            revoke_subject_activation(subject, student.id)
-            db.session.commit()
-            flash(f"تم إلغاء الوصول لـ {student.username}", "info")
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            
+            if student:
+                # Check if unused code exists
+                existing_unused = SubjectActivationCode.objects(
+                    subject_id=subject.id, student_id=student.id, is_used=False
+                ).first()
+                
+                if existing_unused:
+                    flash(f"يوجد كود غير مستخدم بالفعل: {existing_unused.code}", "info")
+                else:
+                    # Generate unique 6-char code
+                    import random
+                    import string
+                    code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    
+                    while SubjectActivationCode.objects(code=code_value).first():
+                        code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    
+                    ac = SubjectActivationCode(
+                        subject_id=subject.id, student_id=student.id, code=code_value
+                    )
+                    ac.save()
+                    flash(f"تم إنشاء الكود: {code_value}", "success")
+                    # Auto-activate if not already
+                    existing = SubjectActivation.objects(
+                        subject_id=subject.id, student_id=student.id, active=True
+                    ).first()
+                    if not existing:
+                        sa = SubjectActivation(subject_id=subject.id, student_id=student.id)
+                        sa.save()
+                    flash("تم تفعيل المادة للطالب.", "success")
+                    cascade_subject_activation(subject, student.id)
+        
+        elif action == "revoke_access":
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            if student:
+                revoke_subject_activation(subject.id, student.id)
+                flash("تم إلغاء التفعيل للطالب.", "success")
+        
         elif action == "delete_code":
-            code_id = int(request.form.get("code_id", 0))
-            ac = SubjectActivationCode.query.get_or_404(code_id)
-            if ac.subject_id != subject.id or ac.student_id != student.id:
-                flash("رمز غير صحيح", "error")
-            else:
-                db.session.delete(ac)
-                db.session.commit()
-                flash("تم إزالة الرمز", "info")
-        return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
-
-    students = User.query.filter_by(role="student").order_by(User.created_at.desc()).all()
-    activations = {
-        sa.student_id: sa 
-        for sa in SubjectActivation.query.filter_by(subject_id=subject.id, active=True).all()
+            code_id = request.form.get("code_id")
+            ac = SubjectActivationCode.objects(id=code_id).first()
+            if ac:
+                if ac.subject_id == subject.id:
+                    ac.delete()
+                    flash("تم حذف الكود بنجاح.", "success")
+    
+    students = User.objects(role="student").order_by('-created_at').all()
+    activated_students = {
+        str(sa.student_id): sa for sa in SubjectActivation.objects(subject_id=subject.id, active=True).all()
     }
-    codes_by_student = {}
-    for ac in SubjectActivationCode.query.filter_by(subject_id=subject.id).order_by(
-        SubjectActivationCode.created_at.desc()
-    ).all():
-        lst = codes_by_student.setdefault(ac.student_id, [])
-        lst.append(ac)
-    return render_template(
-        "teacher/subject_access.html", 
-        subject=subject, 
-        students=students, 
-        activations=activations, 
-        codes_by_student=codes_by_student
-    )
+    codes = SubjectActivationCode.objects(subject_id=subject.id).order_by('-created_at').all()
+    
+    return render_template("teacher/subject_access.html", subject=subject, students=students, activated_students=activated_students, codes=codes)
 
 
-@teacher_bp.route("/sections/<int:section_id>/access", methods=["GET", "POST"])
+@teacher_bp.route("/sections/<section_id>/access", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def manage_section_access(section_id):
-    section = Section.query.get_or_404(section_id)
-    subject = section.subject
-    if subject.created_by != current_user.id:
-        flash("Not allowed", "error")
-        return redirect(url_for("teacher.dashboard"))
-
-    # Generate code for a specific student
+    section = Section.objects(id=section_id).first()
+    if not section:
+        raise NotFound()
+    
     if request.method == "POST":
         action = request.form.get("action")
-
-        if action == "toggle_requires_code":
-            section.requires_code = not section.requires_code
-            # If we just locked the section, clear activations so only freebies stay open
-            if section.requires_code:
-                lock_section_access_for_all(section)
-            db.session.commit()
-            flash("تم تحديث متطلبات تفعيل القسم", "success")
-            return redirect(url_for("teacher.manage_section_access", section_id=section.id))
-
-        student_id = int(request.form.get("student_id"))
-        student = User.query.get_or_404(student_id)
-
         if action == "generate_code":
-            # Allow only one unused code at a time
-            existing_unused = ActivationCode.query.filter_by(section_id=section.id, student_id=student.id, is_used=False).first()
-            if existing_unused:
-                flash("Student already has an unused code for this section. Remove it or use it before generating another.", "error")
-                return redirect(url_for("teacher.manage_section_access", section_id=section.id))
-            import random, string
-            # Generate unique 6-char alphanumeric code
-            def gen():
-                return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            code_value = gen()
-            while ActivationCode.query.filter_by(code=code_value).first():
-                code_value = gen()
-            ac = ActivationCode(section_id=section.id, student_id=student.id, code=code_value)
-            db.session.add(ac)
-            db.session.commit()
-            flash(f"Code generated for {student.username}: {code_value}", "success")
-        elif action == "activate":
-            existing = SectionActivation.query.filter_by(section_id=section.id, student_id=student.id, active=True).first()
-            if not existing:
-                db.session.add(SectionActivation(section_id=section.id, student_id=student.id))
-            cascade_section_activation(section, student.id)
-            db.session.commit()
-            flash(f"Section activated for {student.username}", "success")
-        elif action == "revoke":
-            revoke_section_activation(section, student.id)
-            db.session.commit()
-            flash(f"تم إلغاء الوصول لـ {student.username}", "info")
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            
+            if student:
+                existing_unused = ActivationCode.objects(
+                    section_id=section.id, student_id=student.id, is_used=False
+                ).first()
+                
+                if existing_unused:
+                    flash(f"يوجد كود غير مستخدم بالفعل: {existing_unused.code}", "info")
+                else:
+                    import random
+                    import string
+                    code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    
+                    while ActivationCode.objects(code=code_value).first():
+                        code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    
+                    ac = ActivationCode(
+                        section_id=section.id, student_id=student.id, code=code_value
+                    )
+                    ac.save()
+                    flash(f"تم إنشاء الكود: {code_value}", "success")
+                    existing = SectionActivation.objects(
+                        section_id=section.id, student_id=student.id, active=True
+                    ).first()
+                    if not existing:
+                        sa = SectionActivation(section_id=section.id, student_id=student.id)
+                        sa.save()
+                    flash("تم تفعيل القسم للطالب.", "success")
+                    cascade_section_activation(section, student.id)
+        
+        elif action == "revoke_access":
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            if student:
+                revoke_section_activation(section.id, student.id)
+                flash("تم إلغاء التفعيل للطالب.", "success")
+        
         elif action == "delete_code":
-            code_id = int(request.form.get("code_id", 0))
-            ac = ActivationCode.query.get_or_404(code_id)
-            if ac.section_id != section.id or ac.student_id != student.id:
-                flash("رمز غير صحيح", "error")
-            else:
-                db.session.delete(ac)
-                db.session.commit()
-                flash("تم إزالة الرمز", "info")
-        return redirect(url_for("teacher.manage_section_access", section_id=section.id))
+            code_id = request.form.get("code_id")
+            ac = ActivationCode.objects(id=code_id).first()
+            if ac:
+                if str(ac.section_id) == section_id:
+                    ac.delete()
+                    flash("تم حذف الكود بنجاح.", "success")
+    
+    students = User.objects(role="student").order_by('-created_at').all()
+    activations = {str(sa.student_id): sa for sa in SectionActivation.objects(section_id=section.id, active=True).all()}
+    codes = ActivationCode.objects(section_id=section.id).order_by('-created_at').all()
+    
+    return render_template("teacher/section_access.html", section=section, students=students, activations=activations, codes=codes)
 
-    students = User.query.filter_by(role="student").order_by(User.created_at.desc()).all()
-    activations = { (sa.student_id): sa for sa in SectionActivation.query.filter_by(section_id=section.id, active=True).all() }
-    codes_by_student = {}
-    for ac in ActivationCode.query.filter_by(section_id=section.id).order_by(ActivationCode.created_at.desc()).all():
-        lst = codes_by_student.setdefault(ac.student_id, [])
-        lst.append(ac)
-    return render_template("teacher/section_access.html", section=section, students=students, activations=activations, codes_by_student=codes_by_student)
+
+@teacher_bp.route("/lessons/<lesson_id>/access", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def manage_lesson_access(lesson_id):
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        raise NotFound()
+    
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "generate_code":
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            
+            if student:
+                existing_unused = LessonActivationCode.objects(
+                    lesson_id=lesson.id, student_id=student.id, is_used=False
+                ).first()
+                
+                if existing_unused:
+                    flash(f"يوجد كود غير مستخدم بالفعل: {existing_unused.code}", "info")
+                else:
+                    import random
+                    import string
+                    code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    
+                    while LessonActivationCode.objects(code=code_value).first():
+                        code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    
+                    lac = LessonActivationCode(
+                        lesson_id=lesson.id, student_id=student.id, code=code_value
+                    )
+                    lac.save()
+                    flash(f"تم إنشاء الكود: {code_value}", "success")
+                    existing = LessonActivation.objects(
+                        lesson_id=lesson.id, student_id=student.id, active=True
+                    ).first()
+                    if not existing:
+                        la = LessonActivation(lesson_id=lesson.id, student_id=student.id)
+                        la.save()
+                    flash("تم تفعيل الدرس للطالب.", "success")
+                    cascade_lesson_activation(lesson, student.id)
+        
+        elif action == "revoke_access":
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            if student:
+                revoke_lesson_activation(lesson.id, student.id)
+                flash("تم إلغاء التفعيل للطالب.", "success")
+        
+        elif action == "delete_code":
+            code_id = request.form.get("code_id")
+            lac = LessonActivationCode.objects(id=code_id).first()
+            if lac:
+                if str(lac.lesson_id) == lesson_id:
+                    lac.delete()
+                    flash("تم حذف الكود بنجاح.", "success")
+    
+    students = User.objects(role="student").order_by('-created_at').all()
+    activations = {str(la.student_id): la for la in LessonActivation.objects(lesson_id=lesson.id, active=True).all()}
+    codes = LessonActivationCode.objects(lesson_id=lesson.id).order_by('-created_at').all()
+    
+    return render_template("teacher/lesson_access.html", lesson=lesson, students=students, activations=activations, codes=codes)
+
+
+# Subject CRUD
 
 @teacher_bp.route("/subjects/new", methods=["GET", "POST"])
 @login_required
@@ -312,486 +362,445 @@ def manage_section_access(section_id):
 def new_subject():
     form = SubjectForm()
     if form.validate_on_submit():
-        subject = Subject(name=form.name.data, description=form.description.data, created_by=current_user.id)
-        db.session.add(subject)
-        db.session.commit()
-        flash("تم إنشاء المادة", "success")
-        return redirect(url_for("teacher.dashboard"))
+        subject = Subject(
+            name=form.name.data,
+            description=form.description.data,
+            created_by=current_user.id,
+        )
+        subject.save()
+        flash("تم إنشاء المادة بنجاح.", "success")
+        return redirect(url_for("teacher.subject_detail", subject_id=subject.id))
     return render_template("teacher/subject_form.html", form=form)
 
-@teacher_bp.route("/subjects/<int:subject_id>/edit", methods=["GET", "POST"])
+
+@teacher_bp.route("/subjects/<subject_id>")
+@login_required
+@role_required("teacher")
+def subject_detail(subject_id):
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        raise NotFound()
+    sections = Section.objects(subject_id=subject.id).all()
+    return render_template("teacher/subject_detail.html", subject=subject, sections=sections)
+
+
+@teacher_bp.route("/subjects/<subject_id>/edit", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def edit_subject(subject_id):
-    subject = Subject.query.get_or_404(subject_id)
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-    form = SubjectForm(obj=subject)
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        raise NotFound()
+    form = SubjectForm()
     if form.validate_on_submit():
         subject.name = form.name.data
         subject.description = form.description.data
-        db.session.commit()
-        flash("تم تحديث المادة", "success")
-        return redirect(url_for("teacher.dashboard"))
-    return render_template("teacher/subject_form.html", form=form)
+        subject.save()
+        flash("تم تحديث المادة بنجاح.", "success")
+        return redirect(url_for("teacher.subject_detail", subject_id=subject.id))
+    elif request.method == "GET":
+        form.name.data = subject.name
+        form.description.data = subject.description
+    return render_template("teacher/subject_form.html", form=form, subject=subject)
 
-@teacher_bp.route("/subjects/<int:subject_id>/delete", methods=["POST"]) 
+
+@teacher_bp.route("/subjects/<subject_id>/delete", methods=["POST"])
 @login_required
 @role_required("teacher")
 def delete_subject(subject_id):
-    subject = Subject.query.get_or_404(subject_id)
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-    db.session.delete(subject)
-    db.session.commit()
-    flash("تم حذف المادة", "info")
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        raise NotFound()
+    subject.delete()
+    flash("تم حذف المادة بنجاح.", "success")
     return redirect(url_for("teacher.dashboard"))
 
-@teacher_bp.route("/subjects/<int:subject_id>/sections/new", methods=["GET", "POST"])
+
+# Section CRUD
+
+@teacher_bp.route("/subjects/<subject_id>/sections/new", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def new_section(subject_id):
-    subject = Subject.query.get_or_404(subject_id)
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        raise NotFound()
     form = SectionForm()
     if form.validate_on_submit():
         section = Section(
             subject_id=subject.id,
             title=form.title.data,
             description=form.description.data,
-            requires_code=False,
+            requires_code=form.requires_code.data,
         )
-        db.session.add(section)
-        db.session.commit()
-        flash("تم إنشاء القسم", "success")
-        return redirect(url_for("teacher.dashboard"))
+        section.save()
+        flash("تم إنشاء القسم بنجاح.", "success")
+        return redirect(url_for("teacher.section_detail", section_id=section.id))
     return render_template("teacher/section_form.html", form=form, subject=subject)
 
 
-@teacher_bp.route("/sections/<int:section_id>/edit", methods=["GET", "POST"])
+@teacher_bp.route("/sections/<section_id>")
+@login_required
+@role_required("teacher")
+def section_detail(section_id):
+    section = Section.objects(id=section_id).first()
+    if not section:
+        raise NotFound()
+    lessons = Lesson.objects(section_id=section.id).all()
+    tests = Test.objects(section_id=section.id, lesson_id=None).all()  # section-wide tests
+    return render_template("teacher/section_detail.html", section=section, lessons=lessons, tests=tests)
+
+
+@teacher_bp.route("/sections/<section_id>/edit", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def edit_section(section_id):
-    section = Section.query.get_or_404(section_id)
-    subject = section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-    form = SectionForm(obj=section)
+    section = Section.objects(id=section_id).first()
+    if not section:
+        raise NotFound()
+    form = SectionForm()
     if form.validate_on_submit():
         section.title = form.title.data
         section.description = form.description.data
-        db.session.commit()
-        flash("تم تحديث القسم", "success")
-        return redirect(url_for("teacher.dashboard"))
-    return render_template("teacher/section_form.html", form=form, subject=subject)
+        section.requires_code = form.requires_code.data
+        section.save()
+        flash("تم تحديث القسم بنجاح.", "success")
+        return redirect(url_for("teacher.section_detail", section_id=section.id))
+    elif request.method == "GET":
+        form.title.data = section.title
+        form.description.data = section.description
+        form.requires_code.data = section.requires_code
+    return render_template("teacher/section_form.html", form=form, section=section)
 
-@teacher_bp.route("/sections/<int:section_id>/lessons/new", methods=["GET", "POST"])
+
+@teacher_bp.route("/sections/<section_id>/delete", methods=["POST"])
+@login_required
+@role_required("teacher")
+def delete_section(section_id):
+    section = Section.objects(id=section_id).first()
+    if not section:
+        raise NotFound()
+    subject_id = section.subject_id
+    section.delete()
+    flash("تم حذف القسم بنجاح.", "success")
+    return redirect(url_for("teacher.subject_detail", subject_id=subject_id))
+
+
+# Lesson CRUD
+
+@teacher_bp.route("/sections/<section_id>/lessons/new", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def new_lesson(section_id):
-    section = Section.query.get_or_404(section_id)
-    subject = section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
+    section = Section.objects(id=section_id).first()
+    if not section:
+        raise NotFound()
     form = LessonForm()
     if form.validate_on_submit():
-        resource_labels = request.form.getlist("resource_label[]")
-        resource_urls = request.form.getlist("resource_url[]")
-        resource_types = request.form.getlist("resource_type[]")
-        resources = [
-            (lbl.strip(), url.strip(), rtype.strip().lower() if rtype else None)
-            for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
-            if lbl.strip() and url.strip()
-        ]
-        # First lesson in a section is open by default
-        requires_code = bool(form.requires_code.data)
-        if len(section.lessons) == 0:
-            requires_code = False
         lesson = Lesson(
             section_id=section.id,
             title=form.title.data,
-            content=form.content.data or "",
-            requires_code=requires_code,
-            link_label=form.link_label.data or None,
-            link_url=form.link_url.data or None,
+            content=form.content.data,
+            requires_code=form.requires_code.data,
+            link_label=form.link_label.data,
+            link_url=form.link_url.data,
+            link_label_2=form.link_label_2.data,
+            link_url_2=form.link_url_2.data,
         )
-        db.session.add(lesson)
-        db.session.flush()
-        for idx, (lbl, url, rtype) in enumerate(resources):
-            db.session.add(LessonResource(lesson_id=lesson.id, label=lbl, url=url, resource_type=rtype, position=idx))
-        db.session.commit()
-        flash("تم إنشاء الدرس", "success")
-        return redirect(url_for("teacher.dashboard"))
+        lesson.save()
+        flash("تم إنشاء الدرس بنجاح.", "success")
+        return redirect(url_for("teacher.lesson_detail", lesson_id=lesson.id))
     return render_template("teacher/lesson_form.html", form=form, section=section)
 
-@teacher_bp.route("/lessons/<int:lesson_id>/edit", methods=["GET", "POST"])
+
+@teacher_bp.route("/lessons/<lesson_id>")
+@login_required
+@role_required("teacher")
+def lesson_detail(lesson_id):
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        raise NotFound()
+    resources = LessonResource.objects(lesson_id=lesson.id).order_by('position').all()
+    tests = Test.objects(lesson_id=lesson.id).all()
+    return render_template("teacher/lesson_detail.html", lesson=lesson, resources=resources, tests=tests)
+
+
+@teacher_bp.route("/lessons/<lesson_id>/edit", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def edit_lesson(lesson_id):
-    lesson = Lesson.query.get_or_404(lesson_id)
-    subject = lesson.section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-    form = LessonForm(obj=lesson)
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        raise NotFound()
+    form = LessonForm()
     if form.validate_on_submit():
-        resource_labels = request.form.getlist("resource_label[]")
-        resource_urls = request.form.getlist("resource_url[]")
-        resource_types = request.form.getlist("resource_type[]")
-        resources = [
-            (lbl.strip(), url.strip(), rtype.strip().lower() if rtype else None)
-            for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
-            if lbl.strip() and url.strip()
-        ]
         lesson.title = form.title.data
-        lesson.content = form.content.data or ""
-        lesson.requires_code = bool(form.requires_code.data)
-        lesson.link_label = form.link_label.data or None
-        lesson.link_url = form.link_url.data or None
-        lesson.resources.clear()
-        for idx, (lbl, url, rtype) in enumerate(resources):
-            lesson.resources.append(LessonResource(label=lbl, url=url, resource_type=rtype, position=idx))
-        db.session.commit()
-        flash("تم تحديث الدرس", "success")
-        return redirect(url_for("teacher.dashboard"))
-    return render_template("teacher/lesson_form.html", form=form, section=lesson.section, lesson=lesson)
+        lesson.content = form.content.data
+        lesson.requires_code = form.requires_code.data
+        lesson.link_label = form.link_label.data
+        lesson.link_url = form.link_url.data
+        lesson.link_label_2 = form.link_label_2.data
+        lesson.link_url_2 = form.link_url_2.data
+        lesson.save()
+        flash("تم تحديث الدرس بنجاح.", "success")
+        return redirect(url_for("teacher.lesson_detail", lesson_id=lesson.id))
+    elif request.method == "GET":
+        form.title.data = lesson.title
+        form.content.data = lesson.content
+        form.requires_code.data = lesson.requires_code
+        form.link_label.data = lesson.link_label
+        form.link_url.data = lesson.link_url
+        form.link_label_2.data = lesson.link_label_2
+        form.link_url_2.data = lesson.link_url_2
+    return render_template("teacher/lesson_form.html", form=form, lesson=lesson)
 
 
-@teacher_bp.route("/lessons/<int:lesson_id>/delete", methods=["POST"])
+@teacher_bp.route("/lessons/<lesson_id>/delete", methods=["POST"])
 @login_required
 @role_required("teacher")
 def delete_lesson(lesson_id):
-    lesson = Lesson.query.get_or_404(lesson_id)
-    subject = lesson.section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-    
-    # Delete associated lesson resources
-    LessonResource.query.filter_by(lesson_id=lesson.id).delete()
-    
-    # Delete associated tests (and their attempts will be cascaded)
-    from .models import Test, TestAttempt
-    tests = Test.query.filter_by(lesson_id=lesson.id).all()
-    for test in tests:
-        TestAttempt.query.filter_by(test_id=test.id).delete()
-    Test.query.filter_by(lesson_id=lesson.id).delete()
-    
-    # Delete the lesson
-    db.session.delete(lesson)
-    db.session.commit()
-    flash("تم حذف الدرس بنجاح", "success")
-    return redirect(url_for("teacher.dashboard"))
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        raise NotFound()
+    section_id = lesson.section_id
+    lesson.delete()
+    flash("تم حذف الدرس بنجاح.", "success")
+    return redirect(url_for("teacher.section_detail", section_id=section_id))
 
-@teacher_bp.route("/tests/<int:test_id>/delete", methods=["POST"])
+
+@teacher_bp.route("/lessons/<lesson_id>/resources/new", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
-def delete_test(test_id):
-    test = Test.query.get_or_404(test_id)
-    subject = test.section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-
-    db.session.delete(test)
-    db.session.commit()
-    flash("تم حذف الاختبار بنجاح", "success")
-    return redirect(url_for("teacher.dashboard"))
-
-
-
-@teacher_bp.route("/lessons/<int:lesson_id>/access", methods=["GET", "POST"])
-@login_required
-@role_required("teacher")
-def manage_lesson_access(lesson_id):
-    lesson = Lesson.query.get_or_404(lesson_id)
-    section = lesson.section
-    subject = section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-
+def new_lesson_resource(lesson_id):
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        raise NotFound()
+    
     if request.method == "POST":
-        action = request.form.get("action")
-        student_id = int(request.form.get("student_id"))
-        student = User.query.get_or_404(student_id)
+        label = request.form.get("label")
+        url = request.form.get("url")
+        resource_type = request.form.get("resource_type")
+        
+        # Get max position for this lesson
+        max_pos_resource = LessonResource.objects(lesson_id=lesson.id).order_by('-position').first()
+        position = (max_pos_resource.position + 1) if max_pos_resource else 0
+        
+        resource = LessonResource(
+            lesson_id=lesson.id,
+            label=label,
+            url=url,
+            resource_type=resource_type,
+            position=position,
+        )
+        resource.save()
+        flash("تم إضافة المورد بنجاح.", "success")
+        return redirect(url_for("teacher.lesson_detail", lesson_id=lesson.id))
+    
+    return render_template("teacher/lesson_resource_form.html", lesson=lesson)
 
-        if action == "generate_code":
-            import random, string
-            def gen():
-                return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            # Allow only one unused code at a time
-            from .models import LessonActivationCode
-            existing_unused = LessonActivationCode.query.filter_by(lesson_id=lesson.id, student_id=student.id, is_used=False).first()
-            if existing_unused:
-                flash("الطالب لديه رمز غير مستخدم لهذا الدرس. قم بإزالته أو استخدامه قبل إنشاء آخر.", "error")
-                return redirect(url_for("teacher.manage_lesson_access", lesson_id=lesson.id))
-            code_value = gen()
-            while LessonActivationCode.query.filter_by(code=code_value).first():
-                code_value = gen()
-            lac = LessonActivationCode(lesson_id=lesson.id, student_id=student.id, code=code_value)
-            db.session.add(lac)
-            db.session.commit()
-            flash(f"تم إنشاء رمز لـ {student.username}: {code_value}", "success")
-        elif action == "activate":
-            from .models import LessonActivation
-            existing = LessonActivation.query.filter_by(lesson_id=lesson.id, student_id=student.id, active=True).first()
-            if not existing:
-                db.session.add(LessonActivation(lesson_id=lesson.id, student_id=student.id))
-                db.session.commit()
-            flash(f"تم تفعيل الدرس لـ {student.username}", "success")
-        elif action == "revoke":
-            from .models import LessonActivation
-            existing = LessonActivation.query.filter_by(lesson_id=lesson.id, student_id=student.id, active=True).first()
-            if existing:
-                existing.active = False
-                db.session.commit()
-            flash(f"Access revoked for {student.username}", "info")
-        elif action == "delete_code":
-            from .models import LessonActivationCode
-            code_id = int(request.form.get("code_id", 0))
-            ac = LessonActivationCode.query.get_or_404(code_id)
-            if ac.lesson_id != lesson.id or ac.student_id != student.id:
-                flash("رمز غير صحيح", "error")
-            else:
-                db.session.delete(ac)
-                db.session.commit()
-                flash("تم إزالة الرمز", "info")
-        return redirect(url_for("teacher.manage_lesson_access", lesson_id=lesson.id))
 
-    students = User.query.filter_by(role="student").order_by(User.created_at.desc()).all()
-    from .models import LessonActivation, LessonActivationCode
-    activations = { sa.student_id: sa for sa in LessonActivation.query.filter_by(lesson_id=lesson.id, active=True).all() }
-    codes_by_student = {}
-    for ac in LessonActivationCode.query.filter_by(lesson_id=lesson.id).order_by(LessonActivationCode.created_at.desc()).all():
-        lst = codes_by_student.setdefault(ac.student_id, [])
-        lst.append(ac)
-    return render_template("teacher/lesson_access.html", lesson=lesson, section=section, students=students, activations=activations, codes_by_student=codes_by_student)
+@teacher_bp.route("/lesson-resources/<resource_id>/delete", methods=["POST"])
+@login_required
+@role_required("teacher")
+def delete_lesson_resource(resource_id):
+    resource = LessonResource.objects(id=resource_id).first()
+    if not resource:
+        raise NotFound()
+    lesson_id = resource.lesson_id
+    resource.delete()
+    flash("تم حذف المورد بنجاح.", "success")
+    return redirect(url_for("teacher.lesson_detail", lesson_id=lesson_id))
 
-@teacher_bp.route("/sections/<int:section_id>/tests/new", methods=["GET", "POST"])
+
+# Test CRUD
+
+@teacher_bp.route("/sections/<section_id>/tests/new", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def new_test(section_id):
-    section = Section.query.get_or_404(section_id)
-    subject = section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
+    section = Section.objects(id=section_id).first()
+    if not section:
+        raise NotFound()
     form = TestForm()
-    lesson_choices = [(0, "Section-wide test")]
-    lesson_choices += [(lesson.id, lesson.title) for lesson in section.lessons]
-    form.lesson_id.choices = lesson_choices
+    
+    # Populate lesson choices for dropdown
+    lessons = Lesson.objects(section_id=section.id).all()
+    form.lesson_id.choices = [(str(l.id), l.title) for l in lessons]
+    form.lesson_id.choices.insert(0, ("", "بدون درس (اختبار شامل)"))
+    
     if form.validate_on_submit():
-        linked = form.lesson_id.data if form.lesson_id.data else None
-        if linked == 0:
-            linked = None
-        # First section-wide test is open by default
-        requires_code = bool(form.requires_code.data)
-        if linked is None:
-            section_wide_tests = Test.query.filter_by(section_id=section.id, lesson_id=None).all()
-            if len(section_wide_tests) == 0:
-                requires_code = False
+        lesson_id = form.lesson_id.data if form.lesson_id.data else None
         test = Test(
             section_id=section.id,
-            lesson_id=linked,
+            lesson_id=lesson_id,
             title=form.title.data,
             description=form.description.data,
-            requires_code=requires_code,
             created_by=current_user.id,
+            requires_code=form.requires_code.data,
         )
-        db.session.add(test)
-        db.session.commit()
-        flash("تم إنشاء الاختبار", "success")
-        return redirect(url_for("teacher.edit_test", test_id=test.id))
+        test.save()
+        flash("تم إنشاء الاختبار بنجاح.", "success")
+        return redirect(url_for("teacher.test_detail", test_id=test.id))
     return render_template("teacher/test_form.html", form=form, section=section)
 
-@teacher_bp.route("/tests/<int:test_id>/edit", methods=["GET", "POST"])
+
+@teacher_bp.route("/tests/<test_id>")
+@login_required
+@role_required("teacher")
+def test_detail(test_id):
+    test = Test.objects(id=test_id).first()
+    if not test:
+        raise NotFound()
+    questions = Question.objects(test_id=test.id).all()
+    return render_template("teacher/test_detail.html", test=test, questions=questions)
+
+
+@teacher_bp.route("/tests/<test_id>/edit", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def edit_test(test_id):
-    test = Test.query.get_or_404(test_id)
-    subject = test.section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
+    test = Test.objects(id=test_id).first()
+    if not test:
+        raise NotFound()
+    
+    section = test.section_id
+    form = TestForm()
+    
+    # Populate lesson choices
+    lessons = Lesson.objects(section_id=section.id).all()
+    form.lesson_id.choices = [(str(l.id), l.title) for l in lessons]
+    form.lesson_id.choices.insert(0, ("", "بدون درس (اختبار شامل)"))
+    
+    if form.validate_on_submit():
+        test.title = form.title.data
+        test.description = form.description.data
+        test.requires_code = form.requires_code.data
+        test.lesson_id = form.lesson_id.data if form.lesson_id.data else None
+        test.save()
+        flash("تم تحديث الاختبار بنجاح.", "success")
+        return redirect(url_for("teacher.test_detail", test_id=test.id))
+    elif request.method == "GET":
+        form.title.data = test.title
+        form.description.data = test.description
+        form.requires_code.data = test.requires_code
+        form.lesson_id.data = str(test.lesson_id) if test.lesson_id else ""
+    
+    return render_template("teacher/test_edit.html", form=form, test=test)
 
-    meta_form = TestForm(obj=test)
-    lesson_choices = [(0, "Section-wide test")]
-    lesson_choices += [(lesson.id, lesson.title) for lesson in test.section.lessons]
-    meta_form.lesson_id.choices = lesson_choices
-    meta_form.lesson_id.data = test.lesson_id or 0
 
+@teacher_bp.route("/tests/<test_id>/delete", methods=["POST"])
+@login_required
+@role_required("teacher")
+def delete_test(test_id):
+    test = Test.objects(id=test_id).first()
+    if not test:
+        raise NotFound()
+    section_id = test.section_id
+    test.delete()
+    flash("تم حذف الاختبار بنجاح.", "success")
+    return redirect(url_for("teacher.section_detail", section_id=section_id))
+
+
+# Question CRUD
+
+@teacher_bp.route("/tests/<test_id>/questions/new", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def new_question(test_id):
+    test = Test.objects(id=test_id).first()
+    if not test:
+        raise NotFound()
+    
     if request.method == "POST":
-        action = request.form.get("form_name")
+        text = request.form.get("text")
+        hint = request.form.get("hint")
+        
+        choices_data = []
+        i = 0
+        while f"choice_{i}" in request.form:
+            choice_text = request.form.get(f"choice_{i}")
+            is_correct = request.form.get(f"is_correct_{i}") == "on"
+            if choice_text:
+                choices_data.append({
+                    "text": choice_text,
+                    "is_correct": is_correct
+                })
+            i += 1
+        
+        if not choices_data:
+            flash("يجب إضافة خيار واحد على الأقل.", "error")
+        else:
+            from bson import ObjectId
+            from .models import Choice
+            
+            choices = [Choice(text=c["text"], is_correct=c["is_correct"]) for c in choices_data]
+            question = Question(
+                test_id=test.id,
+                text=text,
+                hint=hint,
+                choices=choices,
+            )
+            question.save()
+            flash("تم إنشاء السؤال بنجاح.", "success")
+            return redirect(url_for("teacher.test_detail", test_id=test.id))
+    
+    return render_template("teacher/question_form.html", test=test)
 
-        if action == "update_test":
-            if meta_form.validate_on_submit():
-                linked = meta_form.lesson_id.data if meta_form.lesson_id.data else None
-                if linked == 0:
-                    linked = None
-                requires_code = bool(meta_form.requires_code.data)
-                # Preserve the rule: first section-wide test stays open if already the first
-                if linked is None:
-                    section_wide_tests = Test.query.filter_by(section_id=test.section_id, lesson_id=None).order_by(Test.id).all()
-                    if section_wide_tests and section_wide_tests[0].id == test.id:
-                        requires_code = False
-                test.title = meta_form.title.data
-                test.description = meta_form.description.data
-                test.lesson_id = linked
-                test.requires_code = requires_code
-                db.session.commit()
-                flash("تم تحديث تفاصيل الاختبار", "success")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
-            else:
-                flash("يرجى إصلاح الأخطاء في نموذج الاختبار", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
 
-        if action == "upsert_question":
-            question_text = request.form.get("question_text", "").strip()
-            question_hint = request.form.get("question_hint", "").strip() or None
-            choices = [request.form.get(f"choice_{i}", "").strip() for i in range(1, 5)]
-            correct_choice = request.form.get("correct_choice")
-            question_id = request.form.get("question_id")
+@teacher_bp.route("/questions/<question_id>/edit", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def edit_question(question_id):
+    question = Question.objects(id=question_id).first()
+    if not question:
+        raise NotFound()
+    
+    if request.method == "POST":
+        question.text = request.form.get("text")
+        question.hint = request.form.get("hint")
+        
+        choices_data = []
+        i = 0
+        while f"choice_{i}" in request.form:
+            choice_text = request.form.get(f"choice_{i}")
+            is_correct = request.form.get(f"is_correct_{i}") == "on"
+            if choice_text:
+                choices_data.append({
+                    "text": choice_text,
+                    "is_correct": is_correct
+                })
+            i += 1
+        
+        if not choices_data:
+            flash("يجب إضافة خيار واحد على الأقل.", "error")
+        else:
+            from .models import Choice
+            question.choices = [Choice(text=c["text"], is_correct=c["is_correct"]) for c in choices_data]
+            question.save()
+            flash("تم تحديث السؤال بنجاح.", "success")
+            return redirect(url_for("teacher.test_detail", test_id=question.test_id))
+    
+    return render_template("teacher/question_edit.html", question=question)
 
-            if not question_text:
-                flash("نص السؤال مطلوب", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
 
-            filtered = [(idx, text) for idx, text in enumerate(choices, start=1) if text]
-            if len(filtered) < 2:
-                flash("يرجى توفير خيارين على الأقل للإجابة", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+@teacher_bp.route("/questions/<question_id>/delete", methods=["POST"])
+@login_required
+@role_required("teacher")
+def delete_question(question_id):
+    question = Question.objects(id=question_id).first()
+    if not question:
+        raise NotFound()
+    test_id = question.test_id
+    question.delete()
+    flash("تم حذف السؤال بنجاح.", "success")
+    return redirect(url_for("teacher.test_detail", test_id=test_id))
 
-            if not correct_choice:
-                flash("اختر الإجابة الصحيحة", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
 
-            correct_idx = int(correct_choice)
-            if correct_idx < 1 or correct_idx > 4 or not choices[correct_idx - 1]:
-                flash("يجب أن تتوافق الإجابة الصحيحة مع خيار غير فارغ", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+# Helpers
 
-            if question_id:
-                q = Question.query.get_or_404(int(question_id))
-                if q.test_id != test.id:
-                    flash("سؤال غير صحيح", "error")
-                    return redirect(url_for("teacher.edit_test", test_id=test.id))
-                q.text = question_text
-                q.hint = question_hint
-
-                existing = sorted(q.choices, key=lambda c: c.id)
-                non_empty_count = 0
-                for idx in range(1, 5):
-                    text = choices[idx - 1]
-                    is_correct = (idx == correct_idx)
-                    if idx <= len(existing):
-                        choice_obj = existing[idx - 1]
-                        choice_obj.text = text
-                        choice_obj.is_correct = is_correct
-                        if not text:
-                            db.session.delete(choice_obj)
-                        else:
-                            non_empty_count += 1
-                    else:
-                        if text:
-                            db.session.add(Choice(question_id=q.id, text=text, is_correct=is_correct))
-                            non_empty_count += 1
-
-                if non_empty_count < 2:
-                    db.session.rollback()
-                    flash("يرجى الاحتفاظ بخيارين غير فارغين على الأقل", "error")
-                    return redirect(url_for("teacher.edit_test", test_id=test.id))
-
-                db.session.commit()
-                flash("تم تحديث السؤال", "success")
-            else:
-                q = Question(test_id=test.id, text=question_text, hint=question_hint)
-                db.session.add(q)
-                db.session.flush()
-                for idx, text in filtered:
-                    is_correct = (idx == correct_idx)
-                    db.session.add(Choice(question_id=q.id, text=text, is_correct=is_correct))
-                db.session.commit()
-                flash("تمت إضافة السؤال", "success")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
-
-        if action == "delete_question":
-            q_id = int(request.form.get("question_id", 0))
-            q = Question.query.get_or_404(q_id)
-            if q.test_id != test.id:
-                flash("سؤال غير صحيح", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
-            db.session.delete(q)
-            db.session.commit()
-            flash("تم حذف السؤال", "info")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
-
-        if action == "import_json":
-            payload = None
-            uploaded = request.files.get("questions_file")
-            raw_text = request.form.get("questions_json", "").strip()
-            include_hints = request.form.get("include_hints") == "1"
-
-            try:
-                if uploaded and uploaded.filename:
-                    payload = json.load(uploaded)
-                elif raw_text:
-                    payload = json.loads(raw_text)
-                else:
-                    flash("يرجى تحميل ملف JSON أو لصق محتوى JSON.", "error")
-                    return redirect(url_for("teacher.edit_test", test_id=test.id))
-            except json.JSONDecodeError:
-                flash("تنسيق JSON غير صحيح.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
-
-            items = payload.get("quiz") if isinstance(payload, dict) else None
-            if not items or not isinstance(items, list):
-                flash("يجب أن يتضمن JSON مصفوفة 'quiz'.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
-
-            added = 0
-            skipped = 0
-            for item in items:
-                question_text = (item.get("question") or "").strip()
-                if not question_text:
-                    skipped += 1
-                    continue
-                answer_options = item.get("answerOptions") or []
-                if not isinstance(answer_options, list) or len(answer_options) < 2:
-                    skipped += 1
-                    continue
-
-                options = answer_options[:4]
-                correct_index = None
-                for idx, opt in enumerate(options):
-                    if opt.get("isCorrect"):
-                        correct_index = idx
-                        break
-                if correct_index is None:
-                    skipped += 1
-                    continue
-
-                q_hint = (item.get("hint") or "").strip() if include_hints else None
-                q = Question(test_id=test.id, text=question_text, hint=q_hint or None)
-                db.session.add(q)
-                db.session.flush()
-
-                for idx, opt in enumerate(options):
-                    text = (opt.get("text") or "").strip()
-                    if not text:
-                        continue
-                    is_correct = idx == correct_index
-                    db.session.add(Choice(question_id=q.id, text=text, is_correct=is_correct))
-                added += 1
-
-            db.session.commit()
-            flash(f"تم استيراد {added} أسئلة. تم تخطي {skipped}.", "success")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
-
-    return render_template("teacher/test_edit.html", test=test, meta_form=meta_form)
+def revoke_lesson_activation(lesson_id, student_id):
+    """Mark lesson activation as inactive for a student"""
+    activation = LessonActivation.objects(lesson_id=lesson_id, student_id=student_id).first()
+    if activation:
+        activation.active = False
+        activation.save()

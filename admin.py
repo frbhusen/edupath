@@ -1,10 +1,10 @@
 import json
 from datetime import datetime
+from bson import ObjectId
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 
-from .extensions import db
 from .models import (
     User,
     Subject,
@@ -57,40 +57,45 @@ def admin_required():
 
 
 def serialize_instance(obj):
+    """Serialize a MongoEngine document to a JSON-compatible dict"""
     data = {}
-    for col in obj.__table__.columns:
-        val = getattr(obj, col.key)
+    for field_name in obj._fields.keys():
+        val = getattr(obj, field_name, None)
         if isinstance(val, datetime):
-            data[col.key] = val.isoformat()
+            data[field_name] = val.isoformat()
+        elif isinstance(val, ObjectId):
+            data[field_name] = str(val)
         else:
-            data[col.key] = val
+            data[field_name] = val
     return data
 
 
 def apply_payload(obj, payload):
-    for col in obj.__table__.columns:
-        if col.primary_key:
+    """Apply payload dict to MongoEngine document fields"""
+    for field_name, field_obj in obj._fields.items():
+        if field_name not in payload:
             continue
-        if col.key not in payload:
+        if field_name == "id":  # Skip primary key
             continue
-        raw_val = payload[col.key]
+        raw_val = payload[field_name]
         if raw_val is None:
-            setattr(obj, col.key, None)
+            setattr(obj, field_name, None)
             continue
         # Basic type handling
-        if col.type.python_type is bool:
+        field_type = field_obj.__class__.__name__
+        if field_type == "BooleanField":
             if isinstance(raw_val, str):
                 raw_val = raw_val.lower() in {"true", "1", "yes", "on"}
             else:
                 raw_val = bool(raw_val)
-        elif col.type.python_type is int:
+        elif field_type == "IntField":
             raw_val = int(raw_val)
-        elif col.type.python_type is float:
+        elif field_type == "FloatField":
             raw_val = float(raw_val)
-        elif col.type.python_type is datetime:
+        elif field_type == "DateTimeField":
             if isinstance(raw_val, str):
                 raw_val = datetime.fromisoformat(raw_val)
-        setattr(obj, col.key, raw_val)
+        setattr(obj, field_name, raw_val)
 
 
 @admin_bp.route("/")
@@ -100,7 +105,7 @@ def dashboard():
     counts = {}
     for name, model in ALLOWED_MODELS.items():
         try:
-            counts[name] = model.query.count()
+            counts[name] = model.objects().count()
         except Exception:
             counts[name] = "?"
     return render_template("admin/dashboard.html", counts=counts)
@@ -113,8 +118,9 @@ def table_view(table_name):
     model = ALLOWED_MODELS.get(table_name)
     if not model:
         abort(404)
-    rows = model.query.limit(100).all()
-    columns = [c.key for c in model.__table__.columns]
+    rows = model.objects().limit(100).all()
+    # Get field names from model
+    columns = list(model._fields.keys()) if hasattr(model, '_fields') else []
     return render_template("admin/table.html", table_name=table_name, columns=columns, rows=rows)
 
 
@@ -136,22 +142,23 @@ def table_new(table_name):
             return redirect(request.url)
         obj = model()
         apply_payload(obj, payload)
-        db.session.add(obj)
-        db.session.commit()
+        obj.save()
         flash(f"تم إنشاء سجل {table_name}", "success")
         return redirect(url_for("admin.table_view", table_name=table_name))
     example = json.dumps({"field": "value"}, indent=2)
     return render_template("admin/edit.html", table_name=table_name, payload=example, is_new=True)
 
 
-@admin_bp.route("/table/<table_name>/<int:row_id>/edit", methods=["GET", "POST"])
+@admin_bp.route("/table/<table_name>/<row_id>/edit", methods=["GET", "POST"])
 @login_required
 def table_edit(table_name, row_id):
     admin_required()
     model = ALLOWED_MODELS.get(table_name)
     if not model:
         abort(404)
-    obj = model.query.get_or_404(row_id)
+    obj = model.objects(id=ObjectId(row_id)).first()
+    if not obj:
+        abort(404)
     if request.method == "POST":
         payload_raw = request.form.get("payload", "{}")
         try:
@@ -162,22 +169,24 @@ def table_edit(table_name, row_id):
             flash(f"JSON غير صحيح: {exc}", "error")
             return redirect(request.url)
         apply_payload(obj, payload)
-        db.session.commit()
+        obj.save()
         flash(f"تم تحديث سجل {table_name} {row_id}", "success")
         return redirect(url_for("admin.table_view", table_name=table_name))
     payload = json.dumps(serialize_instance(obj), indent=2, default=str)
     return render_template("admin/edit.html", table_name=table_name, payload=payload, is_new=False, row_id=row_id)
 
 
-@admin_bp.route("/table/<table_name>/<int:row_id>/delete", methods=["POST"])
+@admin_bp.route("/table/<table_name>/<row_id>/delete", methods=["POST"])
 @login_required
 def table_delete(table_name, row_id):
     admin_required()
     model = ALLOWED_MODELS.get(table_name)
     if not model:
         abort(404)
-    obj = model.query.get_or_404(row_id)
-    db.session.delete(obj)
-    db.session.commit()
+    obj = model.objects(id=ObjectId(row_id)).first()
+    if not obj:
+        abort(404)
+    obj.delete()
     flash(f"تم حذف سجل {table_name} {row_id}", "info")
     return redirect(url_for("admin.table_view", table_name=table_name))
+

@@ -2,7 +2,8 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 import secrets
 from flask_login import login_user, logout_user, current_user
 
-from .extensions import db, login_manager
+from .extensions import login_manager
+from bson import ObjectId
 from .models import User
 from .forms import RegisterForm, LoginForm
 
@@ -10,7 +11,9 @@ auth_bp = Blueprint("auth", __name__, template_folder="templates")
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    if not ObjectId.is_valid(str(user_id)):
+        return None
+    return User.objects(id=ObjectId(str(user_id))).first()
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
@@ -18,7 +21,7 @@ def register():
         return redirect(url_for("index"))
     form = RegisterForm()
     if form.validate_on_submit():
-        if User.query.filter((User.username == form.username.data) | (User.email == form.email.data)).first():
+        if User.objects(username=form.username.data).first() or User.objects(email=form.email.data).first():
             flash("اسم المستخدم أو البريد الإلكتروني موجود مسبقاً", "error")
         else:
             user = User(
@@ -27,8 +30,7 @@ def register():
                 role=form.role.data,
             )
             user.set_password(form.password.data)
-            db.session.add(user)
-            db.session.commit()
+            user.save()
             flash("تم التسجيل بنجاح. يرجى تسجيل الدخول.", "success")
             return redirect(url_for("auth.login"))
     return render_template("auth/register.html", form=form)
@@ -39,12 +41,12 @@ def login():
         return redirect(url_for("index"))
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
+        user = User.objects(username=form.username.data).first()
         if user and user.check_password(form.password.data):
             # Generate a new session token and store it to enforce single-device login
             new_token = secrets.token_hex(16)
             user.current_session_token = new_token
-            db.session.commit()
+            user.save()
             # Clear any stale session data before logging in to ensure the new token is the only one
             session.clear()
             login_user(user)
@@ -63,6 +65,6 @@ def logout():
     # Optionally clear server-side token to avoid stale values
     if current_user.is_authenticated:
         current_user.current_session_token = None
-        db.session.commit()
+        current_user.save()
     flash("تم تسجيل الخروج", "info")
     return redirect(url_for("index"))

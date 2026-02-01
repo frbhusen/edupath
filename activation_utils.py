@@ -1,5 +1,4 @@
-from .extensions import db
-from .models import Subject, Section, LessonActivation, SectionActivation, SubjectActivation
+from .models import Subject, Section, Lesson, LessonActivation, SectionActivation, SubjectActivation
 
 
 def cascade_subject_activation(subject: Subject, student_id: int) -> None:
@@ -8,14 +7,16 @@ def cascade_subject_activation(subject: Subject, student_id: int) -> None:
         return
 
     # Activate all sections in the subject
-    for section in subject.sections:
-        if not SectionActivation.query.filter_by(section_id=section.id, student_id=student_id, active=True).first():
-            db.session.add(SectionActivation(section_id=section.id, student_id=student_id))
+    for section in Section.objects(subject_id=subject.id).all():
+        if not SectionActivation.objects(section_id=section.id, student_id=student_id, active=True).first():
+            sa = SectionActivation(section_id=section.id, student_id=student_id)
+            sa.save()
         
         # Activate all lessons in each section
-        for lesson in section.lessons:
-            if not LessonActivation.query.filter_by(lesson_id=lesson.id, student_id=student_id, active=True).first():
-                db.session.add(LessonActivation(lesson_id=lesson.id, student_id=student_id))
+        for lesson in Lesson.objects(section_id=section.id).all():
+            if not LessonActivation.objects(lesson_id=lesson.id, student_id=student_id, active=True).first():
+                la = LessonActivation(lesson_id=lesson.id, student_id=student_id)
+                la.save()
 
 
 def cascade_section_activation(section: Section, student_id: int) -> None:
@@ -24,9 +25,10 @@ def cascade_section_activation(section: Section, student_id: int) -> None:
         return
 
     # Activate all lessons in the section
-    for lesson in section.lessons:
-        if not LessonActivation.query.filter_by(lesson_id=lesson.id, student_id=student_id, active=True).first():
-            db.session.add(LessonActivation(lesson_id=lesson.id, student_id=student_id))
+    for lesson in Lesson.objects(section_id=section.id).all():
+        if not LessonActivation.objects(lesson_id=lesson.id, student_id=student_id, active=True).first():
+            la = LessonActivation(lesson_id=lesson.id, student_id=student_id)
+            la.save()
 
 
 def cascade_lesson_activation(lesson, student_id: int) -> None:
@@ -34,78 +36,93 @@ def cascade_lesson_activation(lesson, student_id: int) -> None:
     if not lesson:
         return
 
-    if not LessonActivation.query.filter_by(lesson_id=lesson.id, student_id=student_id, active=True).first():
-        db.session.add(LessonActivation(lesson_id=lesson.id, student_id=student_id))
+    if not LessonActivation.objects(lesson_id=lesson.id, student_id=student_id, active=True).first():
+        la = LessonActivation(lesson_id=lesson.id, student_id=student_id)
+        la.save()
 
 
-def revoke_subject_activation(subject: Subject, student_id: int) -> None:
+def revoke_subject_activation(subject_id, student_id: int) -> None:
     """Deactivate subject and all related section/lesson activations for a student."""
-    SubjectActivation.query.filter_by(subject_id=subject.id, student_id=student_id, active=True).update({"active": False})
+    for sa in SubjectActivation.objects(subject_id=subject_id, student_id=student_id, active=True).all():
+        sa.active = False
+        sa.save()
 
-    section_ids = [s.id for s in subject.sections]
+    # Get all section IDs from subject
+    sections = Section.objects(subject_id=subject_id).all()
+    section_ids = [s.id for s in sections]
+    
     if section_ids:
-        SectionActivation.query.filter(
-            SectionActivation.section_id.in_(section_ids),
-            SectionActivation.student_id == student_id,
-            SectionActivation.active.is_(True),
-        ).update({"active": False}, synchronize_session=False)
+        for sec_activation in SectionActivation.objects(section_id__in=section_ids, student_id=student_id, active=True).all():
+            sec_activation.active = False
+            sec_activation.save()
 
         # Get all lesson IDs from all sections
         lesson_ids = []
-        for section in subject.sections:
-            lesson_ids.extend([l.id for l in section.lessons])
+        for section in sections:
+            lessons = LessonActivation.objects(section_id=section.id).all()
+            lesson_ids.extend([l.id for l in lessons])
         
         if lesson_ids:
-            LessonActivation.query.filter(
-                LessonActivation.lesson_id.in_(lesson_ids),
-                LessonActivation.student_id == student_id,
-                LessonActivation.active.is_(True),
-            ).update({"active": False}, synchronize_session=False)
+            for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, student_id=student_id, active=True).all():
+                les_activation.active = False
+                les_activation.save()
 
 
-def revoke_section_activation(section: Section, student_id: int) -> None:
+def revoke_section_activation(section_id, student_id: int) -> None:
     """Deactivate section and all related lesson activations for a student."""
-    SectionActivation.query.filter_by(section_id=section.id, student_id=student_id, active=True).update({"active": False})
+    for sa in SectionActivation.objects(section_id=section_id, student_id=student_id, active=True).all():
+        sa.active = False
+        sa.save()
 
-    lesson_ids = [l.id for l in section.lessons]
+    # Get all lesson IDs in section
+    lessons = LessonActivation.objects(section_id=section_id).all()
+    lesson_ids = [l.id for l in lessons]
+    
     if lesson_ids:
-        LessonActivation.query.filter(
-            LessonActivation.lesson_id.in_(lesson_ids),
-            LessonActivation.student_id == student_id,
-            LessonActivation.active.is_(True),
-        ).update({"active": False}, synchronize_session=False)
+        for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, student_id=student_id, active=True).all():
+            les_activation.active = False
+            les_activation.save()
 
 
-def lock_subject_access_for_all(subject: Subject) -> None:
+def lock_subject_access_for_all(subject_id) -> None:
     """When a subject is (re)locked, deactivate all activations so only freebies stay open."""
-    SubjectActivation.query.filter_by(subject_id=subject.id, active=True).update({"active": False})
+    for sa in SubjectActivation.objects(subject_id=subject_id, active=True).all():
+        sa.active = False
+        sa.save()
 
-    section_ids = [s.id for s in subject.sections]
+    # Get all sections and their lessons
+    sections = Section.objects(subject_id=subject_id).all()
+    section_ids = [s.id for s in sections]
+    
     if section_ids:
-        SectionActivation.query.filter(
-            SectionActivation.section_id.in_(section_ids),
-            SectionActivation.active.is_(True),
-        ).update({"active": False}, synchronize_session=False)
+        for sec_activation in SectionActivation.objects(section_id__in=section_ids, active=True).all():
+            sec_activation.active = False
+            sec_activation.save()
 
         # Get all lesson IDs from all sections
         lesson_ids = []
-        for section in subject.sections:
-            lesson_ids.extend([l.id for l in section.lessons])
+        for section in sections:
+            lessons = LessonActivation.objects(section_id=section.id).all()
+            lesson_ids.extend([l.id for l in lessons])
         
         if lesson_ids:
-            LessonActivation.query.filter(
-                LessonActivation.lesson_id.in_(lesson_ids),
-                LessonActivation.active.is_(True),
-            ).update({"active": False}, synchronize_session=False)
+            for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, active=True).all():
+                les_activation.active = False
+                les_activation.save()
 
 
-def lock_section_access_for_all(section: Section) -> None:
+def lock_section_access_for_all(section_id) -> None:
     """When a section is (re)locked, deactivate all activations so only freebies stay open."""
-    SectionActivation.query.filter_by(section_id=section.id, active=True).update({"active": False})
+    for sa in SectionActivation.objects(section_id=section_id, active=True).all():
+        sa.active = False
+        sa.save()
 
-    lesson_ids = [l.id for l in section.lessons]
+    # Get all lesson IDs in section
+    lessons = LessonActivation.objects(section_id=section_id).all()
+    lesson_ids = [l.id for l in lessons]
+    
     if lesson_ids:
-        LessonActivation.query.filter(
-            LessonActivation.lesson_id.in_(lesson_ids),
-            LessonActivation.active.is_(True),
-        ).update({"active": False}, synchronize_session=False)
+        for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, active=True).all():
+            les_activation.active = False
+            les_activation.save()
+
