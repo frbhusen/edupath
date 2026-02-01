@@ -74,35 +74,41 @@ def ensure_schema():
                 """
             ))
 
-        # Create TestActivation table if missing
-        if "test_activation" not in tables:
+        # Drop old TestActivation tables if they exist (no longer used)
+        if "test_activation" in tables:
+            conn.execute(text("DROP TABLE IF EXISTS test_activation"))
+        if "test_activation_code" in tables:
+            conn.execute(text("DROP TABLE IF EXISTS test_activation_code"))
+
+        # Create SubjectActivation table if missing
+        if "subject_activation" not in tables:
             conn.execute(text(
                 """
-                CREATE TABLE test_activation (
+                CREATE TABLE subject_activation (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    test_id INTEGER NOT NULL,
+                    subject_id INTEGER NOT NULL,
                     student_id INTEGER NOT NULL,
                     activated_at DATETIME,
                     active BOOLEAN NOT NULL DEFAULT 1,
-                    FOREIGN KEY(test_id) REFERENCES test(id) ON DELETE CASCADE,
+                    FOREIGN KEY(subject_id) REFERENCES subject(id) ON DELETE CASCADE,
                     FOREIGN KEY(student_id) REFERENCES user(id) ON DELETE CASCADE
                 )
                 """
             ))
 
-        # Create TestActivationCode table if missing
-        if "test_activation_code" not in tables:
+        # Create SubjectActivationCode table if missing
+        if "subject_activation_code" not in tables:
             conn.execute(text(
                 """
-                CREATE TABLE test_activation_code (
+                CREATE TABLE subject_activation_code (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    test_id INTEGER NOT NULL,
+                    subject_id INTEGER NOT NULL,
                     student_id INTEGER NOT NULL,
                     code TEXT NOT NULL UNIQUE,
                     created_at DATETIME,
                     used_at DATETIME,
                     is_used BOOLEAN NOT NULL DEFAULT 0,
-                    FOREIGN KEY(test_id) REFERENCES test(id) ON DELETE CASCADE,
+                    FOREIGN KEY(subject_id) REFERENCES subject(id) ON DELETE CASCADE,
                     FOREIGN KEY(student_id) REFERENCES user(id) ON DELETE CASCADE
                 )
                 """

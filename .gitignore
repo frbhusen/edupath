@@ -1,7 +1,7 @@
 ﻿# Python
 __pycache__/
 *.py[cod]
-*.class
+*$py.class
 *.so
 .Python
 env/
@@ -22,6 +22,10 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Node
+node_modules/
+package-lock.json
 
 # Flask
 instance/

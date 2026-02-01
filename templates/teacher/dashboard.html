@@ -46,6 +46,11 @@
           </div>
           <div class="text-nowrap d-flex gap-2">
             <a
+              class="btn btn-sm btn-outline-info"
+              href="{{ url_for('teacher.manage_subject_access', subject_id=subject.id) }}"
+              >إدارة الوصول</a
+            >
+            <a
               class="btn btn-sm btn-outline-primary"
               href="{{ url_for('teacher.new_section', subject_id=subject.id) }}"
               >إضافة قسم</a
@@ -229,11 +234,6 @@
                               class="btn btn-outline-primary btn-sm"
                               href="{{ url_for('teacher.edit_test', test_id=test.id) }}"
                               >تعديل</a
-                            >
-                            <a
-                              class="btn btn-outline-secondary btn-sm"
-                              href="{{ url_for('teacher.manage_test_access', test_id=test.id) }}"
-                              >الوصول</a
                             >
                             <form
                               class="d-inline"

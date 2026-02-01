@@ -5,7 +5,19 @@
     <h1 class="h4 mb-1">{{ subject.name }}</h1>
     <p class="mb-0">{{ subject.description or 'لا يوجد وصف.' }}</p>
   </div>
-  <span class="chip">{{ subject.sections|length }} أقسام</span>
+  <div class="d-flex gap-2 align-items-center">
+    {% if current_user.role == 'student' %}
+      {% set subject_active = subject_activation and subject_activation.active %}
+      {% if not subject_active %}
+        <a class="btn btn-warning btn-sm" href="{{ url_for('student.activate_subject', subject_id=subject.id) }}">
+          🔓 تفعيل المادة
+        </a>
+      {% else %}
+        <span class="badge text-bg-success">✓ مفعّلة</span>
+      {% endif %}
+    {% endif %}
+    <span class="chip">{{ subject.sections|length }} أقسام</span>
+  </div>
 </div>
 
 <h3 class="h5 mb-3">الأقسام</h3>

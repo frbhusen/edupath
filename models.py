@@ -140,24 +140,6 @@ class CustomTestAnswer(db.Model):
     is_correct = db.Column(db.Boolean, default=False, nullable=False)
 
 
-class TestActivation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    test_id = db.Column(db.Integer, db.ForeignKey("test.id"), nullable=False)
-    student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    activated_at = db.Column(db.DateTime, default=datetime.utcnow)
-    active = db.Column(db.Boolean, default=True, nullable=False)
-
-
-class TestActivationCode(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    test_id = db.Column(db.Integer, db.ForeignKey("test.id"), nullable=False)
-    student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    code = db.Column(db.String(6), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    used_at = db.Column(db.DateTime, nullable=True)
-    is_used = db.Column(db.Boolean, default=False, nullable=False)
-
-
 class LessonActivation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lesson_id = db.Column(db.Integer, db.ForeignKey("lesson.id"), nullable=False)
@@ -187,6 +169,24 @@ class SectionActivation(db.Model):
 class ActivationCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     section_id = db.Column(db.Integer, db.ForeignKey("section.id"), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    code = db.Column(db.String(6), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    used_at = db.Column(db.DateTime, nullable=True)
+    is_used = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class SubjectActivation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    subject_id = db.Column(db.Integer, db.ForeignKey("subject.id"), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    activated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+
+
+class SubjectActivationCode(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    subject_id = db.Column(db.Integer, db.ForeignKey("subject.id"), nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     code = db.Column(db.String(6), unique=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

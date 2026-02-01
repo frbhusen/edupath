@@ -5,28 +5,39 @@ from datetime import datetime
 from flask_login import login_required, current_user
 
 from .extensions import db
-from .models import Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, TestActivationCode, TestActivation, CustomTestAttempt, CustomTestAnswer
+from .models import Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer
 from .forms import ActivationForm, LessonActivationForm
-from .activation_utils import cascade_section_activation, cascade_lesson_activation
+from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
 
 student_bp = Blueprint("student", __name__, template_folder="templates")
 
 
 class AccessContext:
-    """Per-student access computation for a section."""
+    """Per-student access computation for a section with three-level hierarchy: Subject → Section → Lesson."""
 
     def __init__(self, section: Section, student_id: int):
         self.section = section
         self.student_id = student_id
+        self.subject = section.subject
+        
+        # Check if entire subject is activated
+        self.subject_active = bool(
+            SubjectActivation.query.filter_by(subject_id=self.subject.id, student_id=student_id, active=True).first()
+        )
+        
+        # Check if section is activated
         self.section_requires_code = section.requires_code
         self.section_active = bool(
             SectionActivation.query.filter_by(section_id=section.id, student_id=student_id, active=True).first()
         )
-        # If a section does not require a code, treat it as open for access checks
-        self.section_open = self.section_active or not self.section_requires_code
+        
+        # Section is "open" if:
+        # - Subject is activated (everything in subject is accessible) OR
+        # - Section doesn't require code OR
+        # - Section is activated
+        self.section_open = self.subject_active or self.section_active or not self.section_requires_code
 
         lesson_ids = [l.id for l in section.lessons]
-        test_ids = [t.id for t in section.tests]
 
         if lesson_ids:
             self.lesson_activation_ids = {
@@ -40,46 +51,56 @@ class AccessContext:
         else:
             self.lesson_activation_ids = set()
 
-        if test_ids:
-            self.test_activation_ids = {
-                ta.test_id
-                for ta in TestActivation.query.filter(
-                    TestActivation.test_id.in_(test_ids),
-                    TestActivation.student_id == student_id,
-                    TestActivation.active.is_(True),
-                ).all()
-            }
-        else:
-            self.test_activation_ids = set()
-
         self.first_lesson_id = min([l.id for l in section.lessons], default=None)
         self.first_section_wide_test_id = min([t.id for t in section.tests if t.lesson_id is None], default=None)
 
     def lesson_open(self, lesson: Lesson) -> bool:
-        # Section is open or does not require code
+        """Check if student can access this lesson."""
+        # If subject or section is open, all lessons visible
         if self.section_open:
             return True
 
         # Section requires code and is not active
+        # First lesson is always free
         if self.first_lesson_id and lesson.id == self.first_lesson_id:
             return True
+        
+        # Check if lesson is individually activated
         return lesson.id in self.lesson_activation_ids
 
     def test_open(self, test: Test) -> bool:
-        # Section is open or does not require code
+        """Check if student can access this test.
+        
+        Logic:
+        - Subject activated → all tests accessible
+        - Section activated → all tests in section accessible (lesson + section-wide)
+        - Lesson activated → only tests linked to that lesson accessible
+        - Section-wide tests: require section or subject activation
+        """
+        # If subject is activated, all tests are accessible
+        if self.subject_active:
+            return True
+        
+        # If section is open (activated or doesn't require code), all tests in section are accessible
         if self.section_open:
             return True
 
-        # Section requires code and is not active: allow first freebies or activated items
+        # Section requires code and is not active
+        # Check if this is a lesson-specific test
         if test.lesson_id:
+            # First lesson's tests are free
             if self.first_lesson_id and test.lesson_id == self.first_lesson_id:
                 return True
-            if test.lesson and test.lesson.id in self.lesson_activation_ids:
+            # If lesson is activated, its tests are accessible
+            if test.lesson_id in self.lesson_activation_ids:
                 return True
         else:
+            # Section-wide test: first section-wide test is free
             if self.first_section_wide_test_id and test.id == self.first_section_wide_test_id:
                 return True
-        return test.id in self.test_activation_ids
+            # Section-wide tests require section activation (not accessible via lesson activation)
+        
+        return False
 
 
 def get_unlocked_lessons(student_id: int):
@@ -96,7 +117,17 @@ def get_unlocked_lessons(student_id: int):
 @login_required
 def subjects():
     subs = Subject.query.all()
-    return render_template("student/subjects.html", subjects=subs)
+    
+    # Get activation status for each subject if student
+    subject_activations = {}
+    if current_user.role == "student":
+        activations = SubjectActivation.query.filter_by(
+            student_id=current_user.id, 
+            active=True
+        ).all()
+        subject_activations = {sa.subject_id: sa for sa in activations}
+    
+    return render_template("student/subjects.html", subjects=subs, subject_activations=subject_activations)
 
 # Redirect '/student' to subjects for Up navigation
 @student_bp.route("/student")
@@ -108,7 +139,17 @@ def student_root():
 @login_required
 def subject_detail(subject_id):
     subject = Subject.query.get_or_404(subject_id)
-    return render_template("student/subject_detail.html", subject=subject)
+    
+    # Check if subject is activated for this student
+    subject_activation = None
+    if current_user.role == "student":
+        subject_activation = SubjectActivation.query.filter_by(
+            subject_id=subject.id, 
+            student_id=current_user.id, 
+            active=True
+        ).first()
+    
+    return render_template("student/subject_detail.html", subject=subject, subject_activation=subject_activation)
 
 @student_bp.route("/sections/<int:section_id>")
 @login_required
@@ -245,8 +286,13 @@ def take_test(test_id):
     if current_user.role == "student":
         access = AccessContext(test.section, current_user.id)
         if not access.test_open(test):
-            flash("قم بتفعيل هذا الاختبار (أو درسه) للمتابعة.", "warning")
-            return redirect(url_for("student.activate_test", test_id=test.id))
+            # Redirect to appropriate activation page based on test type
+            if test.lesson_id:
+                flash("قم بتفعيل الدرس للوصول إلى هذا الاختبار.", "warning")
+                return redirect(url_for("student.activate_lesson", lesson_id=test.lesson_id))
+            else:
+                flash("قم بتفعيل القسم للوصول إلى هذا الاختبار.", "warning")
+                return redirect(url_for("student.activate_section", section_id=test.section_id))
 
     total_questions_available = len(test.questions)
     min_select = 10 if total_questions_available >= 10 else total_questions_available
@@ -328,6 +374,33 @@ def take_test(test_id):
     )
 
 
+@student_bp.route("/subjects/<int:subject_id>/activate", methods=["GET", "POST"])
+@login_required
+def activate_subject(subject_id):
+    subject = Subject.query.get_or_404(subject_id)
+    form = ActivationForm()
+    if request.method == "POST" and form.validate_on_submit():
+        code_value = form.code.data.strip().upper()
+        ac = SubjectActivationCode.query.filter_by(subject_id=subject.id, student_id=current_user.id, code=code_value).first()
+        if not ac:
+            flash("رمز غير صحيح لهذه المادة.", "error")
+            return render_template("student/activate_subject.html", subject=subject, form=form)
+        if ac.is_used:
+            flash("This code has already been used.", "error")
+            return render_template("student/activate_subject.html", subject=subject, form=form)
+        # mark used and activate
+        ac.is_used = True
+        ac.used_at = datetime.utcnow()
+        existing = SubjectActivation.query.filter_by(subject_id=subject.id, student_id=current_user.id, active=True).first()
+        if not existing:
+            db.session.add(SubjectActivation(subject_id=subject.id, student_id=current_user.id))
+        cascade_subject_activation(subject, current_user.id)
+        db.session.commit()
+        flash("تم تفعيل المادة بالكامل!", "success")
+        return redirect(url_for("student.subject_detail", subject_id=subject.id))
+    return render_template("student/activate_subject.html", subject=subject, form=form)
+
+
 @student_bp.route("/sections/<int:section_id>/activate", methods=["GET", "POST"])
 @login_required
 def activate_section(section_id):
@@ -344,7 +417,6 @@ def activate_section(section_id):
             return render_template("student/activate_section.html", section=section, form=form)
         # mark used and activate
         ac.is_used = True
-        from datetime import datetime
         ac.used_at = datetime.utcnow()
         existing = SectionActivation.query.filter_by(section_id=section.id, student_id=current_user.id, active=True).first()
         if not existing:
@@ -372,7 +444,6 @@ def activate_lesson(lesson_id):
             flash("This code has already been used.", "error")
             return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
         ac.is_used = True
-        from datetime import datetime
         ac.used_at = datetime.utcnow()
         existing = LessonActivation.query.filter_by(lesson_id=lesson.id, student_id=current_user.id, active=True).first()
         if not existing:
@@ -382,32 +453,6 @@ def activate_lesson(lesson_id):
         flash("تم تفعيل الدرس!", "success")
         return redirect(url_for("student.lesson_detail", lesson_id=lesson.id))
     return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
-
-
-@student_bp.route("/tests/<int:test_id>/activate", methods=["GET", "POST"])
-@login_required
-def activate_test(test_id):
-    test = Test.query.get_or_404(test_id)
-    form = ActivationForm()
-    if request.method == "POST" and form.validate_on_submit():
-        code_value = form.code.data.strip().upper()
-        tac = TestActivationCode.query.filter_by(test_id=test.id, student_id=current_user.id, code=code_value).first()
-        if not tac:
-            flash("رمز غير صحيح لهذا الاختبار.", "error")
-            return render_template("student/activate_test.html", test=test, form=form)
-        if tac.is_used:
-            flash("This code has already been used.", "error")
-            return render_template("student/activate_test.html", test=test, form=form)
-        tac.is_used = True
-        from datetime import datetime
-        tac.used_at = datetime.utcnow()
-        existing = TestActivation.query.filter_by(test_id=test.id, student_id=current_user.id, active=True).first()
-        if not existing:
-            db.session.add(TestActivation(test_id=test.id, student_id=current_user.id))
-        db.session.commit()
-        flash("تم تفعيل الاختبار!", "success")
-        return redirect(url_for("student.take_test", test_id=test.id))
-    return render_template("student/activate_test.html", test=test, form=form)
 
 
 @student_bp.route("/results")

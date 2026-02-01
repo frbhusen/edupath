@@ -20,8 +20,8 @@ from .models import (
     ActivationCode,
     LessonActivation,
     LessonActivationCode,
-    TestActivation,
-    TestActivationCode,
+    SubjectActivation,
+    SubjectActivationCode,
 )
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")
@@ -42,8 +42,8 @@ ALLOWED_MODELS = {
     "activation_code": ActivationCode,
     "lesson_activation": LessonActivation,
     "lesson_activation_code": LessonActivationCode,
-    "test_activation": TestActivation,
-    "test_activation_code": TestActivationCode,
+    "subject_activation": SubjectActivation,
+    "subject_activation_code": SubjectActivationCode,
 }
 
 

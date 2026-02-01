@@ -3,10 +3,15 @@ import json
 from flask_login import login_required, current_user
 
 from .extensions import db
-from .models import User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, ActivationCode, SectionActivation, Attempt, AttemptAnswer
-from .models import User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, ActivationCode, SectionActivation, LessonActivation, LessonActivationCode, TestActivation, TestActivationCode, Attempt, AttemptAnswer
-from .extensions import db
-from .activation_utils import cascade_section_activation, cascade_lesson_activation, revoke_section_activation, lock_section_access_for_all
+from .models import (
+    User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, 
+    ActivationCode, SectionActivation, LessonActivation, LessonActivationCode,
+    SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer
+)
+from .activation_utils import (
+    cascade_subject_activation, cascade_section_activation, cascade_lesson_activation,
+    revoke_subject_activation, revoke_section_activation, lock_subject_access_for_all, lock_section_access_for_all
+)
 from .forms import SubjectForm, SectionForm, LessonForm, TestForm, StudentEditForm
 
 teacher_bp = Blueprint("teacher", __name__, template_folder="templates")
@@ -150,6 +155,82 @@ def edit_student(user_id):
         return redirect(url_for("teacher.students"))
 
     return render_template("teacher/student_form.html", form=form, student=student)
+
+
+@teacher_bp.route("/subjects/<int:subject_id>/access", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def manage_subject_access(subject_id):
+    subject = Subject.query.get_or_404(subject_id)
+    if subject.created_by != current_user.id:
+        flash("غير مسموح", "error")
+        return redirect(url_for("teacher.dashboard"))
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        student_id = int(request.form.get("student_id"))
+        student = User.query.get_or_404(student_id)
+
+        if action == "generate_code":
+            # Allow only one unused code at a time
+            existing_unused = SubjectActivationCode.query.filter_by(
+                subject_id=subject.id, student_id=student.id, is_used=False
+            ).first()
+            if existing_unused:
+                flash("الطالب لديه رمز غير مستخدم لهذه المادة. قم بإزالته أو استخدامه قبل إنشاء آخر.", "error")
+                return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
+            import random, string
+            def gen():
+                return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+            code_value = gen()
+            while SubjectActivationCode.query.filter_by(code=code_value).first():
+                code_value = gen()
+            ac = SubjectActivationCode(subject_id=subject.id, student_id=student.id, code=code_value)
+            db.session.add(ac)
+            db.session.commit()
+            flash(f"تم إنشاء رمز لـ {student.username}: {code_value}", "success")
+        elif action == "activate":
+            existing = SubjectActivation.query.filter_by(
+                subject_id=subject.id, student_id=student.id, active=True
+            ).first()
+            if not existing:
+                db.session.add(SubjectActivation(subject_id=subject.id, student_id=student.id))
+            cascade_subject_activation(subject, student.id)
+            db.session.commit()
+            flash(f"تم تفعيل المادة لـ {student.username}", "success")
+        elif action == "revoke":
+            revoke_subject_activation(subject, student.id)
+            db.session.commit()
+            flash(f"تم إلغاء الوصول لـ {student.username}", "info")
+        elif action == "delete_code":
+            code_id = int(request.form.get("code_id", 0))
+            ac = SubjectActivationCode.query.get_or_404(code_id)
+            if ac.subject_id != subject.id or ac.student_id != student.id:
+                flash("رمز غير صحيح", "error")
+            else:
+                db.session.delete(ac)
+                db.session.commit()
+                flash("تم إزالة الرمز", "info")
+        return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
+
+    students = User.query.filter_by(role="student").order_by(User.created_at.desc()).all()
+    activations = {
+        sa.student_id: sa 
+        for sa in SubjectActivation.query.filter_by(subject_id=subject.id, active=True).all()
+    }
+    codes_by_student = {}
+    for ac in SubjectActivationCode.query.filter_by(subject_id=subject.id).order_by(
+        SubjectActivationCode.created_at.desc()
+    ).all():
+        lst = codes_by_student.setdefault(ac.student_id, [])
+        lst.append(ac)
+    return render_template(
+        "teacher/subject_access.html", 
+        subject=subject, 
+        students=students, 
+        activations=activations, 
+        codes_by_student=codes_by_student
+    )
 
 
 @teacher_bp.route("/sections/<int:section_id>/access", methods=["GET", "POST"])
@@ -417,9 +498,6 @@ def delete_test(test_id):
     if subject.created_by != current_user.id:
         flash("غير مسموح", "error")
         return redirect(url_for("teacher.dashboard"))
-
-    TestActivationCode.query.filter_by(test_id=test.id).delete()
-    TestActivation.query.filter_by(test_id=test.id).delete()
 
     db.session.delete(test)
     db.session.commit()
@@ -717,65 +795,3 @@ def edit_test(test_id):
             return redirect(url_for("teacher.edit_test", test_id=test.id))
 
     return render_template("teacher/test_edit.html", test=test, meta_form=meta_form)
-
-
-@teacher_bp.route("/tests/<int:test_id>/access", methods=["GET", "POST"])
-@login_required
-@role_required("teacher")
-def manage_test_access(test_id):
-    test = Test.query.get_or_404(test_id)
-    subject = test.section.subject
-    if subject.created_by != current_user.id:
-        flash("غير مسموح", "error")
-        return redirect(url_for("teacher.dashboard"))
-
-    if request.method == "POST":
-        action = request.form.get("action")
-        student_id = int(request.form.get("student_id"))
-        student = User.query.get_or_404(student_id)
-
-        if action == "generate_code":
-            existing_unused = TestActivationCode.query.filter_by(test_id=test.id, student_id=student.id, is_used=False).first()
-            if existing_unused:
-                flash("الطالب لديه رمز غير مستخدم لهذا الاختبار. قم بإزالته أو استخدامه قبل إنشاء آخر.", "error")
-                return redirect(url_for("teacher.manage_test_access", test_id=test.id))
-            import random, string
-            def gen():
-                return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            code_value = gen()
-            while TestActivationCode.query.filter_by(code=code_value).first():
-                code_value = gen()
-            tac = TestActivationCode(test_id=test.id, student_id=student.id, code=code_value)
-            db.session.add(tac)
-            db.session.commit()
-            flash(f"تم إنشاء رمز لـ {student.username}: {code_value}", "success")
-        elif action == "activate":
-            existing = TestActivation.query.filter_by(test_id=test.id, student_id=student.id, active=True).first()
-            if not existing:
-                db.session.add(TestActivation(test_id=test.id, student_id=student.id))
-                db.session.commit()
-            flash(f"تم تفعيل الاختبار لـ {student.username}", "success")
-        elif action == "revoke":
-            existing = TestActivation.query.filter_by(test_id=test.id, student_id=student.id, active=True).first()
-            if existing:
-                existing.active = False
-                db.session.commit()
-            flash(f"Access revoked for {student.username}", "info")
-        elif action == "delete_code":
-            code_id = int(request.form.get("code_id", 0))
-            tac = TestActivationCode.query.get_or_404(code_id)
-            if tac.test_id != test.id or tac.student_id != student.id:
-                flash("رمز غير صحيح", "error")
-            else:
-                db.session.delete(tac)
-                db.session.commit()
-                flash("تم إزالة الرمز", "info")
-        return redirect(url_for("teacher.manage_test_access", test_id=test.id))
-
-    students = User.query.filter_by(role="student").order_by(User.created_at.desc()).all()
-    activations = { ta.student_id: ta for ta in TestActivation.query.filter_by(test_id=test.id, active=True).all() }
-    codes_by_student = {}
-    for ac in TestActivationCode.query.filter_by(test_id=test.id).order_by(TestActivationCode.created_at.desc()).all():
-        lst = codes_by_student.setdefault(ac.student_id, [])
-        lst.append(ac)
-    return render_template("teacher/test_access.html", test=test, students=students, activations=activations, codes_by_student=codes_by_student)
