@@ -48,6 +48,10 @@ class Subject(Document):
         ]
     }
 
+    @property
+    def sections(self):
+        return Section.objects(subject_id=self).all()
+
 
 class Section(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
@@ -64,6 +68,18 @@ class Section(Document):
             'created_at'
         ]
     }
+
+    @property
+    def subject(self):
+        return self.subject_id
+
+    @property
+    def lessons(self):
+        return Lesson.objects(section_id=self).all()
+
+    @property
+    def tests(self):
+        return Test.objects(section_id=self).all()
 
 
 class Lesson(Document):
@@ -85,6 +101,18 @@ class Lesson(Document):
             'created_at'
         ]
     }
+
+    @property
+    def section(self):
+        return self.section_id
+
+    @property
+    def resources(self):
+        return LessonResource.objects(lesson_id=self).order_by('position').all()
+
+    @property
+    def tests(self):
+        return Test.objects(lesson_id=self).all()
 
 
 class LessonResource(Document):
@@ -125,6 +153,18 @@ class Test(Document):
         ]
     }
 
+    @property
+    def section(self):
+        return self.section_id
+
+    @property
+    def lesson(self):
+        return self.lesson_id
+
+    @property
+    def questions(self):
+        return Question.objects(test_id=self).all()
+
 
 class Choice(EmbeddedDocument):
     choice_id = ObjectIdField(default=ObjectId)
@@ -138,6 +178,7 @@ class Question(Document):
     text = StringField(required=True)
     hint = StringField(null=True)
     choices = ListField(EmbeddedDocumentField(Choice), required=True)
+    correct_choice_id = ObjectIdField(null=True)
     created_at = DateTimeField(default=datetime.utcnow)
     
     meta = {
@@ -157,7 +198,7 @@ class Attempt(Document):
     total = IntField(required=True)
     started_at = DateTimeField(default=datetime.utcnow)
     submitted_at = DateTimeField(default=datetime.utcnow)
-    answers = ListField(required=True)  # List of {question_id, choice_id, is_correct}
+    answers = ListField(default=list)  # List of {question_id, choice_id, is_correct}
     
     meta = {
         'collection': 'attempts',
@@ -168,6 +209,14 @@ class Attempt(Document):
             'submitted_at'
         ]
     }
+
+    @property
+    def test(self):
+        return self.test_id
+
+    @property
+    def student(self):
+        return self.student_id
 
 
 class AttemptAnswer(Document):
@@ -184,6 +233,14 @@ class AttemptAnswer(Document):
             'question_id'
         ]
     }
+
+    @property
+    def attempt(self):
+        return self.attempt_id
+
+    @property
+    def question(self):
+        return self.question_id
 
 
 class CustomTestAttempt(Document):
@@ -205,6 +262,10 @@ class CustomTestAttempt(Document):
             'created_at'
         ]
     }
+
+    @property
+    def student(self):
+        return self.student_id
 
 
 class CustomTestAnswer(Document):

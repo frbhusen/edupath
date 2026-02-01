@@ -164,7 +164,11 @@ def manage_subject_access(subject_id):
     
     if request.method == "POST":
         action = request.form.get("action")
-        if action == "generate_code":
+        if action == "toggle_requires_code":
+            section.requires_code = not section.requires_code
+            section.save()
+            flash("تم تحديث حالة التفعيل للقسم.", "success")
+        elif action == "generate_code":
             student_id = request.form.get("student_id")
             student = User.objects(id=student_id).first()
             
@@ -200,12 +204,25 @@ def manage_subject_access(subject_id):
                     flash("تم تفعيل المادة للطالب.", "success")
                     cascade_subject_activation(subject, student.id)
         
-        elif action == "revoke_access":
+        elif action in {"revoke_access", "revoke"}:
             student_id = request.form.get("student_id")
             student = User.objects(id=student_id).first()
             if student:
                 revoke_subject_activation(subject.id, student.id)
                 flash("تم إلغاء التفعيل للطالب.", "success")
+
+        elif action == "activate":
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            if student:
+                existing = SubjectActivation.objects(
+                    subject_id=subject.id, student_id=student.id, active=True
+                ).first()
+                if not existing:
+                    sa = SubjectActivation(subject_id=subject.id, student_id=student.id)
+                    sa.save()
+                cascade_subject_activation(subject, student.id)
+                flash("تم تفعيل المادة للطالب.", "success")
         
         elif action == "delete_code":
             code_id = request.form.get("code_id")
@@ -217,11 +234,23 @@ def manage_subject_access(subject_id):
     
     students = User.objects(role="student").order_by('-created_at').all()
     activated_students = {
-        str(sa.student_id): sa for sa in SubjectActivation.objects(subject_id=subject.id, active=True).all()
+        sa.student_id.id: sa for sa in SubjectActivation.objects(subject_id=subject.id, active=True).all()
     }
     codes = SubjectActivationCode.objects(subject_id=subject.id).order_by('-created_at').all()
+    codes_by_student = {}
+    for code in codes:
+        key = code.student_id.id if code.student_id else None
+        if key is not None:
+            codes_by_student.setdefault(key, []).append(code)
     
-    return render_template("teacher/subject_access.html", subject=subject, students=students, activated_students=activated_students, codes=codes)
+    return render_template(
+        "teacher/subject_access.html",
+        subject=subject,
+        students=students,
+        activations=activated_students,
+        codes=codes,
+        codes_by_student=codes_by_student,
+    )
 
 
 @teacher_bp.route("/sections/<section_id>/access", methods=["GET", "POST"])
@@ -267,12 +296,25 @@ def manage_section_access(section_id):
                     flash("تم تفعيل القسم للطالب.", "success")
                     cascade_section_activation(section, student.id)
         
-        elif action == "revoke_access":
+        elif action in {"revoke_access", "revoke"}:
             student_id = request.form.get("student_id")
             student = User.objects(id=student_id).first()
             if student:
                 revoke_section_activation(section.id, student.id)
                 flash("تم إلغاء التفعيل للطالب.", "success")
+
+        elif action == "activate":
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            if student:
+                existing = SectionActivation.objects(
+                    section_id=section.id, student_id=student.id, active=True
+                ).first()
+                if not existing:
+                    sa = SectionActivation(section_id=section.id, student_id=student.id)
+                    sa.save()
+                cascade_section_activation(section, student.id)
+                flash("تم تفعيل القسم للطالب.", "success")
         
         elif action == "delete_code":
             code_id = request.form.get("code_id")
@@ -283,10 +325,22 @@ def manage_section_access(section_id):
                     flash("تم حذف الكود بنجاح.", "success")
     
     students = User.objects(role="student").order_by('-created_at').all()
-    activations = {str(sa.student_id): sa for sa in SectionActivation.objects(section_id=section.id, active=True).all()}
+    activations = {sa.student_id.id: sa for sa in SectionActivation.objects(section_id=section.id, active=True).all()}
     codes = ActivationCode.objects(section_id=section.id).order_by('-created_at').all()
+    codes_by_student = {}
+    for code in codes:
+        key = code.student_id.id if code.student_id else None
+        if key is not None:
+            codes_by_student.setdefault(key, []).append(code)
     
-    return render_template("teacher/section_access.html", section=section, students=students, activations=activations, codes=codes)
+    return render_template(
+        "teacher/section_access.html",
+        section=section,
+        students=students,
+        activations=activations,
+        codes=codes,
+        codes_by_student=codes_by_student,
+    )
 
 
 @teacher_bp.route("/lessons/<lesson_id>/access", methods=["GET", "POST"])
@@ -296,6 +350,7 @@ def manage_lesson_access(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         raise NotFound()
+    section = lesson.section_id
     
     if request.method == "POST":
         action = request.form.get("action")
@@ -332,12 +387,25 @@ def manage_lesson_access(lesson_id):
                     flash("تم تفعيل الدرس للطالب.", "success")
                     cascade_lesson_activation(lesson, student.id)
         
-        elif action == "revoke_access":
+        elif action in {"revoke_access", "revoke"}:
             student_id = request.form.get("student_id")
             student = User.objects(id=student_id).first()
             if student:
                 revoke_lesson_activation(lesson.id, student.id)
                 flash("تم إلغاء التفعيل للطالب.", "success")
+
+        elif action == "activate":
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id).first()
+            if student:
+                existing = LessonActivation.objects(
+                    lesson_id=lesson.id, student_id=student.id, active=True
+                ).first()
+                if not existing:
+                    la = LessonActivation(lesson_id=lesson.id, student_id=student.id)
+                    la.save()
+                cascade_lesson_activation(lesson, student.id)
+                flash("تم تفعيل الدرس للطالب.", "success")
         
         elif action == "delete_code":
             code_id = request.form.get("code_id")
@@ -348,10 +416,23 @@ def manage_lesson_access(lesson_id):
                     flash("تم حذف الكود بنجاح.", "success")
     
     students = User.objects(role="student").order_by('-created_at').all()
-    activations = {str(la.student_id): la for la in LessonActivation.objects(lesson_id=lesson.id, active=True).all()}
+    activations = {la.student_id.id: la for la in LessonActivation.objects(lesson_id=lesson.id, active=True).all()}
     codes = LessonActivationCode.objects(lesson_id=lesson.id).order_by('-created_at').all()
+    codes_by_student = {}
+    for code in codes:
+        key = code.student_id.id if code.student_id else None
+        if key is not None:
+            codes_by_student.setdefault(key, []).append(code)
     
-    return render_template("teacher/lesson_access.html", lesson=lesson, students=students, activations=activations, codes=codes)
+    return render_template(
+        "teacher/lesson_access.html",
+        lesson=lesson,
+        section=section,
+        students=students,
+        activations=activations,
+        codes=codes,
+        codes_by_student=codes_by_student,
+    )
 
 
 # Subject CRUD
@@ -497,17 +578,42 @@ def new_lesson(section_id):
         raise NotFound()
     form = LessonForm()
     if form.validate_on_submit():
+        resource_labels = request.form.getlist("resource_label[]")
+        resource_urls = request.form.getlist("resource_url[]")
+        resource_types = request.form.getlist("resource_type[]")
+        resources = [
+            (lbl.strip(), url.strip(), (rtype or "").strip().lower() or None)
+            for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
+            if lbl.strip() and url.strip()
+        ]
+
+        requires_code = bool(form.requires_code.data)
+        # First lesson in a section is open by default
+        if Lesson.objects(section_id=section.id).count() == 0:
+            requires_code = False
+
         lesson = Lesson(
             section_id=section.id,
             title=form.title.data,
             content=form.content.data,
-            requires_code=form.requires_code.data,
+            requires_code=requires_code,
             link_label=form.link_label.data,
             link_url=form.link_url.data,
             link_label_2=form.link_label_2.data,
             link_url_2=form.link_url_2.data,
         )
         lesson.save()
+
+        if resources:
+            for idx, (lbl, url, rtype) in enumerate(resources):
+                res = LessonResource(
+                    lesson_id=lesson.id,
+                    label=lbl,
+                    url=url,
+                    resource_type=rtype,
+                    position=idx,
+                )
+                res.save()
         flash("تم إنشاء الدرس بنجاح.", "success")
         return redirect(url_for("teacher.lesson_detail", lesson_id=lesson.id))
     return render_template("teacher/lesson_form.html", form=form, section=section)
@@ -534,6 +640,15 @@ def edit_lesson(lesson_id):
         raise NotFound()
     form = LessonForm()
     if form.validate_on_submit():
+        resource_labels = request.form.getlist("resource_label[]")
+        resource_urls = request.form.getlist("resource_url[]")
+        resource_types = request.form.getlist("resource_type[]")
+        resources = [
+            (lbl.strip(), url.strip(), (rtype or "").strip().lower() or None)
+            for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
+            if lbl.strip() and url.strip()
+        ]
+
         lesson.title = form.title.data
         lesson.content = form.content.data
         lesson.requires_code = form.requires_code.data
@@ -542,6 +657,18 @@ def edit_lesson(lesson_id):
         lesson.link_label_2 = form.link_label_2.data
         lesson.link_url_2 = form.link_url_2.data
         lesson.save()
+
+        # Replace resources from form
+        LessonResource.objects(lesson_id=lesson.id).delete()
+        for idx, (lbl, url, rtype) in enumerate(resources):
+            res = LessonResource(
+                lesson_id=lesson.id,
+                label=lbl,
+                url=url,
+                resource_type=rtype,
+                position=idx,
+            )
+            res.save()
         flash("تم تحديث الدرس بنجاح.", "success")
         return redirect(url_for("teacher.lesson_detail", lesson_id=lesson.id))
     elif request.method == "GET":
@@ -562,7 +689,7 @@ def delete_lesson(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         raise NotFound()
-    section_id = lesson.section_id
+    section_id = lesson.section_id.id if lesson.section_id else None
     lesson.delete()
     flash("تم حذف الدرس بنجاح.", "success")
     return redirect(url_for("teacher.section_detail", section_id=section_id))
@@ -629,10 +756,12 @@ def new_test(section_id):
     form.lesson_id.choices.insert(0, ("", "بدون درس (اختبار شامل)"))
     
     if form.validate_on_submit():
-        lesson_id = form.lesson_id.data if form.lesson_id.data else None
+        lesson_ref = None
+        if form.lesson_id.data:
+            lesson_ref = Lesson.objects(id=form.lesson_id.data).first()
         test = Test(
             section_id=section.id,
-            lesson_id=lesson_id,
+            lesson_id=lesson_ref,
             title=form.title.data,
             description=form.description.data,
             created_by=current_user.id,
@@ -671,21 +800,199 @@ def edit_test(test_id):
     form.lesson_id.choices = [(str(l.id), l.title) for l in lessons]
     form.lesson_id.choices.insert(0, ("", "بدون درس (اختبار شامل)"))
     
-    if form.validate_on_submit():
-        test.title = form.title.data
-        test.description = form.description.data
-        test.requires_code = form.requires_code.data
-        test.lesson_id = form.lesson_id.data if form.lesson_id.data else None
-        test.save()
-        flash("تم تحديث الاختبار بنجاح.", "success")
-        return redirect(url_for("teacher.test_detail", test_id=test.id))
+    if request.method == "POST":
+        form_name = request.form.get("form_name")
+
+        if form_name == "update_test":
+            if form.validate_on_submit():
+                test.title = form.title.data
+                test.description = form.description.data
+                test.requires_code = form.requires_code.data
+                if form.lesson_id.data:
+                    test.lesson_id = Lesson.objects(id=form.lesson_id.data).first()
+                else:
+                    test.lesson_id = None
+                test.save()
+                flash("تم تحديث الاختبار بنجاح.", "success")
+                return redirect(url_for("teacher.test_detail", test_id=test.id))
+
+        elif form_name == "upsert_question":
+            question_id = request.form.get("question_id")
+            text = (request.form.get("question_text") or "").strip()
+            hint = (request.form.get("question_hint") or "").strip() or None
+            correct_choice = request.form.get("correct_choice")
+            correct_index = int(correct_choice) if (correct_choice and correct_choice.isdigit()) else None
+
+            choices = []
+            for i in range(1, 5):
+                choice_text = (request.form.get(f"choice_{i}") or "").strip()
+                if choice_text:
+                    choices.append(Choice(text=choice_text, is_correct=(correct_index == i)))
+
+            if not text:
+                flash("نص السؤال مطلوب.", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            if not choices:
+                flash("يجب إضافة خيار واحد على الأقل.", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            if not any(c.is_correct for c in choices):
+                choices[0].is_correct = True
+
+            question = None
+            if question_id:
+                question = Question.objects(id=question_id, test_id=test.id).first()
+
+            if question:
+                question.text = text
+                question.hint = hint
+                question.choices = choices
+                correct_choice = next((c for c in choices if c.is_correct), None)
+                question.correct_choice_id = correct_choice.choice_id if correct_choice else None
+                question.save()
+                flash("تم تحديث السؤال.", "success")
+            else:
+                correct_choice = next((c for c in choices if c.is_correct), None)
+                question = Question(
+                    test_id=test.id,
+                    text=text,
+                    hint=hint,
+                    choices=choices,
+                    correct_choice_id=correct_choice.choice_id if correct_choice else None,
+                )
+                question.save()
+                flash("تمت إضافة السؤال.", "success")
+
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+        elif form_name == "delete_question":
+            question_id = request.form.get("question_id")
+            if question_id:
+                q = Question.objects(id=question_id, test_id=test.id).first()
+                if q:
+                    q.delete()
+                    flash("تم حذف السؤال.", "success")
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+        elif form_name == "import_json":
+            def _to_bool(val):
+                if isinstance(val, bool):
+                    return val
+                if isinstance(val, (int, float)):
+                    return val != 0
+                if isinstance(val, str):
+                    return val.strip().lower() in {"true", "1", "yes", "on"}
+                return False
+
+            raw_json = request.form.get("questions_json") or ""
+            upload = request.files.get("questions_file")
+            include_hints = request.form.get("include_hints") == "1"
+            if upload and upload.filename:
+                raw_json = upload.read().decode("utf-8")
+
+            try:
+                payload = json.loads(raw_json) if raw_json.strip() else None
+            except Exception as exc:
+                flash(f"JSON غير صحيح: {exc}", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            if not payload:
+                flash("لا يوجد JSON صالح للاستيراد.", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            items = payload
+            if isinstance(payload, dict):
+                items = payload.get("quiz") or payload.get("questions") or payload.get("items") or []
+
+            if not isinstance(items, list):
+                flash("تنسيق JSON غير مدعوم.", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            imported = 0
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                q_text = (item.get("question") or item.get("text") or "").strip()
+                q_hint = (item.get("hint") or "").strip() if include_hints else None
+                answer_options = item.get("answerOptions") or item.get("answer_options") or None
+                choices_list = item.get("choices") or item.get("options") or []
+                if not q_text:
+                    continue
+                if answer_options is None and (not isinstance(choices_list, list) or len(choices_list) == 0):
+                    continue
+                if answer_options is not None and (not isinstance(answer_options, list) or len(answer_options) == 0):
+                    continue
+
+                correct = item.get("answer") if "answer" in item else item.get("correct")
+                correct_indices = set()
+
+                if isinstance(correct, int):
+                    correct_indices.add(correct if correct >= 1 else correct + 1)
+                elif isinstance(correct, list):
+                    for c in correct:
+                        if isinstance(c, int):
+                            correct_indices.add(c if c >= 1 else c + 1)
+                elif isinstance(correct, str):
+                    for idx, opt in enumerate(choices_list, start=1):
+                        if str(opt).strip() == correct.strip():
+                            correct_indices.add(idx)
+
+                choices = []
+                has_correct = False
+                if answer_options is not None:
+                    for opt in answer_options[:4]:
+                        if not isinstance(opt, dict):
+                            continue
+                        opt_text = str(opt.get("text", "")).strip()
+                        if not opt_text:
+                            continue
+                        is_correct = _to_bool(opt.get("isCorrect") if "isCorrect" in opt else opt.get("is_correct"))
+                        if is_correct:
+                            has_correct = True
+                        choices.append(Choice(text=opt_text, is_correct=is_correct))
+                else:
+                    for idx, opt in enumerate(choices_list, start=1):
+                        if opt is None:
+                            continue
+                        is_correct = (idx in correct_indices)
+                        if is_correct:
+                            has_correct = True
+                        choices.append(Choice(text=str(opt), is_correct=is_correct))
+
+                if choices and not has_correct:
+                    choices[0].is_correct = True
+                    has_correct = True
+
+                correct_choice = next((c for c in choices if c.is_correct), None)
+
+                q = Question(
+                    test_id=test.id,
+                    text=q_text,
+                    hint=q_hint,
+                    choices=choices,
+                    correct_choice_id=correct_choice.choice_id if correct_choice else None,
+                )
+                q.save()
+                imported += 1
+
+            flash(f"تم استيراد {imported} سؤال.", "success")
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
     elif request.method == "GET":
         form.title.data = test.title
         form.description.data = test.description
         form.requires_code.data = test.requires_code
         form.lesson_id.data = str(test.lesson_id) if test.lesson_id else ""
     
-    return render_template("teacher/test_edit.html", form=form, test=test)
+    # Backfill correct_choice_id for existing questions if missing
+    for q in Question.objects(test_id=test.id).all():
+        if not q.correct_choice_id:
+            correct_choice = next((c for c in q.choices if c.is_correct), None)
+            if correct_choice:
+                q.correct_choice_id = correct_choice.choice_id
+                q.save()
+
+    return render_template("teacher/test_edit.html", form=form, meta_form=form, test=test)
 
 
 @teacher_bp.route("/tests/<test_id>/delete", methods=["POST"])
@@ -695,7 +1002,7 @@ def delete_test(test_id):
     test = Test.objects(id=test_id).first()
     if not test:
         raise NotFound()
-    section_id = test.section_id
+    section_id = test.section_id.id if test.section_id else None
     test.delete()
     flash("تم حذف الاختبار بنجاح.", "success")
     return redirect(url_for("teacher.section_detail", section_id=section_id))
@@ -734,11 +1041,13 @@ def new_question(test_id):
             from .models import Choice
             
             choices = [Choice(text=c["text"], is_correct=c["is_correct"]) for c in choices_data]
+            correct_choice = next((c for c in choices if c.is_correct), None)
             question = Question(
                 test_id=test.id,
                 text=text,
                 hint=hint,
                 choices=choices,
+                correct_choice_id=correct_choice.choice_id if correct_choice else None,
             )
             question.save()
             flash("تم إنشاء السؤال بنجاح.", "success")
@@ -776,6 +1085,8 @@ def edit_question(question_id):
         else:
             from .models import Choice
             question.choices = [Choice(text=c["text"], is_correct=c["is_correct"]) for c in choices_data]
+            correct_choice = next((c for c in question.choices if c.is_correct), None)
+            question.correct_choice_id = correct_choice.choice_id if correct_choice else None
             question.save()
             flash("تم تحديث السؤال بنجاح.", "success")
             return redirect(url_for("teacher.test_detail", test_id=question.test_id))

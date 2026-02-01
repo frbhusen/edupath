@@ -23,6 +23,7 @@ class SubjectForm(FlaskForm):
 class SectionForm(FlaskForm):
     title = StringField("العنوان", validators=[DataRequired(), Length(max=120)])
     description = TextAreaField("الوصف")
+    requires_code = BooleanField("يتطلب رمز تفعيل")
     submit = SubmitField("حفظ")
 
 class LessonForm(FlaskForm):
@@ -31,12 +32,14 @@ class LessonForm(FlaskForm):
     requires_code = BooleanField("يتطلب رمز تفعيل")
     link_label = StringField("تسمية الرابط", validators=[Length(max=120)])
     link_url = StringField("رابط URL", validators=[Length(max=500)])
+    link_label_2 = StringField("تسمية الرابط 2", validators=[Length(max=120)])
+    link_url_2 = StringField("رابط URL 2", validators=[Length(max=500)])
     submit = SubmitField("حفظ")
 
 class TestForm(FlaskForm):
     title = StringField("العنوان", validators=[DataRequired(), Length(max=200)])
     description = TextAreaField("الوصف")
-    lesson_id = SelectField("الدرس المرتبط", coerce=int, validators=[Optional()])
+    lesson_id = SelectField("الدرس المرتبط", coerce=str, validators=[Optional()])
     requires_code = BooleanField("يتطلب رمز تفعيل")
     submit = SubmitField("حفظ")
 

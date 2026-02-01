@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div>
+      <div class="text-muted small">المادة</div>
+      <h2 class="h5 mb-0">{{ subject.name }}</h2>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.edit_subject', subject_id=subject.id) }}">تعديل</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.manage_subject_access', subject_id=subject.id) }}">إدارة الوصول</a>
+      <form method="post" action="{{ url_for('teacher.delete_subject', subject_id=subject.id) }}" onsubmit="return confirm('حذف المادة؟');">
+        <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+      </form>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if subject.description %}
+      <p class="mb-0">{{ subject.description }}</p>
+    {% else %}
+      <p class="text-muted mb-0">لا يوجد وصف للمادة.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="h6 mb-0">الأقسام</h3>
+  <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.new_section', subject_id=subject.id) }}">إضافة قسم</a>
+</div>
+
+{% if sections %}
+  <div class="list-group">
+    {% for section in sections %}
+      <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <div class="fw-semibold">{{ section.title }}</div>
+          {% if section.description %}
+            <div class="text-muted small">{{ section.description }}</div>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.section_detail', section_id=section.id) }}">عرض</a>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.edit_section', section_id=section.id) }}">تعديل</a>
+          <a class="btn btn-outline-info btn-sm" href="{{ url_for('teacher.manage_section_access', section_id=section.id) }}">الوصول</a>
+          <form method="post" action="{{ url_for('teacher.delete_section', section_id=section.id) }}" onsubmit="return confirm('حذف القسم؟');">
+            <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-light">لا توجد أقسام بعد.</div>
+{% endif %}
+{% endblock %}

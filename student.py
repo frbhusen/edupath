@@ -3,6 +3,7 @@ import json
 import random
 from datetime import datetime
 from flask_login import login_required, current_user
+from bson import ObjectId
 
 from .models import Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer
 from .forms import ActivationForm, LessonActivationForm
@@ -134,7 +135,7 @@ def subjects():
 def student_root():
     return redirect(url_for("student.subjects"))
 
-@student_bp.route("/subjects/<int:subject_id>")
+@student_bp.route("/subjects/<subject_id>")
 @login_required
 def subject_detail(subject_id):
     subject = Subject.objects(id=subject_id).first()
@@ -152,7 +153,7 @@ def subject_detail(subject_id):
     
     return render_template("student/subject_detail.html", subject=subject, subject_activation=subject_activation)
 
-@student_bp.route("/sections/<int:section_id>")
+@student_bp.route("/sections/<section_id>")
 @login_required
 def section_detail(section_id):
     section = Section.objects(id=section_id).first()
@@ -190,7 +191,7 @@ def section_detail(section_id):
         tests_data=tests_data,
     )
 
-@student_bp.route("/lessons/<int:lesson_id>")
+@student_bp.route("/lessons/<lesson_id>")
 @login_required
 def lesson_detail(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
@@ -284,7 +285,7 @@ def lesson_detail(lesson_id):
         tests_data=tests_data,
     )
 
-@student_bp.route("/tests/<int:test_id>", methods=["GET", "POST"])
+@student_bp.route("/tests/<test_id>", methods=["GET", "POST"])
 @login_required
 def take_test(test_id):
     test = Test.objects(id=test_id).first()
@@ -317,9 +318,9 @@ def take_test(test_id):
         # Evaluate answers
         question_ids_raw = request.form.get("question_ids", "")
         if question_ids_raw:
-            question_ids = [int(qid) for qid in question_ids_raw.split(",") if qid.strip().isdigit()]
+            question_ids = [qid.strip() for qid in question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
             questions = Question.objects(id__in=question_ids).all()
-            questions_by_id = {q.id: q for q in questions}
+            questions_by_id = {str(q.id): q for q in questions}
             ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
         else:
             ordered_questions = list(test.questions)
@@ -333,9 +334,12 @@ def take_test(test_id):
                 is_correct = False
                 choice_id = None
             else:
-                choice = Choice.objects(id=int(selected_choice_id)).first()
-                is_correct = bool(choice and choice.is_correct)
-                choice_id = choice.id if choice else None
+                choice = next((c for c in q.choices if str(c.choice_id) == selected_choice_id), None)
+                if q.correct_choice_id:
+                    is_correct = bool(choice and choice.choice_id == q.correct_choice_id)
+                else:
+                    is_correct = bool(choice and choice.is_correct)
+                choice_id = choice.choice_id if choice else None
             if is_correct:
                 score += 1
             if choice_id is not None:
@@ -380,7 +384,7 @@ def take_test(test_id):
     )
 
 
-@student_bp.route("/subjects/<int:subject_id>/activate", methods=["GET", "POST"])
+@student_bp.route("/subjects/<subject_id>/activate", methods=["GET", "POST"])
 @login_required
 def activate_subject(subject_id):
     subject = Subject.objects(id=subject_id).first()
@@ -409,7 +413,7 @@ def activate_subject(subject_id):
     return render_template("student/activate_subject.html", subject=subject, form=form)
 
 
-@student_bp.route("/sections/<int:section_id>/activate", methods=["GET", "POST"])
+@student_bp.route("/sections/<section_id>/activate", methods=["GET", "POST"])
 @login_required
 def activate_section(section_id):
     section = Section.objects(id=section_id).first()
@@ -438,7 +442,7 @@ def activate_section(section_id):
     return render_template("student/activate_section.html", section=section, form=form)
 
 
-@student_bp.route("/lessons/<int:lesson_id>/activate", methods=["GET", "POST"])
+@student_bp.route("/lessons/<lesson_id>/activate", methods=["GET", "POST"])
 @login_required
 def activate_lesson(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
@@ -471,12 +475,22 @@ def activate_lesson(lesson_id):
 @login_required
 def results():
     # Split own attempts and others for clearer presentation; answers still gated in test_result
-    own_attempts = (
+    def _filter_missing_tests(attempts):
+        filtered = []
+        for attempt in attempts:
+            try:
+                _ = attempt.test
+                filtered.append(attempt)
+            except Exception:
+                continue
+        return filtered
+
+    own_attempts = _filter_missing_tests(
         Attempt.objects(student_id=current_user.id)
         .order_by("-started_at")
         .all()
     )
-    other_attempts = (
+    other_attempts = _filter_missing_tests(
         Attempt.objects(student_id__ne=current_user.id)
         .order_by("-started_at")
         .all()
@@ -487,13 +501,13 @@ def results():
         other_attempts=other_attempts,
     )
 
-@student_bp.route("/results/<int:attempt_id>")
+@student_bp.route("/results/<attempt_id>")
 @login_required
 def test_result(attempt_id):
     attempt = Attempt.objects(id=attempt_id).first()
     if not attempt:
         return "404", 404
-    if attempt.student_id != current_user.id and current_user.role != "teacher":
+    if str(attempt.student_id.id) != str(current_user.id) and current_user.role != "teacher":
         flash("غير مسموح", "error")
         return redirect(url_for("student.subjects"))
     questions = attempt.test.questions
@@ -504,7 +518,7 @@ def test_result(attempt_id):
         ans = answers_map.get(q.id)
         selected_choice = None
         if ans and ans.choice_id:
-            selected_choice = next((c for c in q.choices if c.id == ans.choice_id), None)
+            selected_choice = next((c for c in q.choices if c.choice_id == ans.choice_id), None)
         correct_choice = next((c for c in q.choices if c.is_correct), None)
         review.append({
             "question": q,
@@ -521,25 +535,27 @@ def test_result(attempt_id):
 def custom_test_new():
     subjects = Subject.objects().all()
     selected_subject_id = request.args.get("subject_id") or request.form.get("subject_id")
-    try:
-        selected_subject_id = int(selected_subject_id) if selected_subject_id else None
-    except ValueError:
+    if selected_subject_id and not ObjectId.is_valid(str(selected_subject_id)):
         selected_subject_id = None
 
     if current_user.role == "student":
         unlocked_lessons = get_unlocked_lessons(current_user.id)
     else:
         unlocked_lessons = Lesson.objects().all()
+    subject_filter = None
     if selected_subject_id:
-        unlocked_lessons = [
-            lesson for lesson in unlocked_lessons
-            if lesson.section and lesson.section.subject_id == selected_subject_id
-        ]
+        subject_filter = Subject.objects(id=selected_subject_id).first()
+        if subject_filter:
+            unlocked_lessons = [
+                lesson for lesson in unlocked_lessons
+                if lesson.section and lesson.section.subject_id == subject_filter
+            ]
 
-    lesson_question_counts = {
-        lesson.id: Question.objects(tests__lesson_id=lesson.id).count()
-        for lesson in unlocked_lessons
-    }
+    lesson_question_counts = {}
+    for lesson in unlocked_lessons:
+        tests = Test.objects(lesson_id=lesson.id).all()
+        test_ids = [t.id for t in tests]
+        lesson_question_counts[lesson.id] = Question.objects(test_id__in=test_ids).count() if test_ids else 0
     total_available_questions = sum(lesson_question_counts.values())
 
     if request.method == "POST":
@@ -581,7 +597,9 @@ def custom_test_new():
         # Build question pool
         selected_questions = []
         for sel in selections:
-            lesson_questions = Question.objects(tests__lesson_id=sel["lesson_id"]).all()
+            tests = Test.objects(lesson_id=sel["lesson_id"]).all()
+            test_ids = [t.id for t in tests]
+            lesson_questions = Question.objects(test_id__in=test_ids).all() if test_ids else []
             if len(lesson_questions) < sel["count"]:
                 flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
                 return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
@@ -593,17 +611,17 @@ def custom_test_new():
 
         # Shuffle question order
         random.shuffle(selected_questions)
-        question_order = [q.id for q in selected_questions]
+        question_order = [str(q.id) for q in selected_questions]
 
         # Shuffle answer order per question
         answer_order = {}
         for q in selected_questions:
             choices = list(q.choices)
             random.shuffle(choices)
-            answer_order[str(q.id)] = [c.id for c in choices]
+            answer_order[str(q.id)] = [str(c.choice_id) for c in choices]
 
         selections_payload = {
-            "subject_id": selected_subject_id,
+            "subject_id": str(selected_subject_id),
             "lessons": selections,
         }
 
@@ -629,7 +647,7 @@ def custom_test_new():
     )
 
 
-@student_bp.route("/custom-tests/<int:attempt_id>")
+@student_bp.route("/custom-tests/<attempt_id>")
 @login_required
 def custom_test_take(attempt_id):
     attempt = CustomTestAttempt.objects(id=attempt_id).first()
@@ -642,7 +660,7 @@ def custom_test_take(attempt_id):
     question_order = json.loads(attempt.question_order_json)
     answer_order = json.loads(attempt.answer_order_json)
     questions = Question.objects(id__in=question_order).all()
-    questions_by_id = {q.id: q for q in questions}
+    questions_by_id = {str(q.id): q for q in questions}
 
     ordered_questions = []
     for qid in question_order:
@@ -650,7 +668,7 @@ def custom_test_take(attempt_id):
         if not q:
             continue
         ordered_choice_ids = answer_order.get(str(qid), [])
-        choices = {c.id: c for c in q.choices}
+        choices = {str(c.choice_id): c for c in q.choices}
         ordered_choices = [choices[cid] for cid in ordered_choice_ids if cid in choices]
         ordered_questions.append({"question": q, "choices": ordered_choices})
 
@@ -663,7 +681,7 @@ def custom_test_take(attempt_id):
     )
 
 
-@student_bp.route("/custom-tests/<int:attempt_id>/submit", methods=["POST"])
+@student_bp.route("/custom-tests/<attempt_id>/submit", methods=["POST"])
 @login_required
 def custom_test_submit(attempt_id):
     attempt = CustomTestAttempt.objects(id=attempt_id).first()
@@ -677,21 +695,24 @@ def custom_test_submit(attempt_id):
 
     question_order = json.loads(attempt.question_order_json)
     questions = Question.objects(id__in=question_order).all()
-    questions_by_id = {q.id: q for q in questions}
+    questions_by_id = {str(q.id): q for q in questions}
 
     score = 0
     total = len(question_order)
     for qid in question_order:
         selected_choice_id = request.form.get(f"question_{qid}")
-        choice_id = int(selected_choice_id) if selected_choice_id else None
-        q = questions_by_id.get(qid)
-        choice = Choice.objects(id=choice_id).first() if choice_id else None
-        is_correct = bool(choice and choice.is_correct)
+        q = questions_by_id.get(str(qid))
+        choice = next((c for c in q.choices if str(c.choice_id) == selected_choice_id), None) if (q and selected_choice_id) else None
+        if q and q.correct_choice_id:
+            is_correct = bool(choice and choice.choice_id == q.correct_choice_id)
+        else:
+            is_correct = bool(choice and choice.is_correct)
         if is_correct:
             score += 1
+        choice_id = choice.choice_id if choice else None
         ans = CustomTestAnswer(
             attempt_id=attempt.id,
-            question_id=qid,
+            question_id=q,
             choice_id=choice_id,
             is_correct=is_correct,
         )
@@ -704,7 +725,7 @@ def custom_test_submit(attempt_id):
     return redirect(url_for("student.custom_test_result", attempt_id=attempt.id))
 
 
-@student_bp.route("/custom-tests/<int:attempt_id>/result")
+@student_bp.route("/custom-tests/<attempt_id>/result")
 @login_required
 def custom_test_result(attempt_id):
     attempt = CustomTestAttempt.objects(id=attempt_id).first()
@@ -717,8 +738,8 @@ def custom_test_result(attempt_id):
     question_order = json.loads(attempt.question_order_json)
     answer_order = json.loads(attempt.answer_order_json)
     questions = Question.objects(id__in=question_order).all()
-    questions_by_id = {q.id: q for q in questions}
-    answers_by_qid = {a.question_id: a for a in attempt.answers}
+    questions_by_id = {str(q.id): q for q in questions}
+    answers_by_qid = {str(a.question_id.id): a for a in CustomTestAnswer.objects(attempt_id=attempt.id).all()}
 
     review = []
     for qid in question_order:
@@ -726,10 +747,10 @@ def custom_test_result(attempt_id):
         if not q:
             continue
         ordered_choice_ids = answer_order.get(str(qid), [])
-        choices = {c.id: c for c in q.choices}
+        choices = {str(c.choice_id): c for c in q.choices}
         ordered_choices = [choices[cid] for cid in ordered_choice_ids if cid in choices]
-        ans = answers_by_qid.get(qid)
-        selected_choice = choices.get(ans.choice_id) if ans and ans.choice_id else None
+        ans = answers_by_qid.get(str(qid))
+        selected_choice = choices.get(str(ans.choice_id)) if ans and ans.choice_id else None
         correct_choice = next((c for c in q.choices if c.is_correct), None)
         review.append({
             "question": q,
@@ -742,7 +763,7 @@ def custom_test_result(attempt_id):
     return render_template("student/custom_test_result.html", attempt=attempt, review=review)
 
 
-@student_bp.route("/flashcards/resource/<int:resource_id>")
+@student_bp.route("/flashcards/resource/<resource_id>")
 @login_required
 def view_flashcards(resource_id):
     """View flashcards from a JSON resource with pagination (6 cards per page)."""

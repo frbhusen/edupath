@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header">
+    <h2 class="h5 mb-0">تعديل سؤال</h2>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">نص السؤال</label>
+        <textarea name="text" class="form-control" rows="3" required>{{ question.text }}</textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">تلميح (اختياري)</label>
+        <textarea name="hint" class="form-control" rows="2">{{ question.hint }}</textarea>
+      </div>
+
+      <div id="choices-container">
+        {% for choice in question.choices %}
+        <div class="choice-row border rounded p-3 mb-2">
+          <div class="mb-2">
+            <label class="form-label">الخيار {{ loop.index }}</label>
+            <input type="text" name="choice_{{ loop.index0 }}" class="form-control" value="{{ choice.text }}" required>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_correct_{{ loop.index0 }}" id="correct_{{ loop.index0 }}" {% if choice.is_correct %}checked{% endif %}>
+            <label class="form-check-label" for="correct_{{ loop.index0 }}">إجابة صحيحة</label>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addChoice()">إضافة خيار</button>
+      <button type="submit" class="btn btn-cta">حفظ التعديلات</button>
+    </form>
+  </div>
+</div>
+
+<script>
+let choiceIndex = {{ question.choices|length }};
+function addChoice() {
+  const container = document.getElementById('choices-container');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'choice-row border rounded p-3 mb-2';
+  wrapper.innerHTML = `
+    <div class="mb-2">
+      <label class="form-label">الخيار ${choiceIndex + 1}</label>
+      <input type="text" name="choice_${choiceIndex}" class="form-control" required>
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="is_correct_${choiceIndex}" id="correct_${choiceIndex}">
+      <label class="form-check-label" for="correct_${choiceIndex}">إجابة صحيحة</label>
+    </div>
+  `;
+  container.appendChild(wrapper);
+  choiceIndex++;
+}
+</script>
+{% endblock %}

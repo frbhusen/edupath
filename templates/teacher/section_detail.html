@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div>
+      <div class="text-muted small">القسم</div>
+      <h2 class="h5 mb-0">{{ section.title }}</h2>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.edit_section', section_id=section.id) }}">تعديل</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.manage_section_access', section_id=section.id) }}">إدارة الوصول</a>
+      <form method="post" action="{{ url_for('teacher.delete_section', section_id=section.id) }}" onsubmit="return confirm('حذف القسم؟');">
+        <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+      </form>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if section.description %}
+      <p>{{ section.description }}</p>
+    {% endif %}
+    <div class="text-muted small">يتطلب كود: {{ 'نعم' if section.requires_code else 'لا' }}</div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="h6 mb-0">الدروس</h3>
+  <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.new_lesson', section_id=section.id) }}">إضافة درس</a>
+</div>
+
+{% if lessons %}
+  <div class="list-group mb-4">
+    {% for lesson in lessons %}
+      <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <div class="fw-semibold">{{ lesson.title }}</div>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.lesson_detail', lesson_id=lesson.id) }}">عرض</a>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.edit_lesson', lesson_id=lesson.id) }}">تعديل</a>
+          <a class="btn btn-outline-info btn-sm" href="{{ url_for('teacher.manage_lesson_access', lesson_id=lesson.id) }}">الوصول</a>
+          <form method="post" action="{{ url_for('teacher.delete_lesson', lesson_id=lesson.id) }}" onsubmit="return confirm('حذف الدرس؟');">
+            <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-light">لا توجد دروس بعد.</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="h6 mb-0">اختبارات القسم (بدون درس)</h3>
+  <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.new_test', section_id=section.id) }}">إضافة اختبار</a>
+</div>
+
+{% if tests %}
+  <div class="list-group">
+    {% for test in tests %}
+      <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="fw-semibold">{{ test.title }}</div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.test_detail', test_id=test.id) }}">عرض</a>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.edit_test', test_id=test.id) }}">تعديل</a>
+          <form method="post" action="{{ url_for('teacher.delete_test', test_id=test.id) }}" onsubmit="return confirm('حذف الاختبار؟');">
+            <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-light">لا توجد اختبارات للقسم بعد.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header">
+    <h2 class="h5 mb-0">إضافة مورد للدرس</h2>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">العنوان</label>
+        <input type="text" name="label" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">الرابط</label>
+        <input type="url" name="url" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">نوع المورد</label>
+        <input type="text" name="resource_type" class="form-control" placeholder="فيديو / ملف / رابط">
+      </div>
+      <button type="submit" class="btn btn-cta">حفظ</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -78,7 +78,11 @@
                       {% set c4 = choices[3] if choices|length > 3 else None %}
                       {% set correct_idx = 0 %}
                       {% for ch in choices %}
-                        {% if ch.is_correct %}{% set correct_idx = loop.index %}{% endif %}
+                        {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
+                          {% set correct_idx = loop.index %}
+                        {% elif ch.is_correct %}
+                          {% set correct_idx = loop.index %}
+                        {% endif %}
                       {% endfor %}
                       <option value="{{ q.id }}"
                         data-text="{{ q.text }}"
@@ -165,7 +169,11 @@
                 {% set choices = q.choices|list %}
                 {% set correct_idx = 0 %}
                 {% for ch in choices %}
-                  {% if ch.is_correct %}{% set correct_idx = loop.index %}{% endif %}
+                  {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
+                    {% set correct_idx = loop.index %}
+                  {% elif ch.is_correct %}
+                    {% set correct_idx = loop.index %}
+                  {% endif %}
                 {% endfor %}
                 <li class="list-group-item d-flex justify-content-between align-items-start">
                   <div>

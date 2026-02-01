@@ -19,6 +19,10 @@
         <label class="form-label">{{ form.description.label.text }}</label>
         {{ form.description(class="form-control", rows=4, placeholder="Optional description") }}
       </div>
+      <div class="form-check mb-3">
+        {{ form.requires_code(class="form-check-input", id="requires_code") }}
+        <label class="form-check-label" for="requires_code">{{ form.requires_code.label.text }}</label>
+      </div>
       <button type="submit" class="btn btn-cta">حفظ القسم</button>
     </form>
   </div>
