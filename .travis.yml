@@ -2,15 +2,18 @@ language: python
 python:
   - "2.7"
   - "3.8"
-  # PyPy versions
-  - "pypy"   # currently Python 2.7.18, PyPy 7.3.19
-  - "pypy3"  # currently Python 3.10.16,  PyPy 7.3.19# command to install dependencies
-  - "Flask"
--"mongoengine"
--"Flask-Login"
--"Flask-WTF"
--"email_validator"
--"pymongo"
+Flask:
+  -"3.0.0"
+mongoengine:
+  -"0.27.0"
+Flask-Login:
+  - "0.6.3"
+Flask-WTF:
+  -"1.2.1"
+email_validator:
+  - "2.2.0"
+pymongo:
+  - "4.6.0"
 
 install:
   - pip install -r requirements.txt
