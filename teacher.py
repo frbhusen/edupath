@@ -40,19 +40,7 @@ def role_required(role):
 @role_required("teacher")
 def dashboard():
     subjects = Subject.objects(created_by=current_user.id).all()
-    # Precompute first freebies per section for accurate status display
-    sections_meta = {}
-    for subj in subjects:
-        for sec in Section.objects(subject_id=subj.id).all():
-            lessons = Lesson.objects(section_id=sec.id).order_by('id').all()
-            tests_section_wide = Test.objects(section_id=sec.id, lesson_id=None).order_by('id').all()
-            first_lesson_id = lessons[0].id if lessons else None
-            first_section_test_id = tests_section_wide[0].id if tests_section_wide else None
-            sections_meta[str(sec.id)] = {
-                "first_lesson_id": first_lesson_id,
-                "first_section_test_id": first_section_test_id,
-            }
-    return render_template("teacher/dashboard.html", subjects=subjects, sections_meta=sections_meta)
+    return render_template("teacher/dashboard.html", subjects=subjects)
 
 
 # Redirect teacher base to dashboard for Up navigation
@@ -167,6 +155,8 @@ def manage_subject_access(subject_id):
         if action == "toggle_requires_code":
             subject.requires_code = not subject.requires_code
             subject.save()
+            if subject.requires_code:
+                lock_subject_access_for_all(subject.id)
             flash("تم تحديث حالة التفعيل للمادة.", "success")
         elif action == "generate_code":
             student_id = request.form.get("student_id")
@@ -263,7 +253,13 @@ def manage_section_access(section_id):
     
     if request.method == "POST":
         action = request.form.get("action")
-        if action == "generate_code":
+        if action == "toggle_requires_code":
+            section.requires_code = not section.requires_code
+            section.save()
+            if section.requires_code:
+                lock_section_access_for_all(section.id)
+            flash("تم تحديث حالة التفعيل للقسم.", "success")
+        elif action == "generate_code":
             student_id = request.form.get("student_id")
             student = User.objects(id=student_id).first()
             
@@ -591,9 +587,6 @@ def new_lesson(section_id):
         ]
 
         requires_code = bool(form.requires_code.data)
-        # First lesson in a section is open by default
-        if Lesson.objects(section_id=section.id).count() == 0:
-            requires_code = False
 
         lesson = Lesson(
             section_id=section.id,

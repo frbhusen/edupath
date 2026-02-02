@@ -16,7 +16,7 @@
         <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.subject_detail', subject_id=section.subject.id) }}">العودة للمادة</a>
       </div>
     </div>
-    {% if subject_requires_code and not subject_open %}
+    {% if subject_requires_code and not subject_open and not section_active %}
       <div id="section-lock-alert" class="alert alert-warning mt-3 mb-0">المادة مقفلة. قم بتفعيل المادة لفتح الأقسام والدروس والاختبارات.</div>
     {% elif section_requires_code and not section_open %}
       <div id="section-lock-alert" class="alert alert-warning mt-3 mb-0">القسم مقفل. قم بتفعيل القسم لفتح جميع الدروس والاختبارات، أو قم بتفعيل الدروس بشكل فردي.</div>

@@ -34,9 +34,15 @@ class AccessContext:
         )
         
         # Section is "open" if:
-        # - Subject is open (activated or no subject code) AND
-        # - Section doesn't require code OR section is activated
-        self.section_open = self.subject_open and (self.section_active or not self.section_requires_code)
+        # - Subject is activated OR
+        # - Subject is not locked and section doesn't require code OR is activated
+        # - Subject is locked but section is activated
+        if self.subject_active:
+            self.section_open = True
+        elif self.subject_requires_code:
+            self.section_open = self.section_active
+        else:
+            self.section_open = self.section_active or not self.section_requires_code
 
         lesson_ids = [l.id for l in section.lessons]
 
@@ -52,25 +58,26 @@ class AccessContext:
         else:
             self.lesson_activation_ids = set()
 
-        self.first_lesson_id = min([l.id for l in section.lessons], default=None)
-        self.first_section_wide_test_id = min([t.id for t in section.tests if t.lesson_id is None], default=None)
+        self.first_lesson_id = None
+        self.first_section_wide_test_id = None
 
     def lesson_open(self, lesson: Lesson) -> bool:
         """Check if student can access this lesson."""
-        # Subject must be open to view any lessons
-        if not self.subject_open:
-            return False
+        # If subject is activated, everything is open
+        if self.subject_active:
+            return True
 
-        # If section is open, all lessons visible
+        # If subject is locked, allow only section-activated or lesson-activated
+        if self.subject_requires_code:
+            if self.section_active:
+                return True
+            return lesson.id in self.lesson_activation_ids
+
+        # Subject is open; section rules apply
         if self.section_open:
             return True
 
-        # Section requires code and is not active
-        # First lesson is always free
-        if self.first_lesson_id and lesson.id == self.first_lesson_id:
-            return True
-        
-        # Check if lesson is individually activated
+        # Section locked but lesson activated
         return lesson.id in self.lesson_activation_ids
 
     def test_open(self, test: Test) -> bool:
@@ -82,34 +89,20 @@ class AccessContext:
         - Lesson activated → only tests linked to that lesson accessible
         - Section-wide tests: require section or subject activation
         """
-        # Subject must be open to access tests
-        if not self.subject_open:
-            return False
-
         # If subject is activated, all tests are accessible
         if self.subject_active:
             return True
-        
-        # If section is open (activated or doesn't require code), all tests in section are accessible
-        if self.section_open:
-            return True
 
-        # Section requires code and is not active
-        # Check if this is a lesson-specific test
+        # Lesson-linked tests follow lesson access
         if test.lesson_id:
-            # First lesson's tests are free
-            if self.first_lesson_id and test.lesson_id == self.first_lesson_id:
-                return True
-            # If lesson is activated, its tests are accessible
-            if test.lesson_id in self.lesson_activation_ids:
-                return True
-        else:
-            # Section-wide test: first section-wide test is free
-            if self.first_section_wide_test_id and test.id == self.first_section_wide_test_id:
-                return True
-            # Section-wide tests require section activation (not accessible via lesson activation)
-        
-        return False
+            lesson = test.lesson
+            return bool(lesson and self.lesson_open(lesson))
+
+        # Section-wide tests
+        if self.subject_requires_code:
+            return self.section_active
+
+        return self.section_open
 
 
 def get_unlocked_lessons(student_id: int):
@@ -238,10 +231,10 @@ def lesson_detail(lesson_id):
     section = lesson.section
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
-        if not access.subject_open:
-            flash("قم بتفعيل المادة للوصول إلى هذا الدرس.", "warning")
-            return redirect(url_for("student.activate_subject", subject_id=section.subject.id))
         if not access.lesson_open(lesson):
+            if access.subject_requires_code and not access.section_active:
+                flash("قم بتفعيل الدرس للوصول إليه.", "warning")
+                return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
             flash("قم بتفعيل الدرس للوصول إليه.", "warning")
             return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
     def infer_resource_type(resource):
@@ -334,9 +327,6 @@ def take_test(test_id):
         return "404", 404
     if current_user.role == "student":
         access = AccessContext(test.section, current_user.id)
-        if not access.subject_open:
-            flash("قم بتفعيل المادة للوصول إلى هذا الاختبار.", "warning")
-            return redirect(url_for("student.activate_subject", subject_id=test.section.subject.id))
         if not access.test_open(test):
             # Redirect to appropriate activation page based on test type
             if test.lesson_id:

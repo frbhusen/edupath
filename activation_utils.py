@@ -56,12 +56,7 @@ def revoke_subject_activation(subject_id, student_id: int) -> None:
             sec_activation.active = False
             sec_activation.save()
 
-        # Get all lesson IDs from all sections
-        lesson_ids = []
-        for section in sections:
-            lessons = LessonActivation.objects(section_id=section.id).all()
-            lesson_ids.extend([l.id for l in lessons])
-        
+        lesson_ids = [l.id for l in Lesson.objects(section_id__in=section_ids).all()]
         if lesson_ids:
             for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, student_id=student_id, active=True).all():
                 les_activation.active = False
@@ -74,9 +69,7 @@ def revoke_section_activation(section_id, student_id: int) -> None:
         sa.active = False
         sa.save()
 
-    # Get all lesson IDs in section
-    lessons = LessonActivation.objects(section_id=section_id).all()
-    lesson_ids = [l.id for l in lessons]
+    lesson_ids = [l.id for l in Lesson.objects(section_id=section_id).all()]
     
     if lesson_ids:
         for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, student_id=student_id, active=True).all():
@@ -99,12 +92,7 @@ def lock_subject_access_for_all(subject_id) -> None:
             sec_activation.active = False
             sec_activation.save()
 
-        # Get all lesson IDs from all sections
-        lesson_ids = []
-        for section in sections:
-            lessons = LessonActivation.objects(section_id=section.id).all()
-            lesson_ids.extend([l.id for l in lessons])
-        
+        lesson_ids = [l.id for l in Lesson.objects(section_id__in=section_ids).all()]
         if lesson_ids:
             for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, active=True).all():
                 les_activation.active = False
@@ -117,9 +105,7 @@ def lock_section_access_for_all(section_id) -> None:
         sa.active = False
         sa.save()
 
-    # Get all lesson IDs in section
-    lessons = LessonActivation.objects(section_id=section_id).all()
-    lesson_ids = [l.id for l in lessons]
+    lesson_ids = [l.id for l in Lesson.objects(section_id=section_id).all()]
     
     if lesson_ids:
         for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, active=True).all():
