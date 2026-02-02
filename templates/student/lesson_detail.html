@@ -11,9 +11,11 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <div class="text-muted small mb-2">القسم: {{ section.title }}</div>
-    {% if lesson.content %}
+    {% set has_content = (lesson.content or '').strip()|length > 0 %}
+    {% set has_resources = resources and (resources|length > 0) %}
+    {% if has_content %}
       <div class="mb-3">{{ lesson.content|safe }}</div>
-    {% else %}
+    {% elif not has_resources %}
       <div class="text-muted mb-3">لا يوجد محتوى.</div>
     {% endif %}
     <div class="d-flex flex-wrap gap-2">
