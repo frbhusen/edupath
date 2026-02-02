@@ -204,6 +204,16 @@
         setTimeout(() => clearInterval(retry), 3000);
       }
     });
+
+    window.addEventListener('load', function() {
+      const alerts = document.querySelectorAll('.alert');
+      if (!alerts.length) return;
+      setTimeout(() => {
+        alerts.forEach((alert) => {
+          alert.classList.add('d-none');
+        });
+      }, 5000);
+    });
   </script>
   {% block scripts %}{% endblock %}
 </body>

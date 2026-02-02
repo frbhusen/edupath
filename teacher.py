@@ -163,13 +163,11 @@ def manage_subject_access(subject_id):
             student = User.objects(id=student_id).first()
             
             if student:
-                # Check if unused code exists
-                existing_unused = SubjectActivationCode.objects(
-                    subject_id=subject.id, student_id=student.id, is_used=False
+                existing_any = SubjectActivationCode.objects(
+                    subject_id=subject.id, student_id=student.id
                 ).first()
-                
-                if existing_unused:
-                    flash(f"يوجد كود غير مستخدم بالفعل: {existing_unused.code}", "info")
+                if existing_any:
+                    flash("لا يمكن إنشاء أكثر من كود لهذا الطالب.", "info")
                 else:
                     # Generate unique 6-char code
                     import random
@@ -218,9 +216,10 @@ def manage_subject_access(subject_id):
             code_id = request.form.get("code_id")
             ac = SubjectActivationCode.objects(id=code_id).first()
             if ac:
-                if ac.subject_id == subject.id:
+                if ac.subject_id and str(ac.subject_id.id) == str(subject.id):
                     ac.delete()
                     flash("تم حذف الكود بنجاح.", "success")
+        return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
     
     students = User.objects(role="student").order_by('-created_at').all()
     activated_students = {
@@ -264,12 +263,11 @@ def manage_section_access(section_id):
             student = User.objects(id=student_id).first()
             
             if student:
-                existing_unused = ActivationCode.objects(
-                    section_id=section.id, student_id=student.id, is_used=False
+                existing_any = ActivationCode.objects(
+                    section_id=section.id, student_id=student.id
                 ).first()
-                
-                if existing_unused:
-                    flash(f"يوجد كود غير مستخدم بالفعل: {existing_unused.code}", "info")
+                if existing_any:
+                    flash("لا يمكن إنشاء أكثر من كود لهذا الطالب.", "info")
                 else:
                     import random
                     import string
@@ -316,9 +314,10 @@ def manage_section_access(section_id):
             code_id = request.form.get("code_id")
             ac = ActivationCode.objects(id=code_id).first()
             if ac:
-                if str(ac.section_id) == section_id:
+                if ac.section_id and str(ac.section_id.id) == str(section_id):
                     ac.delete()
                     flash("تم حذف الكود بنجاح.", "success")
+        return redirect(url_for("teacher.manage_section_access", section_id=section.id))
     
     students = User.objects(role="student").order_by('-created_at').all()
     activations = {sa.student_id.id: sa for sa in SectionActivation.objects(section_id=section.id, active=True).all()}
@@ -355,12 +354,11 @@ def manage_lesson_access(lesson_id):
             student = User.objects(id=student_id).first()
             
             if student:
-                existing_unused = LessonActivationCode.objects(
-                    lesson_id=lesson.id, student_id=student.id, is_used=False
+                existing_any = LessonActivationCode.objects(
+                    lesson_id=lesson.id, student_id=student.id
                 ).first()
-                
-                if existing_unused:
-                    flash(f"يوجد كود غير مستخدم بالفعل: {existing_unused.code}", "info")
+                if existing_any:
+                    flash("لا يمكن إنشاء أكثر من كود لهذا الطالب.", "info")
                 else:
                     import random
                     import string
@@ -407,9 +405,10 @@ def manage_lesson_access(lesson_id):
             code_id = request.form.get("code_id")
             lac = LessonActivationCode.objects(id=code_id).first()
             if lac:
-                if str(lac.lesson_id) == lesson_id:
+                if lac.lesson_id and str(lac.lesson_id.id) == str(lesson_id):
                     lac.delete()
                     flash("تم حذف الكود بنجاح.", "success")
+        return redirect(url_for("teacher.manage_lesson_access", lesson_id=lesson.id))
     
     students = User.objects(role="student").order_by('-created_at').all()
     activations = {la.student_id.id: la for la in LessonActivation.objects(lesson_id=lesson.id, active=True).all()}
@@ -1110,7 +1109,6 @@ def delete_question(question_id):
 
 def revoke_lesson_activation(lesson_id, student_id):
     """Mark lesson activation as inactive for a student"""
-    activation = LessonActivation.objects(lesson_id=lesson_id, student_id=student_id).first()
-    if activation:
+    for activation in LessonActivation.objects(lesson_id=lesson_id, student_id=student_id, active=True).all():
         activation.active = False
         activation.save()

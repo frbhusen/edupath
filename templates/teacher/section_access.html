@@ -74,8 +74,8 @@
               <form method="post" class="d-inline">
                 <input type="hidden" name="student_id" value="{{ student.id }}" />
                 <input type="hidden" name="action" value="generate_code" />
-                {% set has_unused = (codes | selectattr('is_used', 'equalto', False) | list) | length > 0 %}
-                <button class="btn btn-outline-primary btn-sm" type="submit" {% if has_unused %}disabled{% endif %}>Generate Code</button>
+                {% set has_any = (codes | length) > 0 %}
+                <button class="btn btn-outline-primary btn-sm" type="submit" {% if has_any %}disabled{% endif %}>Generate Code</button>
               </form>
               {% if active %}
                 <form method="post" class="d-inline ms-1">

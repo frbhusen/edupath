@@ -1,168 +1,77 @@
 .custom-footer {
     width: 100%;
     position: relative;
-    background: #25262A;
-    height: min-content;
-    color: #fff;
-    padding: 20px 0;
+    background: #0b1220;
+    color: #e5e7eb;
+    padding: 32px 0 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
 }
 .custom-footer .container {
-    width: 90%;
+    width: min(1200px, 92%);
     margin: auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
 }
-.custom-footer .container h3::after {
+.custom-footer h3 {
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+.custom-footer h3::after {
     content: "";
     display: block;
     height: 2px;
-    width: auto;
-    background: #fff;
-    margin-top: 20px;
+    width: 36px;
+    background: #3b82f6;
+    margin-top: 10px;
 }
-.custom-footer .container li a:hover {
-    color: #398927;
-    transition: all 0.5s ease;
-}
-.col-1 {
-    flex-basis: 30%;
-    padding: 10px;
-    margin-bottom: 20px;
-}
-.col-1 img {
-    width: 55px;
-    margin-bottom: 15px;
-}
-.col-1 p {
-    color: #fff;
-    font-size: 15px;
-    line-height: 20px;
-}
-.col-2 {
-    padding: 10px;
-    margin-bottom: 20px;
-
-}
-.col-2 h3 {
-    color: #fff;
-    font-size: 20px;
-    margin-bottom: 15px;
-}
-.col-2 ul {
+.custom-footer ul {
     list-style: none;
+    padding: 0;
+    margin: 0;
 }
-.col-2 ul li {
+.custom-footer ul li {
     margin-bottom: 10px;
 }
-.col-2 ul li a {
-    color: #fff;
+.custom-footer ul li a {
+    color: #cbd5f5;
     text-decoration: none;
+    font-size: 0.92rem;
 }
-.col-3 {
-    flex-basis: 15%;
-    padding: 10px;
-    margin-bottom: 20px;
+.custom-footer ul li a:hover {
+    color: #ffffff;
 }
-.col-3 h3 {
-    color: #fff;
-    font-size: 20px;
-    margin-bottom: 15px;
+.col-1, .col-2, .col-3, .col-3-f, .col-4 {
+    padding: 0 4px;
 }
-.col-3 ul {
-    list-style: none;
-}
-.col-3 ul li {
-    margin-bottom: 10px;
-}
-.col-3 ul li a {
-    color: #fff;
-    text-decoration: none;
-}
-
-.col-3-f {
-    padding: 10px;
-    margin-bottom: 20px;
-}
-.col-3-f h3 {
-    color: #fff;
-    font-size: 20px;
-    margin-bottom: 15px;
-}
-.col-3-f ul {
-    list-style: none;
-}
-.col-3-f ul li {
-    margin-bottom: 10px;
-}
-.col-3-f ul li a {
-    color: #fff;
-    text-decoration: none;
-}
-.col-4 {
-    flex-basis: 20%;
-    padding: 10px;
-    margin-bottom: 20px;
-}
-.col-4 h3 {
-    color: #fff;
-    font-size: 20px;
-    margin-bottom: 15px;
-}
-.custom-footer form{
+.custom-footer .social-icons {
+    margin-top: 8px;
     display: flex;
-    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.custom-footer .social-icons a {
+    display: inline-flex;
     align-items: center;
-    border-bottom: 1px solid #ccc;
-    padding-bottom: 20px;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border-radius: 10px;
+    transition: all 0.2s ease;
 }
-.custom-footer form .far{
-    color: #ccc;
-    margin-right: 10px;
+.custom-footer .social-icons a:hover {
+    background: #3b82f6;
+    transform: translateY(-1px);
 }
-.custom-footer form input{
-    background: transparent;
+.custom-footer .footer-2 {
     width: 100%;
-    border: none;
-    color: #fff;
-    outline: none;
-}
-.custom-footer form button{
-    background: transparent;
-    border: none;
-    color: #fff;
-    cursor: pointer;
-    outline: none;
-}
-.custom-footer .social-icons{
-    margin-top: 25px;
-}
-.custom-footer .social-icons a{
-    display: inline-block;
-    width: 40px;
-    height: 40px;
-    background: #fff;
-    color: #25262A;
+    color: #94a3b8;
+    padding-top: 12px;
     text-align: center;
-    line-height: 40px;
-    border-radius: 50%;
-    margin-right: 10px;
-    margin-bottom: 10px;
-    transition: all 0.5s ease;
-}
-.custom-footer .social-icons a:hover{
-    background: #398927;
-    color: #fff;
-    width: 45px;
-    height: 45px;
-    transition: all 0.5s ease;
-}
-.custom-footer .footer-2{ /* last footer (جميع الحقوق محفوظة)*/
-    width: 100%;
-    background: #25262A;
-    color: #fff;
-    padding-top: 0px;
-    text-align: center;
+    font-size: 0.9rem;
 }
 
