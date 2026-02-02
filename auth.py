@@ -21,12 +21,12 @@ def register():
         return redirect(url_for("index"))
     form = RegisterForm()
     if form.validate_on_submit():
-        if User.objects(username=form.username.data).first() or User.objects(email=form.email.data).first():
-            flash("اسم المستخدم أو البريد الإلكتروني موجود مسبقاً", "error")
+        if User.objects(username=form.username.data).first() or User.objects(phone=form.phone.data).first():
+            flash("اسم المستخدم أو رقم الهاتف موجود مسبقاً", "error")
         else:
             user = User(
                 username=form.username.data,
-                email=form.email.data,
+                phone=form.phone.data,
                 role=form.role.data,
             )
             user.set_password(form.password.data)

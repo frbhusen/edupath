@@ -22,7 +22,7 @@
       <thead>
         <tr>
           <th>Student</th>
-          <th>Email</th>
+          <th>Phone</th>
           <th>Status</th>
           <th>Codes</th>
           <th class="text-end">Actions</th>
@@ -34,7 +34,7 @@
           {% set codes = codes_by_student.get(student.id, []) %}
           <tr>
             <td>{{ student.username }}</td>
-            <td class="text-muted small">{{ student.email }}</td>
+            <td class="text-muted small">{{ student.phone }}</td>
             <td>
               {% if active %}
                 <span class="badge text-bg-success">Activated</span>

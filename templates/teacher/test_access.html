@@ -22,7 +22,7 @@
       <thead>
         <tr>
           <th>الطالب</th>
-          <th>البريد الإلكتروني</th>
+          <th>رقم الهاتف</th>
           <th>الحالة</th>
           <th>الرموز</th>
           <th class="text-end">الإجراءات</th>
@@ -34,7 +34,7 @@
           {% set codes = codes_by_student.get(student.id, []) %}
           <tr>
             <td>{{ student.username }}</td>
-            <td class="text-muted small">{{ student.email }}</td>
+            <td class="text-muted small">{{ student.phone }}</td>
             <td>
               {% if active %}
                 <span class="badge text-bg-success">مفعّل</span>
@@ -66,8 +66,8 @@
               <form method="post" class="d-inline">
                 <input type="hidden" name="student_id" value="{{ student.id }}" />
                 <input type="hidden" name="action" value="generate_code" />
-                {% set has_unused = (codes | selectattr('is_used', 'equalto', False) | list) | length > 0 %}
-                <button class="btn btn-outline-primary btn-sm" type="submit" {% if has_unused %}disabled{% endif %}>إنشاء رمز</button>
+                {% set has_any = (codes | length) > 0 %}
+                <button class="btn btn-outline-primary btn-sm" type="submit" {% if has_any %}disabled{% endif %}>إنشاء رمز</button>
               </form>
               {% if active %}
                 <form method="post" class="d-inline ms-1">

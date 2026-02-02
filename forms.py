@@ -1,10 +1,10 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, PasswordField, SelectField, SubmitField, IntegerField, BooleanField
-from wtforms.validators import DataRequired, Email, Length, EqualTo, Optional
+from wtforms.validators import DataRequired, Length, EqualTo, Optional
 
 class RegisterForm(FlaskForm):
     username = StringField("اسم المستخدم", validators=[DataRequired(), Length(min=3, max=80)])
-    email = StringField("البريد الإلكتروني", validators=[DataRequired(), Email()])
+    phone = StringField("رقم الهاتف", validators=[DataRequired(), Length(min=7, max=20)])
     password = PasswordField("كلمة المرور", validators=[DataRequired(), Length(min=6)])
     confirm = PasswordField("تأكيد كلمة المرور", validators=[DataRequired(), EqualTo("password")])
     role = SelectField("الدور", choices=[("student", "طالب"), ("teacher", "معلم")], validators=[DataRequired()])
@@ -56,7 +56,7 @@ class ChoiceForm(FlaskForm):
 
 class StudentEditForm(FlaskForm):
     username = StringField("اسم المستخدم", validators=[DataRequired(), Length(min=3, max=80)])
-    email = StringField("البريد الإلكتروني", validators=[DataRequired(), Email()])
+    phone = StringField("رقم الهاتف", validators=[DataRequired(), Length(min=7, max=20)])
     password = PasswordField("كلمة مرور جديدة", validators=[Optional(), Length(min=6)])
     role = SelectField("الدور", choices=[("student", "طالب"), ("teacher", "معلم")], validators=[DataRequired()])
     submit = SubmitField("حفظ")

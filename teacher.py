@@ -141,14 +141,14 @@ def edit_student(user_id):
     form = StudentEditForm()
     if form.validate_on_submit():
         student.username = form.username.data
-        student.email = form.email.data
+        student.phone = form.phone.data
         student.role = form.role.data
         student.save()
         flash("تم تحديث بيانات الطالب بنجاح.", "success")
         return redirect(url_for("teacher.students"))
     elif request.method == "GET":
         form.username.data = student.username
-        form.email.data = student.email
+        form.phone.data = student.phone
         form.role.data = student.role
     return render_template("teacher/student_form.html", form=form, student=student)
 
