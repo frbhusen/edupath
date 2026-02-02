@@ -447,6 +447,8 @@ def new_subject():
 @login_required
 @role_required("teacher")
 def subject_detail(subject_id):
+    if isinstance(subject_id, Subject):
+        subject_id = subject_id.id
     subject = Subject.objects(id=subject_id).first()
     if not subject:
         raise NotFound()

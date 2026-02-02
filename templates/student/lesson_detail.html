@@ -81,19 +81,31 @@
       <h5 class="mb-3">الموارد</h5>
       <div class="resources-horizontal-scroll">
         {% for res in videos %}
-          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-video text-decoration-none">
-            <div class="resource-icon">🎬</div>
+          <div class="resource-card resource-card-video resource-embed">
             <div class="resource-label">{{ res.label }}</div>
-            <div class="resource-action">فتح فيديو</div>
-          </a>
+            <div class="resource-embed-frame">
+              <iframe
+                src="{{ res.embed_url }}"
+                title="{{ res.label }}"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+              ></iframe>
+            </div>
+          </div>
         {% endfor %}
 
         {% for res in youtubes %}
-          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-youtube text-decoration-none">
-            <div class="resource-icon">📺</div>
+          <div class="resource-card resource-card-youtube resource-embed">
             <div class="resource-label">{{ res.label }}</div>
-            <div class="resource-action">مشاهدة</div>
-          </a>
+            <div class="resource-embed-frame">
+              <iframe
+                src="{{ res.embed_url }}"
+                title="{{ res.label }}"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+              ></iframe>
+            </div>
+          </div>
         {% endfor %}
 
         {% for res in (pdfs + slides) %}
@@ -105,11 +117,12 @@
         {% endfor %}
 
         {% for res in audios %}
-          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-audio text-decoration-none">
-            <div class="resource-icon">🎵</div>
+          <div class="resource-card resource-card-audio resource-embed">
             <div class="resource-label">{{ res.label }}</div>
-            <div class="resource-action">تشغيل صوت</div>
-          </a>
+            <div class="resource-embed-audio">
+              <audio controls preload="none" src="{{ res.embed_url }}"></audio>
+            </div>
+          </div>
         {% endfor %}
 
         {% for res in flashcards %}
