@@ -15,7 +15,6 @@ from .student import student_bp
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    # Enable debug logging for session enforcement diagnostics
     try:
         app.logger.setLevel('DEBUG')
     except Exception:
