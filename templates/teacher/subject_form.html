@@ -15,6 +15,10 @@
             {{ form.description.label(class="form-label") }}
             {{ form.description(class="form-control", rows=4) }}
           </div>
+          <div class="mb-3 form-check">
+            {{ form.requires_code(class="form-check-input", id="subject_requires_code") }}
+            <label class="form-check-label" for="subject_requires_code">يتطلب رمز تفعيل</label>
+          </div>
           {{ form.submit(class="btn btn-primary") }}
         </form>
       </div>

@@ -18,6 +18,7 @@ class LoginForm(FlaskForm):
 class SubjectForm(FlaskForm):
     name = StringField("الاسم", validators=[DataRequired(), Length(max=120)])
     description = TextAreaField("الوصف")
+    requires_code = BooleanField("يتطلب رمز تفعيل")
     submit = SubmitField("حفظ")
 
 class SectionForm(FlaskForm):

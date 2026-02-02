@@ -260,6 +260,20 @@ body {
 	margin: 8px 0 0;
 }
 
+/* Force LaTeX (MathJax/KaTeX) to LTR site-wide */
+.MathJax,
+mjx-container,
+.katex {
+	direction: ltr;
+	unicode-bidi: isolate;
+	text-align: left;
+}
+.katex-display {
+	direction: ltr;
+	unicode-bidi: isolate;
+	text-align: center;
+}
+
 /* Resource Cards */
 .resources-horizontal-scroll {
 	display: flex;

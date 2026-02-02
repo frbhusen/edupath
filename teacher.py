@@ -165,9 +165,9 @@ def manage_subject_access(subject_id):
     if request.method == "POST":
         action = request.form.get("action")
         if action == "toggle_requires_code":
-            section.requires_code = not section.requires_code
-            section.save()
-            flash("تم تحديث حالة التفعيل للقسم.", "success")
+            subject.requires_code = not subject.requires_code
+            subject.save()
+            flash("تم تحديث حالة التفعيل للمادة.", "success")
         elif action == "generate_code":
             student_id = request.form.get("student_id")
             student = User.objects(id=student_id).first()
@@ -446,6 +446,7 @@ def new_subject():
         subject = Subject(
             name=form.name.data,
             description=form.description.data,
+            requires_code=form.requires_code.data,
             created_by=current_user.id,
         )
         subject.save()
@@ -476,12 +477,14 @@ def edit_subject(subject_id):
     if form.validate_on_submit():
         subject.name = form.name.data
         subject.description = form.description.data
+        subject.requires_code = form.requires_code.data
         subject.save()
         flash("تم تحديث المادة بنجاح.", "success")
         return redirect(url_for("teacher.subject_detail", subject_id=subject.id))
     elif request.method == "GET":
         form.name.data = subject.name
         form.description.data = subject.description
+        form.requires_code.data = subject.requires_code
     return render_template("teacher/subject_form.html", form=form, subject=subject)
 
 
@@ -1003,8 +1006,11 @@ def delete_test(test_id):
     if not test:
         raise NotFound()
     section_id = test.section_id.id if test.section_id else None
+    lesson_id = test.lesson_id.id if test.lesson_id else None
     test.delete()
     flash("تم حذف الاختبار بنجاح.", "success")
+    if lesson_id:
+        return redirect(url_for("teacher.lesson_detail", lesson_id=lesson_id))
     return redirect(url_for("teacher.section_detail", section_id=section_id))
 
 

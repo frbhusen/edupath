@@ -5,12 +5,26 @@
     <h1 class="h4 mb-1">إدارة الوصول للمادة: {{ subject.name }}</h1>
     <p class="mb-0">إنشاء الرموز والتحكم في التفعيل لكل طالب. تفعيل المادة يفتح جميع الأقسام والدروس والاختبارات.</p>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">رجوع</a>
+  <div class="d-flex gap-2">
+    <form method="post" class="d-inline">
+      <input type="hidden" name="action" value="toggle_requires_code" />
+      <button class="btn btn-sm {% if subject.requires_code %}btn-outline-warning{% else %}btn-outline-success{% endif %}" type="submit">
+        {% if subject.requires_code %}يتطلب تفعيل{% else %}مفتوحة{% endif %}
+      </button>
+    </form>
+    <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">رجوع</a>
+  </div>
 </div>
 
-<div class="alert alert-info mb-3">
+<div class="alert alert-info mb-3" id="subject-activation-note">
   <strong>ملاحظة:</strong> تفعيل مادة كاملة يمنح الطالب وصولاً فورياً لجميع الأقسام والدروس والاختبارات في هذه المادة.
 </div>
+<script>
+  setTimeout(function() {
+    var note = document.getElementById('subject-activation-note');
+    if (note) { note.classList.add('d-none'); }
+  }, 5000);
+</script>
 
 {% if students %}
   <div class="table-responsive">

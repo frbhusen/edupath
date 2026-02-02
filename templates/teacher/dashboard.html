@@ -45,6 +45,19 @@
             </div>
           </div>
           <div class="text-nowrap d-flex gap-2">
+            <form
+              class="d-inline"
+              action="{{ url_for('teacher.manage_subject_access', subject_id=subject.id) }}"
+              method="post"
+            >
+              <input type="hidden" name="action" value="toggle_requires_code" />
+              <button
+                type="submit"
+                class="btn btn-sm {% if subject.requires_code %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+              >
+                {% if subject.requires_code %}يتطلب تفعيل{% else %}مفتوحة{% endif %}
+              </button>
+            </form>
             <a
               class="btn btn-sm btn-outline-info"
               href="{{ url_for('teacher.manage_subject_access', subject_id=subject.id) }}"

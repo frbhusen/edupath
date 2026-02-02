@@ -16,9 +16,9 @@
               <h5 class="card-title mb-0">{{ subject.name }}</h5>
               <div class="d-flex gap-1 align-items-center">
                 {% if current_user.role == 'student' and subject.id in subject_activations %}
-                  <span class="badge text-bg-success">\u2713</span>
+                  <span class="badge text-bg-success">✔</span>
                 {% endif %}
-                <span class="chip">{{ subject.sections|length }} \u0623\u0642\u0633\u0627\u0645</span>
+                <span class="chip">{{ subject.sections|length }} {{ "أقسام" if subject.sections|length != 1 else "قسم" }}</span>
               </div>
             </div>
             <p class="text-muted">{{ subject.description or 'لا يوجد وصف.' }}</p>

@@ -21,9 +21,11 @@ class AccessContext:
         self.subject = section.subject
         
         # Check if entire subject is activated
+        self.subject_requires_code = getattr(self.subject, "requires_code", False)
         self.subject_active = bool(
             SubjectActivation.objects(subject_id=self.subject.id, student_id=student_id, active=True).first()
         )
+        self.subject_open = self.subject_active or not self.subject_requires_code
         
         # Check if section is activated
         self.section_requires_code = section.requires_code
@@ -32,10 +34,9 @@ class AccessContext:
         )
         
         # Section is "open" if:
-        # - Subject is activated (everything in subject is accessible) OR
-        # - Section doesn't require code OR
-        # - Section is activated
-        self.section_open = self.subject_active or self.section_active or not self.section_requires_code
+        # - Subject is open (activated or no subject code) AND
+        # - Section doesn't require code OR section is activated
+        self.section_open = self.subject_open and (self.section_active or not self.section_requires_code)
 
         lesson_ids = [l.id for l in section.lessons]
 
@@ -56,7 +57,11 @@ class AccessContext:
 
     def lesson_open(self, lesson: Lesson) -> bool:
         """Check if student can access this lesson."""
-        # If subject or section is open, all lessons visible
+        # Subject must be open to view any lessons
+        if not self.subject_open:
+            return False
+
+        # If section is open, all lessons visible
         if self.section_open:
             return True
 
@@ -77,6 +82,10 @@ class AccessContext:
         - Lesson activated → only tests linked to that lesson accessible
         - Section-wide tests: require section or subject activation
         """
+        # Subject must be open to access tests
+        if not self.subject_open:
+            return False
+
         # If subject is activated, all tests are accessible
         if self.subject_active:
             return True
@@ -144,14 +153,39 @@ def subject_detail(subject_id):
     
     # Check if subject is activated for this student
     subject_activation = None
+    sections_data = []
+    subject_requires_code = getattr(subject, "requires_code", False)
+    subject_open = True
     if current_user.role == "student":
         subject_activation = SubjectActivation.objects(
-            subject_id=subject.id, 
-            student_id=current_user.id, 
-            active=True
+            subject_id=subject.id,
+            student_id=current_user.id,
+            active=True,
         ).first()
-    
-    return render_template("student/subject_detail.html", subject=subject, subject_activation=subject_activation)
+        subject_open = bool(subject_activation) or not subject_requires_code
+        for section in subject.sections:
+            access = AccessContext(section, current_user.id)
+            sections_data.append({
+                "section": section,
+                "is_open": access.section_open,
+                "requires_code": access.section_requires_code,
+            })
+    else:
+        for section in subject.sections:
+            sections_data.append({
+                "section": section,
+                "is_open": True,
+                "requires_code": False,
+            })
+
+    return render_template(
+        "student/subject_detail.html",
+        subject=subject,
+        subject_activation=subject_activation,
+        subject_requires_code=subject_requires_code,
+        subject_open=subject_open,
+        sections_data=sections_data,
+    )
 
 @student_bp.route("/sections/<section_id>")
 @login_required
@@ -172,6 +206,8 @@ def section_detail(section_id):
         return render_template(
             "student/section_detail.html",
             section=section,
+            subject_requires_code=access.subject_requires_code,
+            subject_open=access.subject_open,
             section_active=access.section_active,
             section_requires_code=access.section_requires_code,
             section_open=access.section_open,
@@ -184,6 +220,8 @@ def section_detail(section_id):
     return render_template(
         "student/section_detail.html",
         section=section,
+        subject_requires_code=False,
+        subject_open=True,
         section_active=True,
         section_requires_code=False,
         section_open=True,
@@ -200,8 +238,11 @@ def lesson_detail(lesson_id):
     section = lesson.section
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
+        if not access.subject_open:
+            flash("قم بتفعيل المادة للوصول إلى هذا الدرس.", "warning")
+            return redirect(url_for("student.activate_subject", subject_id=section.subject.id))
         if not access.lesson_open(lesson):
-            flash("Activate this lesson to view it.", "warning")
+            flash("قم بتفعيل الدرس للوصول إليه.", "warning")
             return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
     def infer_resource_type(resource):
         if resource.resource_type:
@@ -293,6 +334,9 @@ def take_test(test_id):
         return "404", 404
     if current_user.role == "student":
         access = AccessContext(test.section, current_user.id)
+        if not access.subject_open:
+            flash("قم بتفعيل المادة للوصول إلى هذا الاختبار.", "warning")
+            return redirect(url_for("student.activate_subject", subject_id=test.section.subject.id))
         if not access.test_open(test):
             # Redirect to appropriate activation page based on test type
             if test.lesson_id:

@@ -76,12 +76,12 @@
                       {% set c2 = choices[1] if choices|length > 1 else None %}
                       {% set c3 = choices[2] if choices|length > 2 else None %}
                       {% set c4 = choices[3] if choices|length > 3 else None %}
-                      {% set correct_idx = 0 %}
+                      {% set correct_idx = namespace(value=0) %}
                       {% for ch in choices %}
                         {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
-                          {% set correct_idx = loop.index %}
+                          {% set correct_idx.value = loop.index %}
                         {% elif ch.is_correct %}
-                          {% set correct_idx = loop.index %}
+                          {% set correct_idx.value = loop.index %}
                         {% endif %}
                       {% endfor %}
                       <option value="{{ q.id }}"
@@ -91,7 +91,7 @@
                         data-choice2="{{ c2.text if c2 else '' }}"
                         data-choice3="{{ c3.text if c3 else '' }}"
                         data-choice4="{{ c4.text if c4 else '' }}"
-                        data-correct="{{ correct_idx }}">
+                        data-correct="{{ correct_idx.value }}">
                         Q{{ loop.index }} - {{ q.text[:40] ~ ('...' if q.text|length > 40 else '') }}
                       </option>
                     {% endfor %}
@@ -167,12 +167,12 @@
               <ul class="list-group list-group-flush">
               {% for q in test.questions %}
                 {% set choices = q.choices|list %}
-                {% set correct_idx = 0 %}
+                {% set correct_idx = namespace(value=0) %}
                 {% for ch in choices %}
                   {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
-                    {% set correct_idx = loop.index %}
+                    {% set correct_idx.value = loop.index %}
                   {% elif ch.is_correct %}
-                    {% set correct_idx = loop.index %}
+                    {% set correct_idx.value = loop.index %}
                   {% endif %}
                 {% endfor %}
                 <li class="list-group-item d-flex justify-content-between align-items-start">
@@ -181,7 +181,7 @@
                     {% if q.hint %}
                       <div class="small text-muted">التلميح: {{ q.hint }}</div>
                     {% endif %}
-                    <div class="text-muted small">صحيح: {{ choices[correct_idx-1].text if correct_idx > 0 else 'غير محدد' }}</div>
+                    <div class="text-muted small">صحيح: {{ choices[correct_idx.value-1].text if correct_idx.value > 0 else 'غير محدد' }}</div>
                   </div>
                   <button class="btn btn-outline-primary btn-sm" type="button" onclick="selectQuestion('{{ q.id }}')">Load</button>
                 </li>

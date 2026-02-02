@@ -38,6 +38,7 @@ class Subject(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     name = StringField(required=True, max_length=120)
     description = StringField(null=True)
+    requires_code = BooleanField(default=False, required=True)
     created_by = ReferenceField(User, required=True)
     created_at = DateTimeField(default=datetime.utcnow)
     
