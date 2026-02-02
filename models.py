@@ -180,6 +180,7 @@ class Question(Document):
     test_id = ReferenceField(Test, required=True)
     text = StringField(required=True)
     hint = StringField(null=True)
+    difficulty = StringField(default="medium", choices=["easy", "medium", "hard"])
     choices = ListField(EmbeddedDocumentField(Choice), required=True)
     correct_choice_id = ObjectIdField(null=True)
     created_at = DateTimeField(default=datetime.utcnow)

@@ -14,6 +14,14 @@
         <label class="form-label">تلميح (اختياري)</label>
         <textarea name="hint" class="form-control" rows="2">{{ question.hint }}</textarea>
       </div>
+      <div class="mb-3">
+        <label class="form-label">مستوى السؤال</label>
+        <select class="form-select" name="difficulty">
+          <option value="easy" {% if question.difficulty == 'easy' %}selected{% endif %}>سهل</option>
+          <option value="medium" {% if question.difficulty == 'medium' or not question.difficulty %}selected{% endif %}>متوسط</option>
+          <option value="hard" {% if question.difficulty == 'hard' %}selected{% endif %}>صعب</option>
+        </select>
+      </div>
 
       <div id="choices-container">
         {% for choice in question.choices %}

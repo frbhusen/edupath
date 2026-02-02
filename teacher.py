@@ -809,6 +809,9 @@ def edit_test(test_id):
             question_id = request.form.get("question_id")
             text = (request.form.get("question_text") or "").strip()
             hint = (request.form.get("question_hint") or "").strip() or None
+            difficulty = (request.form.get("difficulty") or "medium").strip().lower()
+            if difficulty not in {"easy", "medium", "hard"}:
+                difficulty = "medium"
             correct_choice = request.form.get("correct_choice")
             correct_index = int(correct_choice) if (correct_choice and correct_choice.isdigit()) else None
 
@@ -836,6 +839,7 @@ def edit_test(test_id):
             if question:
                 question.text = text
                 question.hint = hint
+                question.difficulty = difficulty
                 question.choices = choices
                 correct_choice = next((c for c in choices if c.is_correct), None)
                 question.correct_choice_id = correct_choice.choice_id if correct_choice else None
@@ -847,6 +851,7 @@ def edit_test(test_id):
                     test_id=test.id,
                     text=text,
                     hint=hint,
+                    difficulty=difficulty,
                     choices=choices,
                     correct_choice_id=correct_choice.choice_id if correct_choice else None,
                 )
@@ -877,6 +882,9 @@ def edit_test(test_id):
             raw_json = request.form.get("questions_json") or ""
             upload = request.files.get("questions_file")
             include_hints = request.form.get("include_hints") == "1"
+            import_level = (request.form.get("import_difficulty") or "from_json").strip().lower()
+            if import_level not in {"from_json", "easy", "medium", "hard"}:
+                import_level = "from_json"
             if upload and upload.filename:
                 raw_json = upload.read().decode("utf-8")
 
@@ -904,6 +912,12 @@ def edit_test(test_id):
                     continue
                 q_text = (item.get("question") or item.get("text") or "").strip()
                 q_hint = (item.get("hint") or "").strip() if include_hints else None
+                if import_level == "from_json":
+                    difficulty = (item.get("difficulty") or item.get("level") or "medium").strip().lower()
+                    if difficulty not in {"easy", "medium", "hard"}:
+                        difficulty = "medium"
+                else:
+                    difficulty = import_level
                 answer_options = item.get("answerOptions") or item.get("answer_options") or None
                 choices_list = item.get("choices") or item.get("options") or []
                 if not q_text:
@@ -959,6 +973,7 @@ def edit_test(test_id):
                     test_id=test.id,
                     text=q_text,
                     hint=q_hint,
+                    difficulty=difficulty,
                     choices=choices,
                     correct_choice_id=correct_choice.choice_id if correct_choice else None,
                 )
@@ -971,7 +986,7 @@ def edit_test(test_id):
         form.title.data = test.title
         form.description.data = test.description
         form.requires_code.data = test.requires_code
-        form.lesson_id.data = str(test.lesson_id) if test.lesson_id else ""
+        form.lesson_id.data = str(test.lesson_id.id) if test.lesson_id else ""
     
     # Backfill correct_choice_id for existing questions if missing
     for q in Question.objects(test_id=test.id).all():
@@ -1013,6 +1028,9 @@ def new_question(test_id):
     if request.method == "POST":
         text = request.form.get("text")
         hint = request.form.get("hint")
+        difficulty = (request.form.get("difficulty") or "medium").strip().lower()
+        if difficulty not in {"easy", "medium", "hard"}:
+            difficulty = "medium"
         
         choices_data = []
         i = 0
@@ -1038,6 +1056,7 @@ def new_question(test_id):
                 test_id=test.id,
                 text=text,
                 hint=hint,
+                difficulty=difficulty,
                 choices=choices,
                 correct_choice_id=correct_choice.choice_id if correct_choice else None,
             )
@@ -1059,6 +1078,10 @@ def edit_question(question_id):
     if request.method == "POST":
         question.text = request.form.get("text")
         question.hint = request.form.get("hint")
+        difficulty = (request.form.get("difficulty") or "medium").strip().lower()
+        if difficulty not in {"easy", "medium", "hard"}:
+            difficulty = "medium"
+        question.difficulty = difficulty
         
         choices_data = []
         i = 0

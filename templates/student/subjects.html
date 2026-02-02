@@ -23,7 +23,6 @@
             </div>
             <p class="text-muted">{{ subject.description or 'لا يوجد وصف.' }}</p>
             <div class="mt-auto d-flex justify-content-between align-items-center">
-              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.custom_test_new', subject_id=subject.id) }}">اختبار مخصص</a>
               <a class="btn btn-cta btn-sm" href="{{ url_for('student.subject_detail', subject_id=subject.id) }}">عرض المادة</a>
             </div>
           </div>

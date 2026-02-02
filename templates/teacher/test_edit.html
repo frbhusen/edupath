@@ -1,347 +1,389 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="row">
-  <div class="col-12">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ url_for('teacher.dashboard') }}">لوحة التحكم</a></li>
-        <li class="breadcrumb-item active">تعديل الاختبار</li>
-      </ol>
-    </nav>
+
+  {% extends 'base.html' %}
+  {% block content %}
+  <div class="row mb-3">
+    <div class="col-12">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><a href="{{ url_for('teacher.dashboard') }}">لوحة التحكم</a></li>
+          <li class="breadcrumb-item active">تعديل الاختبار</li>
+        </ol>
+      </nav>
+    </div>
   </div>
-</div>
 
-<div class="row justify-content-center">
-  <div class="col-12 col-lg-11">
-    <div class="card shadow-sm">
-      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-        <h4 class="mb-0">تعديل الاختبار: {{ test.title }}</h4>
-        <span class="small">القسم: {{ test.section.title }}</span>
-      </div>
-      <div class="card-body">
-        <div class="card border-0 shadow-sm mb-4">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h5 class="card-title mb-0">تفاصيل الاختبار</h5>
-              <small class="text-muted">البيانات الوصفية</small>
-            </div>
-            <form method="post">
-              {{ meta_form.hidden_tag() }}
-              <input type="hidden" name="form_name" value="update_test" />
-              <div class="row g-3">
-                <div class="col-12 col-md-4">
-                  {{ meta_form.title.label(class="form-label") }}
-                  {{ meta_form.title(class="form-control") }}
-                </div>
-                <div class="col-12 col-md-4">
-                  {{ meta_form.lesson_id.label(class="form-label") }}
-                  {{ meta_form.lesson_id(class="form-select") }}
-                  <div class="form-text">ربط بدرس أو إبقاءه على مستوى القسم.</div>
-                </div>
-                <div class="col-12 col-md-4">
-                  <label class="form-label">الوصول</label>
-                  <div class="form-check">
-                    {{ meta_form.requires_code(class="form-check-input", id="test_requires_code") }}
-                    <label class="form-check-label" for="test_requires_code">يتطلب رمز تفعيل</label>
-                  </div>
-                  <div class="form-text">يمكن قفل الاختبار أو فتحه عبر رمز التفعيل.</div>
-                </div>
-                <div class="col-12">
-                  {{ meta_form.description.label(class="form-label") }}
-                  {{ meta_form.description(class="form-control", rows=2) }}
-                </div>
-                <div class="col-12 col-md-4 ms-auto">
-                  {{ meta_form.submit(class="btn btn-cta w-100") }}
-                </div>
-              </div>
-            </form>
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-11">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+          <div>
+            <h4 class="mb-1">تعديل الاختبار</h4>
+            <div class="small opacity-75">{{ test.title }}</div>
+          </div>
+          <div class="text-end">
+            <div class="small">القسم</div>
+            <div class="fw-semibold">{{ test.section.title }}</div>
           </div>
         </div>
-
-        <div class="row justify-content-center">
-          <div class="col-12 col-lg-7">
-            <div class="card border-0 shadow-sm">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h5 class="card-title mb-0">لوحة الأسئلة</h5>
-                  <small class="text-muted">إنشاء أو تعديل</small>
+        <div class="card-body">
+          <div class="card border-0 bg-light mb-4">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">إعدادات الاختبار</h5>
+                <span class="badge text-bg-secondary">{{ test.questions|length }} سؤال</span>
+              </div>
+              <form method="post">
+                {{ meta_form.hidden_tag() }}
+                <input type="hidden" name="form_name" value="update_test" />
+                <div class="row g-3">
+                  <div class="col-12 col-lg-4">
+                    {{ meta_form.title.label(class="form-label") }}
+                    {{ meta_form.title(class="form-control") }}
+                  </div>
+                  <div class="col-12 col-lg-4">
+                    {{ meta_form.lesson_id.label(class="form-label") }}
+                    {{ meta_form.lesson_id(class="form-select") }}
+                    <div class="form-text">ربط بدرس أو إبقاءه على مستوى القسم.</div>
+                  </div>
+                  <div class="col-12 col-lg-4">
+                    <label class="form-label">الوصول</label>
+                    <div class="form-check">
+                      {{ meta_form.requires_code(class="form-check-input", id="test_requires_code") }}
+                      <label class="form-check-label" for="test_requires_code">يتطلب رمز تفعيل</label>
+                    </div>
+                    <div class="form-text">يمكن قفل الاختبار أو فتحه عبر رمز التفعيل.</div>
+                  </div>
+                  <div class="col-12">
+                    {{ meta_form.description.label(class="form-label") }}
+                    {{ meta_form.description(class="form-control", rows=2) }}
+                  </div>
+                  <div class="col-12 col-md-4 ms-auto">
+                    {{ meta_form.submit(class="btn btn-cta w-100") }}
+                  </div>
                 </div>
-                <div class="mb-3">
-                  <label class="form-label">اختر سؤال موجود</label>
-                  <select id="questionSelect" class="form-select">
-                    <option value="">سؤال جديد</option>
-                    {% for q in test.questions %}
-                      {% set choices = q.choices|list %}
-                      {% set c1 = choices[0] if choices|length > 0 else None %}
-                      {% set c2 = choices[1] if choices|length > 1 else None %}
-                      {% set c3 = choices[2] if choices|length > 2 else None %}
-                      {% set c4 = choices[3] if choices|length > 3 else None %}
-                      {% set correct_idx = namespace(value=0) %}
-                      {% for ch in choices %}
-                        {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
-                          {% set correct_idx.value = loop.index %}
-                        {% elif ch.is_correct %}
-                          {% set correct_idx.value = loop.index %}
-                        {% endif %}
+              </form>
+            </div>
+          </div>
+
+          <div class="row g-4">
+            <div class="col-12 col-lg-7">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0">تحرير الأسئلة</h5>
+                    <small class="text-muted">إنشاء، تعديل، وحذف</small>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label">اختر سؤال موجود</label>
+                    <select id="questionSelect" class="form-select">
+                      <option value="">سؤال جديد</option>
+                      {% for q in test.questions %}
+                        {% set choices = q.choices|list %}
+                        {% set c1 = choices[0] if choices|length > 0 else None %}
+                        {% set c2 = choices[1] if choices|length > 1 else None %}
+                        {% set c3 = choices[2] if choices|length > 2 else None %}
+                        {% set c4 = choices[3] if choices|length > 3 else None %}
+                        {% set correct_idx = namespace(value=0) %}
+                        {% for ch in choices %}
+                          {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
+                            {% set correct_idx.value = loop.index %}
+                          {% elif ch.is_correct %}
+                            {% set correct_idx.value = loop.index %}
+                          {% endif %}
+                        {% endfor %}
+                        <option value="{{ q.id }}"
+                          data-text="{{ q.text }}"
+                          data-hint="{{ q.hint or '' }}"
+                          data-difficulty="{{ q.difficulty or 'medium' }}"
+                          data-choice1="{{ c1.text if c1 else '' }}"
+                          data-choice2="{{ c2.text if c2 else '' }}"
+                          data-choice3="{{ c3.text if c3 else '' }}"
+                          data-choice4="{{ c4.text if c4 else '' }}"
+                          data-correct="{{ correct_idx.value }}">
+                          Q{{ loop.index }} - {{ q.text[:40] ~ ('...' if q.text|length > 40 else '') }}
+                        </option>
                       {% endfor %}
-                      <option value="{{ q.id }}"
-                        data-text="{{ q.text }}"
-                        data-hint="{{ q.hint or '' }}"
-                        data-choice1="{{ c1.text if c1 else '' }}"
-                        data-choice2="{{ c2.text if c2 else '' }}"
-                        data-choice3="{{ c3.text if c3 else '' }}"
-                        data-choice4="{{ c4.text if c4 else '' }}"
-                        data-correct="{{ correct_idx.value }}">
-                        Q{{ loop.index }} - {{ q.text[:40] ~ ('...' if q.text|length > 40 else '') }}
-                      </option>
-                    {% endfor %}
-                  </select>
-                </div>
+                    </select>
+                  </div>
 
-                <form method="post" id="questionForm">
-                  <input type="hidden" name="form_name" value="upsert_question" />
-                  <input type="hidden" name="question_id" id="question_id" />
-                  <div class="mb-3">
-                    <label class="form-label">السؤال</label>
-                    <textarea class="form-control" id="question_text" name="question_text" rows="3" required></textarea>
-                  </div>
-                  <div class="mb-3">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleHintBtn">إضافة تلميح</button>
-                  </div>
-                  <div class="mb-3 d-none" id="hintWrapper">
-                    <label class="form-label">التلميح</label>
-                    <textarea class="form-control" id="question_hint" name="question_hint" rows="2"></textarea>
-                  </div>
-                  {% for i in range(1,5) %}
-                  <div class="mb-2">
-                    <label class="form-label">الخيار {{ i }}</label>
-                    <div class="input-group">
-                      <div class="input-group-text">
-                        <input class="form-check-input mt-0" type="radio" name="correct_choice" id="correct_choice_{{ i }}" value="{{ i }}" aria-label="Correct choice">
+                  <form method="post" id="questionForm">
+                    <input type="hidden" name="form_name" value="upsert_question" />
+                    <input type="hidden" name="question_id" id="question_id" />
+                    <div class="mb-3">
+                      <label class="form-label">السؤال</label>
+                      <textarea class="form-control" id="question_text" name="question_text" rows="3" required></textarea>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-12 col-md-6">
+                        <label class="form-label">مستوى السؤال</label>
+                        <select class="form-select" id="question_difficulty" name="difficulty">
+                          <option value="easy">سهل</option>
+                          <option value="medium" selected>متوسط</option>
+                          <option value="hard">صعب</option>
+                        </select>
                       </div>
-                      <input type="text" class="form-control" name="choice_{{ i }}" id="choice_{{ i }}" placeholder="Answer option">
+                      <div class="col-12 col-md-6 d-flex align-items-end">
+                        <button type="button" class="btn btn-outline-secondary w-100" id="toggleHintBtn">إضافة تلميح</button>
+                      </div>
                     </div>
-                  </div>
-                  {% endfor %}
-                  <div class="d-flex gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary w-100">حفظ</button>
-                    <button type="button" id="resetBtn" class="btn btn-outline-secondary">إعادة تعيين</button>
-                  </div>
-                  <div class="d-flex gap-2 mt-2">
-                    <button type="button" id="deleteBtn" class="btn btn-outline-danger w-100" disabled>حذف المختار</button>
-                  </div>
-                </form>
+                    <div class="mb-3 d-none" id="hintWrapper">
+                      <label class="form-label">التلميح</label>
+                      <textarea class="form-control" id="question_hint" name="question_hint" rows="2"></textarea>
+                    </div>
 
-                <div class="card border-0 bg-light mt-3">
-                  <div class="card-body">
-                    <h6 class="card-title mb-2">معاينة (MathJax)</h6>
-                    <div class="mb-2"><strong>السؤال:</strong> <span id="previewQuestion"></span></div>
-                    <div class="mb-2"><strong>التلميح:</strong> <span id="previewHint"></span></div>
-                    <div><strong>الخيارات:</strong>
-                      <ol class="mb-0" id="previewChoices"></ol>
+                    <div class="mt-3">
+                      <label class="form-label">الإجابات</label>
+                      <div class="row g-2">
+                        {% for i in range(1,5) %}
+                        <div class="col-12">
+                          <div class="input-group">
+                            <div class="input-group-text">
+                              <input class="form-check-input mt-0" type="radio" name="correct_choice" id="correct_choice_{{ i }}" value="{{ i }}" aria-label="Correct choice">
+                            </div>
+                            <input type="text" class="form-control" name="choice_{{ i }}" id="choice_{{ i }}" placeholder="الخيار {{ i }}">
+                          </div>
+                        </div>
+                        {% endfor %}
+                      </div>
                     </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                      <button type="submit" class="btn btn-primary w-100">حفظ السؤال</button>
+                      <button type="button" id="resetBtn" class="btn btn-outline-secondary">تفريغ</button>
+                    </div>
+                    <div class="d-flex gap-2 mt-2">
+                      <button type="button" id="deleteBtn" class="btn btn-outline-danger w-100" disabled>حذف السؤال المختار</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 col-lg-5">
+              <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="card-title mb-0">المعاينة الحية</h6>
+                    <span class="badge text-bg-light">MathJax</span>
+                  </div>
+                  <div class="mb-2"><strong>السؤال:</strong> <span id="previewQuestion"></span></div>
+                  <div class="mb-2"><strong>التلميح:</strong> <span id="previewHint"></span></div>
+                  <div><strong>الخيارات:</strong>
+                    <ol class="mb-0" id="previewChoices"></ol>
                   </div>
                 </div>
+              </div>
 
-                <div class="card bg-light border-0 mt-3">
-                  <div class="card-body">
-                    <h6 class="card-title">LaTeX quick reference</h6>
-                    <ul class="small mb-0">
-                      <li>Inline: <code>$a^2 + b^2 = c^2$</code></li>
-                      <li>Display: <code>$$\int_0^1 x^2\,dx$$</code></li>
-                      <li>Fraction: <code>$\frac{a}{b}$</code></li>
-                      <li>Root: <code>$\sqrt{x}$</code></li>
-                      <li>Greek: <code>$\alpha, \beta, \pi$</code></li>
-                    </ul>
+              <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-title mb-0">قائمة الأسئلة</h6>
+                    <span class="badge text-bg-secondary">{{ test.questions|length }}</span>
                   </div>
+                  {% if test.questions %}
+                    <div class="list-group list-group-flush">
+                      {% for q in test.questions %}
+                        {% set choices = q.choices|list %}
+                        {% set correct_idx = namespace(value=0) %}
+                        {% for ch in choices %}
+                          {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
+                            {% set correct_idx.value = loop.index %}
+                          {% elif ch.is_correct %}
+                            {% set correct_idx.value = loop.index %}
+                          {% endif %}
+                        {% endfor %}
+                        {% set diff_label = 'متوسط' %}
+                        {% if q.difficulty == 'easy' %}{% set diff_label = 'سهل' %}{% endif %}
+                        {% if q.difficulty == 'hard' %}{% set diff_label = 'صعب' %}{% endif %}
+                        <button class="list-group-item list-group-item-action" type="button" onclick="selectQuestion('{{ q.id }}')">
+                          <div class="d-flex justify-content-between align-items-start">
+                            <div class="me-2">
+                              <div class="fw-semibold">س{{ loop.index }}. {{ q.text }}</div>
+                              {% if q.hint %}
+                                <div class="small text-muted">التلميح: {{ q.hint }}</div>
+                              {% endif %}
+                              <div class="small text-muted">صحيح: {{ choices[correct_idx.value-1].text if correct_idx.value > 0 else 'غير محدد' }}</div>
+                            </div>
+                            <span class="badge text-bg-light">{{ diff_label }}</span>
+                          </div>
+                        </button>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="alert alert-info mb-0">لا توجد أسئلة حتى الآن. قم بإضافة سؤالك الأول.</div>
+                  {% endif %}
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div class="card border-0 shadow-sm mt-4">
-          <div class="card-body">
-            <h5 class="card-title">الأسئلة الموجودة ({{ test.questions|length }})</h5>
-            {% if test.questions %}
-              <ul class="list-group list-group-flush">
-              {% for q in test.questions %}
-                {% set choices = q.choices|list %}
-                {% set correct_idx = namespace(value=0) %}
-                {% for ch in choices %}
-                  {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
-                    {% set correct_idx.value = loop.index %}
-                  {% elif ch.is_correct %}
-                    {% set correct_idx.value = loop.index %}
-                  {% endif %}
-                {% endfor %}
-                <li class="list-group-item d-flex justify-content-between align-items-start">
-                  <div>
-                    <div class="fw-semibold">س{{ loop.index }}. {{ q.text }}</div>
-                    {% if q.hint %}
-                      <div class="small text-muted">التلميح: {{ q.hint }}</div>
-                    {% endif %}
-                    <div class="text-muted small">صحيح: {{ choices[correct_idx.value-1].text if correct_idx.value > 0 else 'غير محدد' }}</div>
+          <div class="card border-0 shadow-sm mt-4">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">استيراد الأسئلة من JSON</h5>
+                <span class="badge text-bg-light">يدعم LaTeX</span>
+              </div>
+              <p class="text-muted small">قم بتحميل ملف JSON أو لصق المحتوى مباشرة.</p>
+              <form method="post" enctype="multipart/form-data">
+                <input type="hidden" name="form_name" value="import_json" />
+                <div class="row g-3">
+                  <div class="col-12 col-lg-6">
+                    <label class="form-label">ملف JSON</label>
+                    <input type="file" class="form-control" name="questions_file" accept="application/json" />
                   </div>
-                  <button class="btn btn-outline-primary btn-sm" type="button" onclick="selectQuestion('{{ q.id }}')">Load</button>
-                </li>
-              {% endfor %}
-              </ul>
-            {% else %}
-              <div class="alert alert-info mb-0">لا توجد أسئلة حتى الآن. قم بإضافة سؤالك الأول.</div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="card border-0 shadow-sm mt-4">
-          <div class="card-body">
-            <h5 class="card-title">استيراد الأسئلة من JSON</h5>
-            <p class="text-muted small">قم بتحميل ملف JSON أو لصق محتوى JSON. يدعم LaTeX.</p>
-            <form method="post" enctype="multipart/form-data">
-              <input type="hidden" name="form_name" value="import_json" />
-              <div class="mb-3">
-                <label class="form-label">ملف JSON</label>
-                <input type="file" class="form-control" name="questions_file" accept="application/json" />
-              </div>
-              <div class="mb-3">
-                <label class="form-label">أو لصق JSON</label>
-                <textarea class="form-control" name="questions_json" rows="6" placeholder='{"quiz": [...]}'></textarea>
-              </div>
-              <div class="mb-3">
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleImportHintBtn">إضافة تلميح</button>
-              </div>
-              <div class="mb-3 d-none" id="importHintWrapper">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="includeHints" name="include_hints" value="1" checked>
-                  <label class="form-check-label" for="includeHints">تضمين التلميحات من JSON</label>
+                  <div class="col-12 col-lg-6">
+                    <label class="form-label">مستوى الأسئلة المستوردة</label>
+                    <select class="form-select" name="import_difficulty">
+                      <option value="from_json" selected>حسب JSON</option>
+                      <option value="easy">سهل</option>
+                      <option value="medium">متوسط</option>
+                      <option value="hard">صعب</option>
+                    </select>
+                    <div class="form-text">اختر مستوى واحد لتطبيقه على جميع الأسئلة المستوردة.</div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">أو لصق JSON</label>
+                    <textarea class="form-control" name="questions_json" rows="6" placeholder='{"quiz": [...]}'>
+                    </textarea>
+                  </div>
+                  <div class="col-12">
+                    <button type="button" class="btn btn-outline-secondary" id="toggleImportHintBtn">إضافة تلميح</button>
+                  </div>
+                  <div class="col-12 d-none" id="importHintWrapper">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="includeHints" name="include_hints" value="1" checked>
+                      <label class="form-check-label" for="includeHints">تضمين التلميحات من JSON</label>
+                    </div>
+                  </div>
+                  <div class="col-12 d-flex justify-content-end">
+                    <button type="submit" class="btn btn-cta">استيراد الأسئلة</button>
+                  </div>
                 </div>
-              </div>
-              <div class="d-flex justify-content-end">
-                <button type="submit" class="btn btn-cta">استيراد الأسئلة</button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<script>
-  const selectEl = document.getElementById('questionSelect');
-  const idField = document.getElementById('question_id');
-  const questionField = document.getElementById('question_text');
-  const hintField = document.getElementById('question_hint');
-  const choiceFields = [1,2,3,4].map(i => document.getElementById(`choice_${i}`));
-  const correctRadios = [1,2,3,4].map(i => document.getElementById(`correct_choice_${i}`));
-  const resetBtn = document.getElementById('resetBtn');
-  const deleteBtn = document.getElementById('deleteBtn');
-  const toggleHintBtn = document.getElementById('toggleHintBtn');
-  const hintWrapper = document.getElementById('hintWrapper');
-  const toggleImportHintBtn = document.getElementById('toggleImportHintBtn');
-  const importHintWrapper = document.getElementById('importHintWrapper');
-  const previewQuestion = document.getElementById('previewQuestion');
-  const previewHint = document.getElementById('previewHint');
-  const previewChoices = document.getElementById('previewChoices');
+  <script>
+    const selectEl = document.getElementById('questionSelect');
+    const idField = document.getElementById('question_id');
+    const questionField = document.getElementById('question_text');
+    const hintField = document.getElementById('question_hint');
+    const difficultyField = document.getElementById('question_difficulty');
+    const choiceFields = [1,2,3,4].map(i => document.getElementById(`choice_${i}`));
+    const correctRadios = [1,2,3,4].map(i => document.getElementById(`correct_choice_${i}`));
+    const resetBtn = document.getElementById('resetBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const toggleHintBtn = document.getElementById('toggleHintBtn');
+    const hintWrapper = document.getElementById('hintWrapper');
+    const toggleImportHintBtn = document.getElementById('toggleImportHintBtn');
+    const importHintWrapper = document.getElementById('importHintWrapper');
+    const previewQuestion = document.getElementById('previewQuestion');
+    const previewHint = document.getElementById('previewHint');
+    const previewChoices = document.getElementById('previewChoices');
 
-  function fillFormFromOption(opt){
-    if(!opt || !opt.value){
-      idField.value = '';
-      questionField.value = '';
-      hintField.value = '';
-      choiceFields.forEach(f => f.value='');
-      correctRadios.forEach(r => r.checked=false);
-      deleteBtn.disabled = true;
+    function fillFormFromOption(opt){
+      if(!opt || !opt.value){
+        idField.value = '';
+        questionField.value = '';
+        hintField.value = '';
+        if (difficultyField) difficultyField.value = 'medium';
+        choiceFields.forEach(f => f.value='');
+        correctRadios.forEach(r => r.checked=false);
+        deleteBtn.disabled = true;
+        updatePreview();
+        return;
+      }
+      idField.value = opt.value;
+      questionField.value = opt.dataset.text || '';
+      hintField.value = opt.dataset.hint || '';
+      if (difficultyField) difficultyField.value = opt.dataset.difficulty || 'medium';
+      choiceFields.forEach((f, idx) => {
+        f.value = opt.dataset[`choice${idx+1}`] || '';
+      });
+      correctRadios.forEach(r => r.checked = false);
+      const cIdx = parseInt(opt.dataset.correct || '0');
+      if(cIdx >=1 && cIdx <=4){ correctRadios[cIdx-1].checked = true; }
+      deleteBtn.disabled = false;
       updatePreview();
-      return;
     }
-    idField.value = opt.value;
-    questionField.value = opt.dataset.text || '';
-    hintField.value = opt.dataset.hint || '';
-    choiceFields.forEach((f, idx) => {
-      f.value = opt.dataset[`choice${idx+1}`] || '';
+
+    selectEl.addEventListener('change', (e)=>{
+      const opt = e.target.selectedOptions[0];
+      fillFormFromOption(opt);
     });
-    correctRadios.forEach(r => r.checked = false);
-    const cIdx = parseInt(opt.dataset.correct || '0');
-    if(cIdx >=1 && cIdx <=4){ correctRadios[cIdx-1].checked = true; }
-    deleteBtn.disabled = false;
-    updatePreview();
-  }
 
-  selectEl.addEventListener('change', (e)=>{
-    const opt = e.target.selectedOptions[0];
-    fillFormFromOption(opt);
-  });
+    resetBtn.addEventListener('click', ()=>{
+      selectEl.value = '';
+      fillFormFromOption(selectEl.selectedOptions[0]);
+    });
 
-  resetBtn.addEventListener('click', ()=>{
-    selectEl.value = '';
-    fillFormFromOption(selectEl.selectedOptions[0]);
-  });
+    deleteBtn.addEventListener('click', ()=>{
+      const qid = idField.value;
+      if(!qid) return;
+      if(!confirm('Delete this question?')) return;
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.innerHTML = `<input type="hidden" name="form_name" value="delete_question"/><input type="hidden" name="question_id" value="${qid}"/>`;
+      document.body.appendChild(form);
+      form.submit();
+    });
 
-  deleteBtn.addEventListener('click', ()=>{
-    const qid = idField.value;
-    if(!qid) return;
-    if(!confirm('Delete this question?')) return;
-    const form = document.createElement('form');
-    form.method = 'post';
-    form.innerHTML = `<input type="hidden" name="form_name" value="delete_question"/><input type="hidden" name="question_id" value="${qid}"/>`;
-    document.body.appendChild(form);
-    form.submit();
-  });
+    function updatePreview(){
+      if(previewQuestion) previewQuestion.textContent = questionField.value || '';
+      if(previewHint) previewHint.textContent = hintField.value || '';
+      if(previewChoices){
+        previewChoices.innerHTML = '';
+        choiceFields.forEach((field, idx) => {
+          if(!field.value) return;
+          const li = document.createElement('li');
+          const prefix = correctRadios[idx] && correctRadios[idx].checked ? '✅ ' : '';
+          li.textContent = `${prefix}${field.value}`;
+          previewChoices.appendChild(li);
+        });
+      }
+      if(window.MathJax && MathJax.typesetPromise){
+        MathJax.typesetPromise([previewQuestion, previewHint, previewChoices]);
+      }
+    }
 
-  function updatePreview(){
-    if(previewQuestion) previewQuestion.textContent = questionField.value || '';
-    if(previewHint) previewHint.textContent = hintField.value || '';
-    if(previewChoices){
-      previewChoices.innerHTML = '';
-      choiceFields.forEach((field, idx) => {
-        if(!field.value) return;
-        const li = document.createElement('li');
-        const prefix = correctRadios[idx] && correctRadios[idx].checked ? '✅ ' : '';
-        li.textContent = `${prefix}${field.value}`;
-        previewChoices.appendChild(li);
+    [questionField, hintField, ...choiceFields].forEach(el => {
+      el.addEventListener('input', updatePreview);
+    });
+    correctRadios.forEach(r => r.addEventListener('change', updatePreview));
+
+    if(toggleHintBtn && hintWrapper){
+      toggleHintBtn.addEventListener('click', ()=>{
+        hintWrapper.classList.toggle('d-none');
+        toggleHintBtn.textContent = hintWrapper.classList.contains('d-none') ? 'إضافة تلميح' : 'إزالة التلميح';
+        if(hintWrapper.classList.contains('d-none')){
+          hintField.value = '';
+          updatePreview();
+        }
       });
     }
-    if(window.MathJax && MathJax.typesetPromise){
-      MathJax.typesetPromise([previewQuestion, previewHint, previewChoices]);
+
+    if(toggleImportHintBtn && importHintWrapper){
+      toggleImportHintBtn.addEventListener('click', ()=>{
+        importHintWrapper.classList.toggle('d-none');
+        toggleImportHintBtn.textContent = importHintWrapper.classList.contains('d-none') ? 'إضافة تلميح' : 'إزالة التلميح';
+      });
     }
-  }
 
-  [questionField, hintField, ...choiceFields].forEach(el => {
-    el.addEventListener('input', updatePreview);
-  });
-  correctRadios.forEach(r => r.addEventListener('change', updatePreview));
-
-  if(toggleHintBtn && hintWrapper){
-    toggleHintBtn.addEventListener('click', ()=>{
-      hintWrapper.classList.toggle('d-none');
-      toggleHintBtn.textContent = hintWrapper.classList.contains('d-none') ? 'Add hint' : 'Remove hint';
-      if(hintWrapper.classList.contains('d-none')){
-        hintField.value = '';
-        updatePreview();
+    function selectQuestion(id){
+      const opt = Array.from(selectEl.options).find(o => o.value === String(id));
+      if(opt){
+        selectEl.value = String(id);
+        fillFormFromOption(opt);
       }
-    });
-  }
-
-  if(toggleImportHintBtn && importHintWrapper){
-    toggleImportHintBtn.addEventListener('click', ()=>{
-      importHintWrapper.classList.toggle('d-none');
-      toggleImportHintBtn.textContent = importHintWrapper.classList.contains('d-none') ? 'Add hint' : 'Remove hint';
-    });
-  }
-
-  // helper to select question from list-group buttons
-  function selectQuestion(id){
-    const opt = Array.from(selectEl.options).find(o => o.value === String(id));
-    if(opt){
-      selectEl.value = String(id);
-      fillFormFromOption(opt);
     }
-  }
-  window.selectQuestion = selectQuestion;
+    window.selectQuestion = selectQuestion;
 
-  // default to new question
-  fillFormFromOption(selectEl.selectedOptions[0]);
-  updatePreview();
-</script>
-{% endblock %}
+    fillFormFromOption(selectEl.selectedOptions[0]);
+    updatePreview();
+  </script>
+  {% endblock %}

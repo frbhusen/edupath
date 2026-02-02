@@ -51,7 +51,7 @@ def create_app():
             try:
                 return render_template(f"pages/{filename}")
             except Exception:
-                return render_template("404.html"), 404
+                return render_template("pages/404.html"), 404
     
     @app.before_request
     def enforce_single_device_login():

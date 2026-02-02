@@ -117,12 +117,11 @@
         {% endfor %}
 
         {% for res in audios %}
-          <div class="resource-card resource-card-audio resource-embed">
+          <a href="{{ res.url }}" target="_blank" rel="noopener" class="resource-card resource-card-audio text-decoration-none">
+            <div class="resource-icon">🎵</div>
             <div class="resource-label">{{ res.label }}</div>
-            <div class="resource-embed-audio">
-              <audio controls preload="none" src="{{ res.embed_url }}"></audio>
-            </div>
-          </div>
+            <div class="resource-action">تشغيل صوت</div>
+          </a>
         {% endfor %}
 
         {% for res in flashcards %}

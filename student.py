@@ -342,13 +342,23 @@ def take_test(test_id):
     min_select = 10 if total_questions_available >= 10 else total_questions_available
     max_select = min(50, total_questions_available)
     selected_count = request.args.get("count")
+    easy_count = request.args.get("easy")
+    medium_count = request.args.get("medium")
+    hard_count = request.args.get("hard")
     try:
         selected_count = int(selected_count) if selected_count else None
     except ValueError:
         selected_count = None
+    try:
+        easy_count = int(easy_count) if easy_count else 0
+        medium_count = int(medium_count) if medium_count else 0
+        hard_count = int(hard_count) if hard_count else 0
+    except ValueError:
+        easy_count = medium_count = hard_count = 0
     if selected_count:
         lower_bound = 10 if total_questions_available >= 10 else 1
         selected_count = max(lower_bound, min(selected_count, max_select))
+    selected_by_level = (easy_count + medium_count + hard_count) > 0
 
     if request.method == "POST":
         # Evaluate answers
@@ -396,8 +406,34 @@ def take_test(test_id):
     time_limit_seconds = None
     if selected_count:
         questions = list(test.questions)
-        if selected_count < len(questions):
-            questions = random.sample(questions, selected_count)
+        if selected_by_level:
+            level_map = {"easy": [], "medium": [], "hard": []}
+            for q in questions:
+                level = (getattr(q, "difficulty", "medium") or "medium").lower()
+                if level not in level_map:
+                    level = "medium"
+                level_map[level].append(q)
+
+            if easy_count > len(level_map["easy"]) or medium_count > len(level_map["medium"]) or hard_count > len(level_map["hard"]):
+                flash("عدد الأسئلة المطلوب أعلى من المتاح لهذا المستوى.", "error")
+                return redirect(url_for("student.take_test", test_id=test.id))
+
+            if selected_count and (easy_count + medium_count + hard_count) != selected_count:
+                flash("مجموع المستويات يجب أن يساوي عدد الأسئلة المختار.", "error")
+                return redirect(url_for("student.take_test", test_id=test.id))
+
+            picked = []
+            if easy_count:
+                picked.extend(random.sample(level_map["easy"], easy_count))
+            if medium_count:
+                picked.extend(random.sample(level_map["medium"], medium_count))
+            if hard_count:
+                picked.extend(random.sample(level_map["hard"], hard_count))
+            questions = picked
+        else:
+            if selected_count < len(questions):
+                questions = random.sample(questions, selected_count)
+
         random.shuffle(questions)
         question_ids = [q.id for q in questions]
         question_ids_str = ",".join(str(qid) for qid in question_ids)
@@ -407,6 +443,15 @@ def take_test(test_id):
             ordered_questions.append({"question": q, "choices": choices})
         time_limit_seconds = (len(question_ids) * 75) + 15
 
+    # Available counts per difficulty for UI
+    def _norm_level(q):
+        level = (getattr(q, "difficulty", "medium") or "medium").lower()
+        return level if level in {"easy", "medium", "hard"} else "medium"
+
+    available_easy = len([q for q in test.questions if _norm_level(q) == "easy"])
+    available_medium = len([q for q in test.questions if _norm_level(q) == "medium"])
+    available_hard = len([q for q in test.questions if _norm_level(q) == "hard"])
+
     return render_template(
         "student/take_test.html",
         test=test,
@@ -414,6 +459,9 @@ def take_test(test_id):
         min_select=min_select,
         max_select=max_select,
         selected_count=selected_count,
+        available_easy=available_easy,
+        available_medium=available_medium,
+        available_hard=available_hard,
         ordered_questions=ordered_questions,
         question_ids_str=question_ids_str,
         time_limit_seconds=time_limit_seconds,

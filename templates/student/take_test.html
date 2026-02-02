@@ -40,6 +40,35 @@
         </div>
       {% endif %}
       <div class="small text-muted mt-1">الأسئلة المتاحة: {{ total_questions }}</div>
+
+      <div class="mt-4">
+        <div class="fw-semibold mb-2">اختر توزيع الصعوبات</div>
+        <div class="row g-2">
+          <div class="col-12 col-md-4">
+            <label class="form-label">سهل ({{ available_easy }})</label>
+            <input class="form-control" type="number" name="easy" min="0" max="{{ available_easy }}" value="0" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">متوسط ({{ available_medium }})</label>
+            <input class="form-control" type="number" name="medium" min="0" max="{{ available_medium }}" value="0" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">صعب ({{ available_hard }})</label>
+            <input class="form-control" type="number" name="hard" min="0" max="{{ available_hard }}" value="0" />
+          </div>
+        </div>
+        <div class="small text-muted mt-2">يجب أن يساوي مجموع المستويات العدد المختار.</div>
+      </div>
+
+      <div class="mt-4">
+        <div class="fw-semibold mb-2">قوالب جاهزة</div>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="applyTemplate('easy')">سهل</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="applyTemplate('medium')">متوسط</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="applyTemplate('hard')">صعب</button>
+        </div>
+      </div>
+
       <div class="d-flex justify-content-end mt-3">
         <button type="submit" class="btn btn-cta">بدء الاختبار</button>
       </div>
@@ -75,6 +104,33 @@
 
 {% block scripts %}
 <script>
+  function applyTemplate(level) {
+    const total = parseInt(document.getElementById('questionRange')?.value || '{{ max_select }}', 10);
+    const easyInput = document.querySelector('input[name="easy"]');
+    const medInput = document.querySelector('input[name="medium"]');
+    const hardInput = document.querySelector('input[name="hard"]');
+    if (!easyInput || !medInput || !hardInput) return;
+
+    let easy = 0, medium = 0, hard = 0;
+    if (level === 'easy') {
+      easy = Math.round(total * 0.7);
+      medium = Math.round(total * 0.2);
+      hard = total - easy - medium;
+    } else if (level === 'medium') {
+      easy = Math.round(total * 0.4);
+      medium = Math.round(total * 0.4);
+      hard = total - easy - medium;
+    } else {
+      easy = Math.round(total * 0.2);
+      medium = Math.round(total * 0.3);
+      hard = total - easy - medium;
+    }
+
+    easyInput.value = Math.max(0, easy);
+    medInput.value = Math.max(0, medium);
+    hardInput.value = Math.max(0, hard);
+  }
+
   // New timer system - pure JavaScript countdown
   (function() {
     const timerElement = document.getElementById('test-timer');
