@@ -115,6 +115,16 @@
                       href="{{ url_for('teacher.edit_section', section_id=section.id) }}"
                       >تعديل القسم</a
                     >
+                    <form
+                      class="d-inline"
+                      action="{{ url_for('teacher.delete_section', section_id=section.id) }}"
+                      method="post"
+                      onsubmit="return confirm('حذف القسم؟');"
+                    >
+                      <button type="submit" class="btn btn-sm btn-outline-danger">
+                        حذف القسم
+                      </button>
+                    </form>
                   </div>
                 </div>
                 {% if section.lessons %}

@@ -44,6 +44,7 @@ class AccessContext:
         else:
             self.section_open = self.section_active or not self.section_requires_code
 
+        # Precompute active lesson activations for faster access checks
         lesson_ids = [l.id for l in section.lessons]
 
         if lesson_ids:
@@ -106,6 +107,7 @@ class AccessContext:
 
 
 def get_unlocked_lessons(student_id: int):
+    """Collect all lessons the student can access across all sections."""
     lessons = []
     sections = Section.objects().all()
     for section in sections:

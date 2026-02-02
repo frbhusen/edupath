@@ -2,7 +2,7 @@ from .models import Subject, Section, Lesson, LessonActivation, SectionActivatio
 
 
 def cascade_subject_activation(subject: Subject, student_id: int) -> None:
-    """Activate entire subject: all sections, all lessons, all tests."""
+    """Activate entire subject: all sections and lessons for a student."""
     if not subject:
         return
 
@@ -20,7 +20,7 @@ def cascade_subject_activation(subject: Subject, student_id: int) -> None:
 
 
 def cascade_section_activation(section: Section, student_id: int) -> None:
-    """Activate section: all lessons in section (section-wide tests inherit from section activation)."""
+    """Activate section: all lessons in section."""
     if not section:
         return
 
@@ -32,7 +32,7 @@ def cascade_section_activation(section: Section, student_id: int) -> None:
 
 
 def cascade_lesson_activation(lesson, student_id: int) -> None:
-    """Activate a lesson only (tests linked to lesson inherit from lesson activation, not section-wide tests)."""
+    """Activate a lesson only (tests linked to lesson inherit from lesson activation)."""
     if not lesson:
         return
 
@@ -56,6 +56,7 @@ def revoke_subject_activation(subject_id, student_id: int) -> None:
             sec_activation.active = False
             sec_activation.save()
 
+        # Use lesson IDs from the subject's sections to deactivate lesson activations
         lesson_ids = [l.id for l in Lesson.objects(section_id__in=section_ids).all()]
         if lesson_ids:
             for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, student_id=student_id, active=True).all():
@@ -69,6 +70,7 @@ def revoke_section_activation(section_id, student_id: int) -> None:
         sa.active = False
         sa.save()
 
+    # Pull lesson IDs from the section to deactivate their activations
     lesson_ids = [l.id for l in Lesson.objects(section_id=section_id).all()]
     
     if lesson_ids:
@@ -78,7 +80,7 @@ def revoke_section_activation(section_id, student_id: int) -> None:
 
 
 def lock_subject_access_for_all(subject_id) -> None:
-    """When a subject is (re)locked, deactivate all activations so only freebies stay open."""
+    """When a subject is (re)locked, deactivate all activations for all students."""
     for sa in SubjectActivation.objects(subject_id=subject_id, active=True).all():
         sa.active = False
         sa.save()
@@ -92,6 +94,7 @@ def lock_subject_access_for_all(subject_id) -> None:
             sec_activation.active = False
             sec_activation.save()
 
+        # Deactivate lesson activations for all lessons in the subject
         lesson_ids = [l.id for l in Lesson.objects(section_id__in=section_ids).all()]
         if lesson_ids:
             for les_activation in LessonActivation.objects(lesson_id__in=lesson_ids, active=True).all():
@@ -100,11 +103,12 @@ def lock_subject_access_for_all(subject_id) -> None:
 
 
 def lock_section_access_for_all(section_id) -> None:
-    """When a section is (re)locked, deactivate all activations so only freebies stay open."""
+    """When a section is (re)locked, deactivate all activations for all students."""
     for sa in SectionActivation.objects(section_id=section_id, active=True).all():
         sa.active = False
         sa.save()
 
+    # Deactivate lesson activations for lessons within this section
     lesson_ids = [l.id for l in Lesson.objects(section_id=section_id).all()]
     
     if lesson_ids:

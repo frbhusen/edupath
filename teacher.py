@@ -16,6 +16,17 @@ from .forms import SubjectForm, SectionForm, LessonForm, TestForm, StudentEditFo
 
 teacher_bp = Blueprint("teacher", __name__, template_folder="templates")
 
+
+def _generate_unique_code(model_cls, length: int = 6) -> str:
+    """Generate a unique activation code for the given model class."""
+    import random
+    import string
+
+    code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+    while model_cls.objects(code=code_value).first():
+        code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+    return code_value
+
 # Role guard decorator
 
 def role_required(role):
@@ -170,12 +181,7 @@ def manage_subject_access(subject_id):
                     flash("لا يمكن إنشاء أكثر من كود لهذا الطالب.", "info")
                 else:
                     # Generate unique 6-char code
-                    import random
-                    import string
-                    code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-                    
-                    while SubjectActivationCode.objects(code=code_value).first():
-                        code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    code_value = _generate_unique_code(SubjectActivationCode)
                     
                     ac = SubjectActivationCode(
                         subject_id=subject.id, student_id=student.id, code=code_value
@@ -268,12 +274,7 @@ def manage_section_access(section_id):
                 if existing_any:
                     flash("لا يمكن إنشاء أكثر من كود لهذا الطالب.", "info")
                 else:
-                    import random
-                    import string
-                    code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-                    
-                    while ActivationCode.objects(code=code_value).first():
-                        code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    code_value = _generate_unique_code(ActivationCode)
                     
                     ac = ActivationCode(
                         section_id=section.id, student_id=student.id, code=code_value
@@ -358,12 +359,7 @@ def manage_lesson_access(lesson_id):
                 if existing_any:
                     flash("لا يمكن إنشاء أكثر من كود لهذا الطالب.", "info")
                 else:
-                    import random
-                    import string
-                    code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-                    
-                    while LessonActivationCode.objects(code=code_value).first():
-                        code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    code_value = _generate_unique_code(LessonActivationCode)
                     
                     lac = LessonActivationCode(
                         lesson_id=lesson.id, student_id=student.id, code=code_value
@@ -619,9 +615,7 @@ def lesson_detail(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         raise NotFound()
-    resources = LessonResource.objects(lesson_id=lesson.id).order_by('position').all()
-    tests = Test.objects(lesson_id=lesson.id).all()
-    return render_template("teacher/lesson_detail.html", lesson=lesson, resources=resources, tests=tests)
+    return redirect(url_for("teacher.edit_lesson", lesson_id=lesson.id))
 
 
 @teacher_bp.route("/lessons/<lesson_id>/edit", methods=["GET", "POST"])
