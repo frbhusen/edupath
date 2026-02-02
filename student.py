@@ -807,7 +807,7 @@ def view_flashcards(resource_id):
     resource = LessonResource.objects(id=resource_id).first()
     if not resource:
         return "404", 404
-    lesson = resource.lesson
+    lesson = resource.lesson_id
     section = lesson.section
     
     # Access check for students

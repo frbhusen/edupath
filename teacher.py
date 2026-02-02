@@ -181,7 +181,6 @@ def manage_subject_access(subject_id):
                         subject_id=subject.id, student_id=student.id, code=code_value
                     )
                     ac.save()
-                    flash(f"تم إنشاء الكود: {code_value}", "success")
                     # Auto-activate if not already
                     existing = SubjectActivation.objects(
                         subject_id=subject.id, student_id=student.id, active=True
@@ -280,7 +279,6 @@ def manage_section_access(section_id):
                         section_id=section.id, student_id=student.id, code=code_value
                     )
                     ac.save()
-                    flash(f"تم إنشاء الكود: {code_value}", "success")
                     existing = SectionActivation.objects(
                         section_id=section.id, student_id=student.id, active=True
                     ).first()
@@ -371,7 +369,6 @@ def manage_lesson_access(lesson_id):
                         lesson_id=lesson.id, student_id=student.id, code=code_value
                     )
                     lac.save()
-                    flash(f"تم إنشاء الكود: {code_value}", "success")
                     existing = LessonActivation.objects(
                         lesson_id=lesson.id, student_id=student.id, active=True
                     ).first()
@@ -537,6 +534,7 @@ def edit_section(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
         raise NotFound()
+    subject = section.subject_id
     form = SectionForm()
     if form.validate_on_submit():
         section.title = form.title.data
@@ -549,7 +547,7 @@ def edit_section(section_id):
         form.title.data = section.title
         form.description.data = section.description
         form.requires_code.data = section.requires_code
-    return render_template("teacher/section_form.html", form=form, section=section)
+    return render_template("teacher/section_form.html", form=form, section=section, subject=subject)
 
 
 @teacher_bp.route("/sections/<section_id>/delete", methods=["POST"])
