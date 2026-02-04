@@ -10,6 +10,8 @@ from bson import ObjectId
 
 class User(Document, UserMixin):
     id = ObjectIdField(primary_key=True, default=ObjectId)
+    first_name = StringField(required=True, max_length=80)
+    last_name = StringField(required=True, max_length=80)
     username = StringField(unique=True, required=True, max_length=80)
     phone = StringField(unique=True, required=True, max_length=20)
     email = StringField(unique=True, null=True, max_length=120)

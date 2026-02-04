@@ -1,16 +1,31 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, PasswordField, SelectField, SubmitField, IntegerField, BooleanField
-from wtforms.validators import DataRequired, Length, EqualTo, Optional
+from wtforms.validators import DataRequired, Length, EqualTo, Optional, Regexp, ValidationError
 
 class RegisterForm(FlaskForm):
-    username = StringField("اسم المستخدم", validators=[DataRequired(), Length(min=3, max=80)])
-    phone = StringField("رقم الهاتف", validators=[DataRequired(), Length(min=7, max=20)])
-    password = PasswordField("كلمة المرور", validators=[DataRequired(), Length(min=6)])
+    first_name = StringField("الاسم الأول", validators=[DataRequired(), Length(min=2, max=80)])
+    last_name = StringField("اسم العائلة", validators=[DataRequired(), Length(min=2, max=80)])
+    username = StringField(
+        "اسم المستخدم (كلمة واحدة بدون مسافات)", 
+        validators=[
+            DataRequired(), 
+            Length(min=3, max=80),
+            Regexp(r'^\S+$', message="اسم المستخدم يجب أن يكون كلمة واحدة بدون مسافات")
+        ]
+    )
+    phone = StringField(
+        "رقم الهاتف (10 أرقام يبدأ ب 09)", 
+        validators=[
+            DataRequired(),
+            Regexp(r'^09\d{8}$', message="يجب أن يكون رقم الهاتف 10 أرقام ويبدأ ب 09")
+        ]
+    )
+    password = PasswordField("كلمة المرور (على الأقل 6 أحرف)", validators=[DataRequired(), Length(min=6)])
     confirm = PasswordField("تأكيد كلمة المرور", validators=[DataRequired(), EqualTo("password")])
     submit = SubmitField("تسجيل")
 
 class LoginForm(FlaskForm):
-    username = StringField("اسم المستخدم", validators=[DataRequired()])
+    username_or_phone = StringField("اسم المستخدم أو رقم الهاتف", validators=[DataRequired()])
     password = PasswordField("كلمة المرور", validators=[DataRequired()])
     submit = SubmitField("تسجيل الدخول")
 

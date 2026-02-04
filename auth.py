@@ -21,14 +21,19 @@ def register():
         return redirect(url_for("index"))
     form = RegisterForm()
     if form.validate_on_submit():
-        if User.objects(username=form.username.data).first() or User.objects(phone=form.phone.data).first():
-            flash("اسم المستخدم أو رقم الهاتف موجود مسبقاً", "error")
+        # Check if username or phone already exists
+        if User.objects(username=form.username.data).first():
+            flash("اسم المستخدم موجود مسبقاً", "error")
+        elif User.objects(phone=form.phone.data).first():
+            flash("رقم الهاتف موجود مسبقاً", "error")
         else:
             try:
                 user = User(
+                    first_name=form.first_name.data,
+                    last_name=form.last_name.data,
                     username=form.username.data,
                     phone=form.phone.data,
-                    role="student",  # Default to student
+                    role="student",
                 )
                 user.set_password(form.password.data)
                 user.save()
@@ -54,7 +59,8 @@ def login():
         return redirect(url_for("index"))
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.objects(username=form.username.data).first()
+        # Try to find user by username or phone
+        user = User.objects(username=form.username_or_phone.data).first() or User.objects(phone=form.username_or_phone.data).first()
         if user and user.check_password(form.password.data):
             # Generate a new session token and store it to enforce single-device login
             new_token = secrets.token_hex(16)
