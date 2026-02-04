@@ -45,7 +45,10 @@
                     </div>
                     <div class="mb-3">
                         {{ form.password.label(class="form-label") }}
-                        {{ form.password(class="form-control") }}
+                        <div class="input-group">
+                            {{ form.password(class="form-control", id="register-password") }}
+                            <button class="btn btn-outline-secondary" type="button" id="toggle-register-password">إظهار</button>
+                        </div>
                         {% if form.password.errors %}
                             <div class="text-danger small mt-1">
                                 {% for error in form.password.errors %}{{ error }}{% endfor %}
@@ -53,8 +56,11 @@
                         {% endif %}
                     </div>
                                         <div class="mb-3">
-                                                {{ form.confirm.label(class="form-label") }}
-                                                {{ form.confirm(class="form-control") }}
+                                            {{ form.confirm.label(class="form-label") }}
+                                            <div class="input-group">
+                                                {{ form.confirm(class="form-control", id="register-confirm") }}
+                                                <button class="btn btn-outline-secondary" type="button" id="toggle-register-confirm">إظهار</button>
+                                            </div>
                         {% if form.confirm.errors %}
                             <div class="text-danger small mt-1">
                                 {% for error in form.confirm.errors %}{{ error }}{% endfor %}
@@ -97,6 +103,30 @@
             passwordInput.addEventListener('input', updateFeedback);
             confirmInput.addEventListener('input', updateFeedback);
             updateFeedback();
+        }
+    })();
+</script>
+<script>
+    (function () {
+        const passBtn = document.getElementById('toggle-register-password');
+        const passInput = document.getElementById('register-password');
+        const confirmBtn = document.getElementById('toggle-register-confirm');
+        const confirmInput = document.getElementById('register-confirm');
+
+        if (passBtn && passInput) {
+            passBtn.addEventListener('click', () => {
+                const isHidden = passInput.type === 'password';
+                passInput.type = isHidden ? 'text' : 'password';
+                passBtn.textContent = isHidden ? 'إخفاء' : 'إظهار';
+            });
+        }
+
+        if (confirmBtn && confirmInput) {
+            confirmBtn.addEventListener('click', () => {
+                const isHidden = confirmInput.type === 'password';
+                confirmInput.type = isHidden ? 'text' : 'password';
+                confirmBtn.textContent = isHidden ? 'إخفاء' : 'إظهار';
+            });
         }
     })();
 </script>

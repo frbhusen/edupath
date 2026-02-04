@@ -13,7 +13,10 @@
                     </div>
                     <div class="mb-3">
                         {{ form.password.label(class="form-label") }}
-                        {{ form.password(class="form-control") }}
+                        <div class="input-group">
+                            {{ form.password(class="form-control", id="login-password") }}
+                            <button class="btn btn-outline-secondary" type="button" id="toggle-login-password">إظهار</button>
+                        </div>
                     </div>
                     {{ form.submit(class="btn btn-primary w-100") }}
                 </form>
@@ -28,4 +31,18 @@
         </div>
     </div>
  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+    (function () {
+        const btn = document.getElementById('toggle-login-password');
+        const input = document.getElementById('login-password');
+        if (!btn || !input) return;
+        btn.addEventListener('click', () => {
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            btn.textContent = isHidden ? 'إخفاء' : 'إظهار';
+        });
+    })();
+</script>
 {% endblock %}
