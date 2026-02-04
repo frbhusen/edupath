@@ -7,7 +7,6 @@ class RegisterForm(FlaskForm):
     phone = StringField("رقم الهاتف", validators=[DataRequired(), Length(min=7, max=20)])
     password = PasswordField("كلمة المرور", validators=[DataRequired(), Length(min=6)])
     confirm = PasswordField("تأكيد كلمة المرور", validators=[DataRequired(), EqualTo("password")])
-    role = SelectField("الدور", choices=[("student", "طالب"), ("teacher", "معلم")], validators=[DataRequired()])
     submit = SubmitField("تسجيل")
 
 class LoginForm(FlaskForm):

@@ -28,7 +28,7 @@ def register():
                 user = User(
                     username=form.username.data,
                     phone=form.phone.data,
-                    role=form.role.data,
+                    role="student",  # Default to student
                 )
                 user.set_password(form.password.data)
                 user.save()
