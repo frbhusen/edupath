@@ -14,7 +14,6 @@ class User(Document, UserMixin):
     last_name = StringField(required=True, max_length=80)
     username = StringField(unique=True, required=True, max_length=80)
     phone = StringField(unique=True, required=True, max_length=20)
-    email = StringField(unique=True, null=True, max_length=120)
     password_hash = StringField(required=True, max_length=256)
     role = StringField(required=True, default="student", choices=['teacher', 'student', 'admin'])
     created_at = DateTimeField(default=datetime.utcnow)
