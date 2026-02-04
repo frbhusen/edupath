@@ -24,25 +24,28 @@ def register():
         if User.objects(username=form.username.data).first() or User.objects(phone=form.phone.data).first():
             flash("اسم المستخدم أو رقم الهاتف موجود مسبقاً", "error")
         else:
-            user = User(
-                username=form.username.data,
-                phone=form.phone.data,
-                role=form.role.data,
-            )
-            user.set_password(form.password.data)
-            user.save()
-            
-            # Auto-login after registration
-            new_token = secrets.token_hex(16)
-            user.current_session_token = new_token
-            user.save()
-            session.clear()
-            login_user(user)
-            session['session_token'] = new_token
-            session.modified = True
-            
-            flash("تم التسجيل بنجاح! مرحباً بك", "success")
-            return redirect(url_for("index"))
+            try:
+                user = User(
+                    username=form.username.data,
+                    phone=form.phone.data,
+                    role=form.role.data,
+                )
+                user.set_password(form.password.data)
+                user.save()
+                
+                # Auto-login after registration
+                new_token = secrets.token_hex(16)
+                user.current_session_token = new_token
+                user.save()
+                session.clear()
+                login_user(user)
+                session['session_token'] = new_token
+                session.modified = True
+                
+                flash("تم التسجيل بنجاح! مرحباً بك", "success")
+                return redirect(url_for("index"))
+            except Exception as e:
+                flash(f"خطأ في التسجيل: {str(e)}", "error")
     return render_template("auth/register.html", form=form)
 
 @auth_bp.route("/login", methods=["GET", "POST"])
