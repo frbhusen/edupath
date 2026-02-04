@@ -1,1 +1,1 @@
-web: gunicorn "edupath:create_app()"
+web: gunicorn wsgi:app
