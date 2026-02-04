@@ -13,9 +13,11 @@
                     </div>
                     <div class="mb-3">
                         {{ form.password.label(class="form-label") }}
-                        <div class="input-group">
-                            {{ form.password(class="form-control", id="login-password") }}
-                            <button class="btn btn-outline-secondary" type="button" id="toggle-login-password">إظهار</button>
+                        <div class="position-relative">
+                            {{ form.password(class="form-control pe-5", id="login-password") }}
+                            <button class="btn btn-link position-absolute end-0 top-50 translate-middle-y me-2 p-0" type="button" id="toggle-login-password" aria-label="إظهار كلمة المرور">
+                                <i class="bi bi-eye" id="login-password-icon"></i>
+                            </button>
                         </div>
                     </div>
                     {{ form.submit(class="btn btn-primary w-100") }}
@@ -37,11 +39,12 @@
     (function () {
         const btn = document.getElementById('toggle-login-password');
         const input = document.getElementById('login-password');
-        if (!btn || !input) return;
+        const icon = document.getElementById('login-password-icon');
+        if (!btn || !input || !icon) return;
         btn.addEventListener('click', () => {
             const isHidden = input.type === 'password';
             input.type = isHidden ? 'text' : 'password';
-            btn.textContent = isHidden ? 'إخفاء' : 'إظهار';
+            icon.className = isHidden ? 'bi bi-eye-slash' : 'bi bi-eye';
         });
     })();
 </script>
