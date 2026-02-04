@@ -46,18 +46,21 @@
         <div class="row g-2">
           <div class="col-12 col-md-4">
             <label class="form-label">سهل ({{ available_easy }})</label>
-            <input class="form-control" type="number" name="easy" min="0" max="{{ available_easy }}" value="0" />
+            <input class="form-control difficulty-input" type="number" name="easy" min="0" max="{{ available_easy }}" value="0" data-difficulty="easy" />
+            <div class="difficulty-error small text-danger d-none mt-1"></div>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label">متوسط ({{ available_medium }})</label>
-            <input class="form-control" type="number" name="medium" min="0" max="{{ available_medium }}" value="0" />
+            <input class="form-control difficulty-input" type="number" name="medium" min="0" max="{{ available_medium }}" value="0" data-difficulty="medium" />
+            <div class="difficulty-error small text-danger d-none mt-1"></div>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label">صعب ({{ available_hard }})</label>
-            <input class="form-control" type="number" name="hard" min="0" max="{{ available_hard }}" value="0" />
+            <input class="form-control difficulty-input" type="number" name="hard" min="0" max="{{ available_hard }}" value="0" data-difficulty="hard" />
+            <div class="difficulty-error small text-danger d-none mt-1"></div>
           </div>
         </div>
-        <div class="small text-muted mt-2">يجب أن يساوي مجموع المستويات العدد المختار.</div>
+        <div class="small text-muted mt-2">المجموع: <span id="difficulty-sum">0</span> | المتاح: 10-50</div>
       </div>
 
       <div class="mt-4">
@@ -107,6 +110,11 @@
   (function () {
     const rangeInput = document.getElementById('questionRange');
     const countBadge = document.getElementById('questionCountValue');
+    const difficultyInputs = document.querySelectorAll('.difficulty-input');
+    const difficultySum = document.getElementById('difficulty-sum');
+    
+    if (!difficultyInputs || difficultyInputs.length === 0) return;
+
     const inputs = {
       easy: document.querySelector('input[name="easy"]'),
       medium: document.querySelector('input[name="medium"]'),
@@ -122,15 +130,8 @@
       hard: parseInt(inputs.hard.getAttribute('max') || '0', 10)
     };
 
-    function clamp(name) {
-      const input = inputs[name];
-      const max = maxes[name];
-      let val = parseInt(input.value || '0', 10);
-      if (Number.isNaN(val)) val = 0;
-      val = Math.max(0, Math.min(val, max));
-      input.value = val;
-      return val;
-    }
+    const MIN_QUESTIONS = 10;
+    const MAX_QUESTIONS = 50;
 
     function setDisabled() {
       Object.keys(inputs).forEach((name) => {
@@ -143,55 +144,118 @@
       });
     }
 
-    function sumValues() {
-      return clamp('easy') + clamp('medium') + clamp('hard');
+    function getCurrentSum() {
+      let sum = 0;
+      Object.keys(inputs).forEach((name) => {
+        let val = parseInt(inputs[name].value || '0', 10);
+        if (Number.isNaN(val)) val = 0;
+        sum += val;
+      });
+      return sum;
     }
 
-    function rebalance(target) {
-      let values = {
-        easy: clamp('easy'),
-        medium: clamp('medium'),
-        hard: clamp('hard')
-      };
-
-      let total = values.easy + values.medium + values.hard;
-
-      if (total > target) {
-        const order = ['easy', 'medium', 'hard'].sort((a, b) => values[b] - values[a]);
-        for (const name of order) {
-          while (total > target && values[name] > 0) {
-            values[name] -= 1;
-            total -= 1;
-          }
-        }
-      } else if (total < target) {
-        const order = ['easy', 'medium', 'hard'];
-        for (const name of order) {
-          while (total < target && values[name] < maxes[name]) {
-            values[name] += 1;
-            total += 1;
-          }
-        }
+    function updateSumDisplay() {
+      const sum = getCurrentSum();
+      if (difficultySum) {
+        difficultySum.textContent = sum;
       }
-
-      inputs.easy.value = values.easy;
-      inputs.medium.value = values.medium;
-      inputs.hard.value = values.hard;
     }
 
-    function syncFromRange() {
+    function syncSliderFromInputs() {
       if (!rangeInput) return;
-      const target = parseInt(rangeInput.value || '0', 10);
-      if (countBadge) countBadge.textContent = target;
-      setDisabled();
-      rebalance(target);
+      const sum = getCurrentSum();
+      const clamped = Math.max(MIN_QUESTIONS, Math.min(sum, MAX_QUESTIONS));
+      rangeInput.value = clamped;
+      if (countBadge) {
+        countBadge.textContent = clamped;
+      }
+      updateSumDisplay();
     }
 
-    function syncFromInputs() {
-      if (!rangeInput) return;
-      const target = parseInt(rangeInput.value || '0', 10);
-      setDisabled();
-      rebalance(target);
+    function validateDifficultyInput(input) {
+      const name = input.getAttribute('data-difficulty');
+      const max = maxes[name];
+      let val = parseInt(input.value || '0', 10);
+      if (Number.isNaN(val)) val = 0;
+
+      // Clamp to per-difficulty max
+      val = Math.max(0, Math.min(val, max));
+      input.value = val;
+
+      // Calculate current sum
+      const sum = getCurrentSum();
+      const errorDiv = input.nextElementSibling;
+
+      if (sum > MAX_QUESTIONS) {
+        // Reject the input
+        input.value = Math.max(0, val - (sum - MAX_QUESTIONS));
+        input.classList.add('is-invalid');
+        if (errorDiv && errorDiv.classList.contains('difficulty-error')) {
+          errorDiv.textContent = `⚠️ تجاوزت الحد الأقصى (${MAX_QUESTIONS})`;
+          errorDiv.classList.remove('d-none');
+        }
+        return false;
+      } else {
+        // Valid input
+        input.classList.remove('is-invalid');
+        if (errorDiv && errorDiv.classList.contains('difficulty-error')) {
+          errorDiv.classList.add('d-none');
+          errorDiv.textContent = '';
+        }
+        return true;
+      }
+    }
+
+    // Attach listeners to difficulty inputs
+    difficultyInputs.forEach((input) => {
+      input.addEventListener('input', () => {
+        validateDifficultyInput(input);
+        syncSliderFromInputs();
+      });
+      input.addEventListener('change', () => {
+        validateDifficultyInput(input);
+        syncSliderFromInputs();
+      });
+    });
+
+    // When slider changes, adjust distribution
+    if (rangeInput) {
+      rangeInput.addEventListener('input', () => {
+        const target = parseInt(rangeInput.value || '0', 10);
+        if (countBadge) countBadge.textContent = target;
+        
+        // Rebalance to match slider
+        let values = {
+          easy: Math.max(0, Math.min(parseInt(inputs.easy.value || '0', 10), maxes.easy)),
+          medium: Math.max(0, Math.min(parseInt(inputs.medium.value || '0', 10), maxes.medium)),
+          hard: Math.max(0, Math.min(parseInt(inputs.hard.value || '0', 10), maxes.hard))
+        };
+
+        let total = values.easy + values.medium + values.hard;
+
+        if (total > target) {
+          const order = ['easy', 'medium', 'hard'].sort((a, b) => values[b] - values[a]);
+          for (const name of order) {
+            while (total > target && values[name] > 0) {
+              values[name] -= 1;
+              total -= 1;
+            }
+          }
+        } else if (total < target) {
+          const order = ['easy', 'medium', 'hard'];
+          for (const name of order) {
+            while (total < target && values[name] < maxes[name]) {
+              values[name] += 1;
+              total += 1;
+            }
+          }
+        }
+
+        inputs.easy.value = values.easy;
+        inputs.medium.value = values.medium;
+        inputs.hard.value = values.hard;
+        updateSumDisplay();
+      });
     }
 
     window.applyTemplate = function (level) {
@@ -211,22 +275,14 @@
         hard = total - easy - medium;
       }
 
-      inputs.easy.value = easy;
-      inputs.medium.value = medium;
-      inputs.hard.value = hard;
-      syncFromInputs();
+      inputs.easy.value = Math.max(0, Math.min(easy, maxes.easy));
+      inputs.medium.value = Math.max(0, Math.min(medium, maxes.medium));
+      inputs.hard.value = Math.max(0, Math.min(hard, maxes.hard));
+      syncSliderFromInputs();
     };
 
-    if (rangeInput) {
-      rangeInput.addEventListener('input', syncFromRange);
-    }
-    Object.values(inputs).forEach((input) => {
-      input.addEventListener('input', syncFromInputs);
-      input.addEventListener('change', syncFromInputs);
-    });
-
     setDisabled();
-    syncFromRange();
+    updateSumDisplay();
   })();
 
   // New timer system - pure JavaScript countdown
