@@ -104,32 +104,130 @@
 
 {% block scripts %}
 <script>
-  function applyTemplate(level) {
-    const total = parseInt(document.getElementById('questionRange')?.value || '{{ max_select }}', 10);
-    const easyInput = document.querySelector('input[name="easy"]');
-    const medInput = document.querySelector('input[name="medium"]');
-    const hardInput = document.querySelector('input[name="hard"]');
-    if (!easyInput || !medInput || !hardInput) return;
+  (function () {
+    const rangeInput = document.getElementById('questionRange');
+    const countBadge = document.getElementById('questionCountValue');
+    const inputs = {
+      easy: document.querySelector('input[name="easy"]'),
+      medium: document.querySelector('input[name="medium"]'),
+      hard: document.querySelector('input[name="hard"]')
+    };
 
-    let easy = 0, medium = 0, hard = 0;
-    if (level === 'easy') {
-      easy = Math.round(total * 0.7);
-      medium = Math.round(total * 0.2);
-      hard = total - easy - medium;
-    } else if (level === 'medium') {
-      easy = Math.round(total * 0.4);
-      medium = Math.round(total * 0.4);
-      hard = total - easy - medium;
-    } else {
-      easy = Math.round(total * 0.2);
-      medium = Math.round(total * 0.3);
-      hard = total - easy - medium;
+    const hasSetupForm = inputs.easy && inputs.medium && inputs.hard;
+    if (!hasSetupForm) return;
+
+    const maxes = {
+      easy: parseInt(inputs.easy.getAttribute('max') || '0', 10),
+      medium: parseInt(inputs.medium.getAttribute('max') || '0', 10),
+      hard: parseInt(inputs.hard.getAttribute('max') || '0', 10)
+    };
+
+    function clamp(name) {
+      const input = inputs[name];
+      const max = maxes[name];
+      let val = parseInt(input.value || '0', 10);
+      if (Number.isNaN(val)) val = 0;
+      val = Math.max(0, Math.min(val, max));
+      input.value = val;
+      return val;
     }
 
-    easyInput.value = Math.max(0, easy);
-    medInput.value = Math.max(0, medium);
-    hardInput.value = Math.max(0, hard);
-  }
+    function setDisabled() {
+      Object.keys(inputs).forEach((name) => {
+        if (maxes[name] === 0) {
+          inputs[name].value = 0;
+          inputs[name].disabled = true;
+        } else {
+          inputs[name].disabled = false;
+        }
+      });
+    }
+
+    function sumValues() {
+      return clamp('easy') + clamp('medium') + clamp('hard');
+    }
+
+    function rebalance(target) {
+      let values = {
+        easy: clamp('easy'),
+        medium: clamp('medium'),
+        hard: clamp('hard')
+      };
+
+      let total = values.easy + values.medium + values.hard;
+
+      if (total > target) {
+        const order = ['easy', 'medium', 'hard'].sort((a, b) => values[b] - values[a]);
+        for (const name of order) {
+          while (total > target && values[name] > 0) {
+            values[name] -= 1;
+            total -= 1;
+          }
+        }
+      } else if (total < target) {
+        const order = ['easy', 'medium', 'hard'];
+        for (const name of order) {
+          while (total < target && values[name] < maxes[name]) {
+            values[name] += 1;
+            total += 1;
+          }
+        }
+      }
+
+      inputs.easy.value = values.easy;
+      inputs.medium.value = values.medium;
+      inputs.hard.value = values.hard;
+    }
+
+    function syncFromRange() {
+      if (!rangeInput) return;
+      const target = parseInt(rangeInput.value || '0', 10);
+      if (countBadge) countBadge.textContent = target;
+      setDisabled();
+      rebalance(target);
+    }
+
+    function syncFromInputs() {
+      if (!rangeInput) return;
+      const target = parseInt(rangeInput.value || '0', 10);
+      setDisabled();
+      rebalance(target);
+    }
+
+    window.applyTemplate = function (level) {
+      const total = parseInt(rangeInput?.value || '{{ max_select }}', 10);
+      let easy = 0, medium = 0, hard = 0;
+      if (level === 'easy') {
+        easy = Math.round(total * 0.7);
+        medium = Math.round(total * 0.2);
+        hard = total - easy - medium;
+      } else if (level === 'medium') {
+        easy = Math.round(total * 0.4);
+        medium = Math.round(total * 0.4);
+        hard = total - easy - medium;
+      } else {
+        easy = Math.round(total * 0.2);
+        medium = Math.round(total * 0.3);
+        hard = total - easy - medium;
+      }
+
+      inputs.easy.value = easy;
+      inputs.medium.value = medium;
+      inputs.hard.value = hard;
+      syncFromInputs();
+    };
+
+    if (rangeInput) {
+      rangeInput.addEventListener('input', syncFromRange);
+    }
+    Object.values(inputs).forEach((input) => {
+      input.addEventListener('input', syncFromInputs);
+      input.addEventListener('change', syncFromInputs);
+    });
+
+    setDisabled();
+    syncFromRange();
+  })();
 
   // New timer system - pure JavaScript countdown
   (function() {
