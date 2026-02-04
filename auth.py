@@ -31,8 +31,18 @@ def register():
             )
             user.set_password(form.password.data)
             user.save()
-            flash("تم التسجيل بنجاح. يرجى تسجيل الدخول.", "success")
-            return redirect(url_for("auth.login"))
+            
+            # Auto-login after registration
+            new_token = secrets.token_hex(16)
+            user.current_session_token = new_token
+            user.save()
+            session.clear()
+            login_user(user)
+            session['session_token'] = new_token
+            session.modified = True
+            
+            flash("تم التسجيل بنجاح! مرحباً بك", "success")
+            return redirect(url_for("index"))
     return render_template("auth/register.html", form=form)
 
 @auth_bp.route("/login", methods=["GET", "POST"])
