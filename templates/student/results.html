@@ -62,7 +62,7 @@
                     {% endif %}
                   </div>
                   <h5 class="card-title mb-1">{{ attempt.test.title if attempt.test else 'اختبار غير متوفر' }}</h5>
-                  <div class="text-muted small">الطالب: {{ attempt.student.username }}</div>
+                  <div class="text-muted small">الطالب: {{ attempt.student.first_name or attempt.student.username }}</div>
                 </div>
                 <span class="badge text-bg-primary">{{ attempt.score }}/{{ attempt.total }}</span>
               </div>

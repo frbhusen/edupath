@@ -47,7 +47,8 @@ def register():
                 session['session_token'] = new_token
                 session.modified = True
                 
-                flash("تم التسجيل بنجاح! مرحباً بك", "success")
+                display_name = user.first_name or user.username
+                flash(f"تم التسجيل بنجاح! مرحباً بك يا {display_name}", "success")
                 return redirect(url_for("index"))
             except Exception as e:
                 flash(f"خطأ في التسجيل: {str(e)}", "error")
@@ -71,7 +72,8 @@ def login():
             login_user(user)
             session['session_token'] = new_token
             session.modified = True
-            flash("تم تسجيل الدخول بنجاح", "success")
+            display_name = user.first_name or user.username
+            flash(f"تم تسجيل الدخول بنجاح! أهلاً {display_name}", "success")
             next_url = request.args.get("next")
             return redirect(next_url or url_for("index"))
         flash("بيانات دخول غير صحيحة", "error")

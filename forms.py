@@ -6,11 +6,11 @@ class RegisterForm(FlaskForm):
     first_name = StringField("الاسم الأول", validators=[DataRequired(), Length(min=2, max=80)])
     last_name = StringField("اسم العائلة", validators=[DataRequired(), Length(min=2, max=80)])
     username = StringField(
-        "اسم المستخدم (كلمة واحدة بدون مسافات)", 
+        "اسم المستخدم (بالإنجليزية فقط)", 
         validators=[
             DataRequired(), 
             Length(min=3, max=80),
-            Regexp(r'^\S+$', message="اسم المستخدم يجب أن يكون كلمة واحدة بدون مسافات")
+            Regexp(r'^[A-Za-z0-9_]+$', message="اسم المستخدم يجب أن يكون بالإنجليزية فقط (حروف/أرقام/_)"),
         ]
     )
     phone = StringField(

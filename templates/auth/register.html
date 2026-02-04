@@ -27,7 +27,7 @@
                     </div>
                     <div class="mb-3">
                         {{ form.username.label(class="form-label") }}
-                        {{ form.username(class="form-control") }}
+                        {{ form.username(class="form-control", pattern="[A-Za-z0-9_]+", title="اسم المستخدم يجب أن يكون بالإنجليزية فقط") }}
                         {% if form.username.errors %}
                             <div class="text-danger small mt-1">
                                 {% for error in form.username.errors %}{{ error }}{% endfor %}
@@ -36,7 +36,7 @@
                     </div>
                     <div class="mb-3">
                         {{ form.phone.label(class="form-label") }}
-                        {{ form.phone(class="form-control") }}
+                        {{ form.phone(class="form-control", inputmode="numeric", pattern="09[0-9]{8}", minlength="10", maxlength="10") }}
                         {% if form.phone.errors %}
                             <div class="text-danger small mt-1">
                                 {% for error in form.phone.errors %}{{ error }}{% endfor %}
@@ -52,19 +52,52 @@
                             </div>
                         {% endif %}
                     </div>
-                    <div class="mb-3">
-                        {{ form.confirm.label(class="form-label") }}
-                        {{ form.confirm(class="form-control") }}
+                                        <div class="mb-3">
+                                                {{ form.confirm.label(class="form-label") }}
+                                                {{ form.confirm(class="form-control") }}
                         {% if form.confirm.errors %}
                             <div class="text-danger small mt-1">
                                 {% for error in form.confirm.errors %}{{ error }}{% endfor %}
                             </div>
                         {% endif %}
                     </div>
+                                        <div id="password-match-feedback" class="small mb-3"></div>
                     {{ form.submit(class="btn btn-primary w-100") }}
                 </form>
             </div>
         </div>
     </div>
 </div>
+<script>
+    (function () {
+        const passwordInput = document.querySelector('input[name="password"]');
+        const confirmInput = document.querySelector('input[name="confirm"]');
+        const feedback = document.getElementById('password-match-feedback');
+
+        function updateFeedback() {
+            const password = passwordInput ? passwordInput.value : "";
+            const confirm = confirmInput ? confirmInput.value : "";
+
+            if (!password && !confirm) {
+                feedback.textContent = "";
+                feedback.className = "small mb-3";
+                return;
+            }
+
+            if (password === confirm) {
+                feedback.textContent = "كلمتا المرور متطابقتان";
+                feedback.className = "small mb-3 text-success";
+            } else {
+                feedback.textContent = "كلمتا المرور غير متطابقتين";
+                feedback.className = "small mb-3 text-danger";
+            }
+        }
+
+        if (passwordInput && confirmInput) {
+            passwordInput.addEventListener('input', updateFeedback);
+            confirmInput.addEventListener('input', updateFeedback);
+            updateFeedback();
+        }
+    })();
+</script>
 {% endblock %}
