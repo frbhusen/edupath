@@ -50,7 +50,7 @@ def role_required(role):
 @login_required
 @role_required("teacher")
 def dashboard():
-    subjects = Subject.objects(created_by=current_user.id).all()
+    subjects = Subject.objects().order_by('-created_at').all()
     return render_template("teacher/dashboard.html", subjects=subjects)
 
 
