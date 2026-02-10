@@ -3,13 +3,13 @@ from wtforms import StringField, TextAreaField, PasswordField, SelectField, Subm
 from wtforms.validators import DataRequired, Length, EqualTo, Optional, Regexp, ValidationError
 
 class RegisterForm(FlaskForm):
-    first_name = StringField("الاسم الأول", validators=[DataRequired(), Length(min=2, max=80)])
-    last_name = StringField("اسم العائلة", validators=[DataRequired(), Length(min=2, max=80)])
+    first_name = StringField("الاسم الأول", validators=[DataRequired(), Length(min=3, max=20)])
+    last_name = StringField("اسم العائلة", validators=[DataRequired(), Length(min=2, max=20)])
     username = StringField(
         "اسم المستخدم (بالإنجليزية فقط)", 
         validators=[
             DataRequired(), 
-            Length(min=3, max=80),
+            Length(min=3, max=20),
             Regexp(r'^[A-Za-z0-9_]+$', message="اسم المستخدم يجب أن يكون بالإنجليزية فقط (حروف/أرقام/_)"),
         ]
     )
@@ -17,6 +17,7 @@ class RegisterForm(FlaskForm):
         "رقم الهاتف (10 أرقام يبدأ ب 09)", 
         validators=[
             DataRequired(),
+            Length(min=10, max=10),
             Regexp(r'^09\d{8}$', message="يجب أن يكون رقم الهاتف 10 أرقام ويبدأ ب 09")
         ]
     )
