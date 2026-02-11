@@ -1,10 +1,12 @@
 from mongoengine import connect
 from pymongo.errors import PyMongoError
 from flask_login import LoginManager
+from flask_caching import Cache
 
 # Flask extensions initialized here to avoid circular imports
 
 login_manager = LoginManager()
+cache = Cache()
 
 def init_mongo(app):
     """Initialize MongoDB connection"""

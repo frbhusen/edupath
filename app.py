@@ -1,9 +1,10 @@
-from flask import Flask, render_template, session, request, redirect, url_for, flash, send_from_directory
+from flask import Flask, render_template, session, request, redirect, url_for, flash, send_from_directory, g
 from pathlib import Path
 from werkzeug.exceptions import NotFound
+import time
 
 from .config import Config
-from .extensions import login_manager, init_mongo
+from .extensions import login_manager, init_mongo, cache
 from flask_login import current_user, logout_user
 
 from .auth import auth_bp
@@ -23,6 +24,12 @@ def create_app():
     init_mongo(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
+    
+    # Initialize cache
+    cache.init_app(app, config={
+        'CACHE_TYPE': 'simple',
+        'CACHE_DEFAULT_TIMEOUT': 300
+    })
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
@@ -53,6 +60,11 @@ def create_app():
                 return render_template("pages/404.html"), 404
     
     @app.before_request
+    def start_timer():
+        """Track request start time for performance monitoring"""
+        g.start_time = time.time()
+    
+    @app.before_request
     def enforce_single_device_login():
         # Skip static assets and auth endpoints to avoid loops
         if request.path.startswith('/static'):
@@ -74,6 +86,17 @@ def create_app():
                 # Preserve intended destination
                 flash('You were logged out because your account logged in on another device.', 'warning')
                 return redirect(url_for('auth.login', next=request.path))
+    
+    @app.after_request
+    def log_request_time(response):
+        """Log request processing time"""
+        if hasattr(g, 'start_time'):
+            elapsed = time.time() - g.start_time
+            if elapsed > 0.5:  # Log slow requests (>500ms)
+                app.logger.warning(f"SLOW: {request.method} {request.path} took {elapsed:.3f}s")
+            else:
+                app.logger.debug(f"{request.method} {request.path} took {elapsed:.3f}s")
+        return response
 
     return app
 

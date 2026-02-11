@@ -13,6 +13,7 @@ from .activation_utils import (
     revoke_subject_activation, revoke_section_activation, lock_subject_access_for_all, lock_section_access_for_all
 )
 from .forms import SubjectForm, SectionForm, LessonForm, TestForm, StudentEditForm
+from .extensions import cache
 
 teacher_bp = Blueprint("teacher", __name__, template_folder="templates")
 
@@ -50,8 +51,28 @@ def role_required(role):
 @login_required
 @role_required("teacher")
 def dashboard():
-    subjects = Subject.objects().order_by('-created_at').all()
-    return render_template("teacher/dashboard.html", subjects=subjects)
+    # Pagination for better performance
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    subjects_query = Subject.objects().order_by('-created_at')
+    total_subjects = subjects_query.count()
+    subjects = subjects_query.skip((page - 1) * per_page).limit(per_page)
+    
+    # Calculate pagination info
+    total_pages = (total_subjects + per_page - 1) // per_page
+    has_prev = page > 1
+    has_next = page < total_pages
+    
+    return render_template(
+        "teacher/dashboard.html", 
+        subjects=subjects,
+        page=page,
+        total_pages=total_pages,
+        has_prev=has_prev,
+        has_next=has_next,
+        total_subjects=total_subjects
+    )
 
 
 # Redirect teacher base to dashboard for Up navigation
@@ -66,8 +87,26 @@ def root():
 @login_required
 @role_required("teacher")
 def results_overview():
-    attempts = Attempt.objects().order_by('-started_at').all()
-    return render_template("teacher/results.html", attempts=attempts)
+    # Pagination for performance
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    attempts_query = Attempt.objects().order_by('-started_at')
+    total_attempts = attempts_query.count()
+    attempts = attempts_query.skip((page - 1) * per_page).limit(per_page)
+    
+    total_pages = (total_attempts + per_page - 1) // per_page
+    has_prev = page > 1
+    has_next = page < total_pages
+    
+    return render_template(
+        "teacher/results.html", 
+        attempts=attempts,
+        page=page,
+        total_pages=total_pages,
+        has_prev=has_prev,
+        has_next=has_next
+    )
 
 
 @teacher_bp.route("/students/<student_id>/results")
@@ -77,7 +116,28 @@ def student_results(student_id):
     student = User.objects(id=student_id).first()
     if not student:
         raise NotFound()
-    attempts = Attempt.objects(student_id=student.id).order_by('-started_at').all()
+    
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    per_page = 30
+    
+    attempts_query = Attempt.objects(student_id=student.id).order_by('-started_at')
+    total_attempts = attempts_query.count()
+    attempts = attempts_query.skip((page - 1) * per_page).limit(per_page)
+    
+    total_pages = (total_attempts + per_page - 1) // per_page
+    has_prev = page > 1
+    has_next = page < total_pages
+    
+    return render_template(
+        "teacher/student_results.html", 
+        student=student, 
+        attempts=attempts,
+        page=page,
+        total_pages=total_pages,
+        has_prev=has_prev,
+        has_next=has_next
+    )
     return render_template("teacher/student_results.html", student=student, attempts=attempts)
 
 

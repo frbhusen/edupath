@@ -6,3 +6,4 @@ email_validator==2.2.0
 pymongo==4.6.0
 gunicorn
 requests==2.31.0
+Flask-Caching==2.1.0

@@ -8,6 +8,7 @@ from bson import ObjectId
 from .models import Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer
 from .forms import ActivationForm, LessonActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
+from .extensions import cache
 
 student_bp = Blueprint("student", __name__, template_folder="templates")
 
@@ -107,20 +108,54 @@ class AccessContext:
 
 
 def get_unlocked_lessons(student_id: int):
-    """Collect all lessons the student can access across all sections."""
-    lessons = []
-    sections = Section.objects().all()
+    """Collect all lessons the student can access across all sections.
+    Optimized to avoid N+1 queries by bulk loading data.
+    """
+    # Bulk load all sections
+    sections = list(Section.objects().all())
+    if not sections:
+        return []
+    
+    # Bulk load all lessons for these sections
+    section_ids = [s.id for s in sections]
+    all_lessons = list(Lesson.objects(section_id__in=section_ids).all())
+    
+    # Group lessons by section for faster access
+    lessons_by_section = {}
+    for lesson in all_lessons:
+        section_id = lesson.section_id.id
+        if section_id not in lessons_by_section:
+            lessons_by_section[section_id] = []
+        lessons_by_section[section_id].append(lesson)
+    
+    # Bulk load activations
+    lesson_ids = [l.id for l in all_lessons]
+    lesson_activations = set(
+        la.lesson_id for la in LessonActivation.objects(
+            lesson_id__in=lesson_ids, 
+            student_id=student_id, 
+            active=True
+        ).all()
+    )
+    
+    unlocked = []
     for section in sections:
+        section_lessons = lessons_by_section.get(section.id, [])
+        if not section_lessons:
+            continue
+        
         access = AccessContext(section, student_id)
-        for lesson in section.lessons:
+        for lesson in section_lessons:
             if access.lesson_open(lesson):
-                lessons.append(lesson)
-    return lessons
+                unlocked.append(lesson)
+    
+    return unlocked
 
 @student_bp.route("/subjects")
 @login_required
+@cache.cached(timeout=300, key_prefix=lambda: f"subjects_{current_user.id}_{current_user.role}")
 def subjects():
-    subs = Subject.objects().all()
+    subs = list(Subject.objects().order_by('-created_at').all())
     
     # Get activation status for each subject if student
     subject_activations = {}
@@ -146,11 +181,15 @@ def subject_detail(subject_id):
     if not subject:
         return "404", 404
     
+    # Bulk load sections for this subject
+    sections = list(Section.objects(subject_id=subject.id).order_by('created_at').all())
+    
     # Check if subject is activated for this student
     subject_activation = None
     sections_data = []
     subject_requires_code = getattr(subject, "requires_code", False)
     subject_open = True
+    
     if current_user.role == "student":
         subject_activation = SubjectActivation.objects(
             subject_id=subject.id,
@@ -158,7 +197,19 @@ def subject_detail(subject_id):
             active=True,
         ).first()
         subject_open = bool(subject_activation) or not subject_requires_code
-        for section in subject.sections:
+        
+        # Bulk load section activations to avoid N+1
+        section_ids = [s.id for s in sections]
+        section_activations = {
+            sa.section_id: sa for sa in SectionActivation.objects(
+                section_id__in=section_ids,
+                student_id=current_user.id,
+                active=True
+            ).all()
+        } if section_ids else {}
+        
+        for section in sections:
+            # Create AccessContext with preloaded activation data
             access = AccessContext(section, current_user.id)
             sections_data.append({
                 "section": section,
@@ -166,7 +217,7 @@ def subject_detail(subject_id):
                 "requires_code": access.section_requires_code,
             })
     else:
-        for section in subject.sections:
+        for section in sections:
             sections_data.append({
                 "section": section,
                 "is_open": True,
@@ -188,15 +239,20 @@ def section_detail(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
         return "404", 404
+    
+    # Bulk load lessons and tests for this section
+    lessons = list(Lesson.objects(section_id=section.id).order_by('created_at').all())
+    tests = list(Test.objects(section_id=section.id, lesson_id=None).order_by('created_at').all())
+    
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
         lessons_data = [
             {"lesson": lesson, "is_open": access.lesson_open(lesson)}
-            for lesson in sorted(section.lessons, key=lambda l: l.id)
+            for lesson in lessons
         ]
         tests_data = [
             {"test": test, "is_open": access.test_open(test)}
-            for test in sorted([t for t in section.tests if t.lesson_id is None], key=lambda t: t.id)
+            for test in tests
         ]
         return render_template(
             "student/section_detail.html",
@@ -210,8 +266,8 @@ def section_detail(section_id):
             tests_data=tests_data,
         )
     # Teachers/admins can view everything unlocked
-    lessons_data = [{"lesson": l, "is_open": True} for l in sorted(section.lessons, key=lambda l: l.id)]
-    tests_data = [{"test": t, "is_open": True} for t in sorted([t for t in section.tests if t.lesson_id is None], key=lambda t: t.id)]
+    lessons_data = [{"lesson": l, "is_open": True} for l in lessons]
+    tests_data = [{"test": t, "is_open": True} for t in tests]
     return render_template(
         "student/section_detail.html",
         section=section,
@@ -304,14 +360,17 @@ def lesson_detail(lesson_id):
             "embed_url": to_embed_url(res),
         })
 
+    # Bulk load tests for this lesson
+    tests = list(Test.objects(lesson_id=lesson.id).order_by('created_at').all())
+    
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
         tests_data = [
             {"test": test, "is_open": access.test_open(test)}
-            for test in sorted(lesson.tests, key=lambda t: t.id)
+            for test in tests
         ]
     else:
-        tests_data = [{"test": t, "is_open": True} for t in sorted(lesson.tests, key=lambda t: t.id)]
+        tests_data = [{"test": t, "is_open": True} for t in tests]
 
     return render_template(
         "student/lesson_detail.html",
@@ -626,7 +685,7 @@ def test_result(attempt_id):
 @student_bp.route("/custom-tests/new", methods=["GET", "POST"])
 @login_required
 def custom_test_new():
-    subjects = Subject.objects().all()
+    subjects = list(Subject.objects().order_by('name').all())
     selected_subject_id = request.args.get("subject_id") or request.form.get("subject_id")
     if selected_subject_id and not ObjectId.is_valid(str(selected_subject_id)):
         selected_subject_id = None
@@ -634,7 +693,8 @@ def custom_test_new():
     if current_user.role == "student":
         unlocked_lessons = get_unlocked_lessons(current_user.id)
     else:
-        unlocked_lessons = Lesson.objects().all()
+        unlocked_lessons = list(Lesson.objects().all())
+    
     subject_filter = None
     if selected_subject_id:
         subject_filter = Subject.objects(id=selected_subject_id).first()
@@ -644,11 +704,26 @@ def custom_test_new():
                 if lesson.section and lesson.section.subject_id == subject_filter
             ]
 
+    # Bulk load tests and question counts for all unlocked lessons
     lesson_question_counts = {}
-    for lesson in unlocked_lessons:
-        tests = Test.objects(lesson_id=lesson.id).all()
-        test_ids = [t.id for t in tests]
-        lesson_question_counts[lesson.id] = Question.objects(test_id__in=test_ids).count() if test_ids else 0
+    if unlocked_lessons:
+        lesson_ids = [l.id for l in unlocked_lessons]
+        tests = list(Test.objects(lesson_id__in=lesson_ids).all())
+        
+        # Group tests by lesson
+        tests_by_lesson = {}
+        for test in tests:
+            lesson_id = test.lesson_id.id if test.lesson_id else None
+            if lesson_id:
+                if lesson_id not in tests_by_lesson:
+                    tests_by_lesson[lesson_id] = []
+                tests_by_lesson[lesson_id].append(test.id)
+        
+        # Bulk count questions for each lesson
+        for lesson in unlocked_lessons:
+            test_ids = tests_by_lesson.get(lesson.id, [])
+            lesson_question_counts[lesson.id] = Question.objects(test_id__in=test_ids).count() if test_ids else 0
+    
     total_available_questions = sum(lesson_question_counts.values())
 
     if request.method == "POST":
