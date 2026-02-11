@@ -41,7 +41,7 @@
             <h5 class="card-title mb-1">{{ subject.name }}</h5>
             <p class="card-text text-muted mb-2">{{ subject.description }}</p>
             <div class="small text-muted">
-              الأقسام: {{ subject.sections|length }}
+              الأقسام: {{ subject._cached_sections|default(subject.sections, true)|length }}
             </div>
           </div>
           <div class="text-nowrap d-flex gap-2">
@@ -85,9 +85,9 @@
           </div>
         </div>
 
-        {% if subject.sections %}
+        {% if subject._cached_sections|default(subject.sections, true) %}
         <div class="row g-2 mt-3">
-          {% for section in subject.sections %}
+          {% for section in subject._cached_sections|default(subject.sections, true) %}
           <div class="col-12">
             <div class="card border-0 bg-light">
               <div class="card-body">
@@ -95,8 +95,8 @@
                   <div>
                     <strong>{{ section.title }}</strong>
                     <div class="text-muted small">
-                      الدروس: {{ section.lessons|length }} | الاختبارات: {{
-                      section.tests|length }}
+                      الدروس: {{ section._cached_lessons|default(section.lessons, true)|length }} | الاختبارات: {{
+                      section._cached_tests|default(section.tests, true)|length }}
                     </div>
                   </div>
                   <div class="text-nowrap d-flex gap-2">
@@ -127,7 +127,7 @@
                     </form>
                   </div>
                 </div>
-                {% if section.lessons %}
+                {% if section._cached_lessons|default(section.lessons, true) %}
                 <div class="mt-2">
                   <div class="small text-muted mb-1">الدروس</div>
                   <div class="table-responsive">
@@ -142,7 +142,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        {% for lesson in section.lessons|sort(attribute='title')
+                        {% for lesson in section._cached_lessons|default(section.lessons, true)|sort(attribute='title')
                         %} {% set locked_by_section = section.requires_code %}
                         <tr>
                           <td class="fw-semibold">{{ lesson.title }}</td>
@@ -151,7 +151,7 @@
                             lesson.link_label and lesson.link_url else 0) }}
                           </td>
                           <td class="text-muted small">
-                            {{ lesson.tests|length }}
+                            {{ lesson._cached_test_count|default(0) }}
                           </td>
                           <td>
                             {% if locked_by_section %}
@@ -202,7 +202,7 @@
                     </table>
                   </div>
                 </div>
-                {% endif %} {% if section.tests %}
+                {% endif %} {% if section._cached_tests|default(section.tests, true) %}
                 <div class="mt-3">
                   <div class="small text-muted mb-1">الاختبارات</div>
                   <div class="table-responsive">
@@ -216,7 +216,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        {% for test in section.tests|sort(attribute='title') %}
+                        {% for test in section._cached_tests|default(section.tests, true)|sort(attribute='title') %}
                         {% set locked_by_section = section.requires_code %}
                         <tr>
                           <td class="fw-semibold">{{ test.title }}</td>

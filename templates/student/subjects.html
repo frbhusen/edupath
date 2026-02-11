@@ -18,7 +18,7 @@
                 {% if current_user.role == 'student' and subject.id in subject_activations %}
                   <span class="badge text-bg-success">✔</span>
                 {% endif %}
-                <span class="chip">{{ subject.sections|length }} {{ "أقسام" if subject.sections|length != 1 else "قسم" }}</span>
+                <span class="chip">{{ subject._sections_count|default(0) }} {{ "أقسام" if subject._sections_count|default(0) != 1 else "قسم" }}</span>
               </div>
             </div>
             <p class="text-muted">{{ subject.description or 'لا يوجد وصف.' }}</p>

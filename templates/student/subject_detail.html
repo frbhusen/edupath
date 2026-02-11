@@ -21,7 +21,7 @@
         <span class="badge text-bg-success">✓ مفتوحة</span>
       {% endif %}
     {% endif %}
-    <span class="chip">{{ subject.sections|length }} {{ "أقسام" if subject.sections|length != 1 else "قسم" }}</span>
+    <span class="chip">{{ sections_data|length }} {{ "أقسام" if sections_data|length != 1 else "قسم" }}</span>
   </div>
 </div>
 
@@ -41,7 +41,7 @@
             <div class="d-flex justify-content-between align-items-start mb-1">
               <h5 class="card-title mb-0">{{ section.title }}</h5>
               <div class="d-flex align-items-center gap-2">
-                <span class="badge text-bg-secondary">{{ section.lessons|length }} {{ "دروس" if section.lessons|length != 1 else "درس" }}</span>
+                <span class="badge text-bg-secondary">{{ item.lesson_count }} {{ "دروس" if item.lesson_count != 1 else "درس" }}</span>
                 {% if locked %}
                   <span class="text-muted small">&#128274;</span>
                 {% else %}

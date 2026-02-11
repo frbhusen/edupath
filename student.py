@@ -153,9 +153,23 @@ def get_unlocked_lessons(student_id: int):
 
 @student_bp.route("/subjects")
 @login_required
-@cache.cached(timeout=300, key_prefix=lambda: f"subjects_{current_user.id}_{current_user.role}")
 def subjects():
     subs = list(Subject.objects().order_by('-created_at').all())
+    
+    # Bulk load sections to avoid N+1 in template
+    if subs:
+        subject_ids = [s.id for s in subs]
+        sections = list(Section.objects(subject_id__in=subject_ids).all())
+        
+        # Count sections per subject
+        sections_count = {}
+        for section in sections:
+            subject_id = section.subject_id.id
+            sections_count[subject_id] = sections_count.get(subject_id, 0) + 1
+        
+        # Attach count to subjects
+        for subject in subs:
+            subject._sections_count = sections_count.get(subject.id, 0)
     
     # Get activation status for each subject if student
     subject_activations = {}
@@ -183,6 +197,17 @@ def subject_detail(subject_id):
     
     # Bulk load sections for this subject
     sections = list(Section.objects(subject_id=subject.id).order_by('created_at').all())
+    
+    # Bulk load lesson counts to avoid N+1 in template
+    if sections:
+        section_ids = [s.id for s in sections]
+        lessons = list(Lesson.objects(section_id__in=section_ids).all())
+        lesson_counts = {}
+        for lesson in lessons:
+            section_id = lesson.section_id.id
+            lesson_counts[section_id] = lesson_counts.get(section_id, 0) + 1
+    else:
+        lesson_counts = {}
     
     # Check if subject is activated for this student
     subject_activation = None
@@ -215,6 +240,7 @@ def subject_detail(subject_id):
                 "section": section,
                 "is_open": access.section_open,
                 "requires_code": access.section_requires_code,
+                "lesson_count": lesson_counts.get(section.id, 0)
             })
     else:
         for section in sections:
@@ -222,6 +248,7 @@ def subject_detail(subject_id):
                 "section": section,
                 "is_open": True,
                 "requires_code": False,
+                "lesson_count": lesson_counts.get(section.id, 0)
             })
 
     return render_template(
@@ -243,6 +270,19 @@ def section_detail(section_id):
     # Bulk load lessons and tests for this section
     lessons = list(Lesson.objects(section_id=section.id).order_by('created_at').all())
     tests = list(Test.objects(section_id=section.id, lesson_id=None).order_by('created_at').all())
+    
+    # Bulk load question counts for tests
+    if tests:
+        test_ids = [t.id for t in tests]
+        questions = list(Question.objects(test_id__in=test_ids).only('test_id').all())
+        question_counts = {}
+        for q in questions:
+            test_id = q.test_id.id
+            question_counts[test_id] = question_counts.get(test_id, 0) + 1
+        
+        # Attach counts to tests
+        for test in tests:
+            test._question_count = question_counts.get(test.id, 0)
     
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
@@ -362,6 +402,18 @@ def lesson_detail(lesson_id):
 
     # Bulk load tests for this lesson
     tests = list(Test.objects(lesson_id=lesson.id).order_by('created_at').all())
+    
+    # Bulk load question counts
+    if tests:
+        test_ids = [t.id for t in tests]
+        questions = list(Question.objects(test_id__in=test_ids).only('test_id').all())
+        question_counts = {}
+        for q in questions:
+            test_id = q.test_id.id
+            question_counts[test_id] = question_counts.get(test_id, 0) + 1
+        
+        for test in tests:
+            test._question_count = question_counts.get(test.id, 0)
     
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)

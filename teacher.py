@@ -57,7 +57,59 @@ def dashboard():
     
     subjects_query = Subject.objects().order_by('-created_at')
     total_subjects = subjects_query.count()
-    subjects = subjects_query.skip((page - 1) * per_page).limit(per_page)
+    subjects = list(subjects_query.skip((page - 1) * per_page).limit(per_page))
+    
+    # Bulk load sections, lessons, and tests to avoid N+1 in templates
+    if subjects:
+        subject_ids = [s.id for s in subjects]
+        sections = list(Section.objects(subject_id__in=subject_ids).all())
+        
+        # Group sections by subject
+        sections_by_subject = {}
+        for section in sections:
+            subject_id = section.subject_id.id
+            if subject_id not in sections_by_subject:
+                sections_by_subject[subject_id] = []
+            sections_by_subject[subject_id].append(section)
+        
+        # Bulk load lessons and tests
+        section_ids = [s.id for s in sections]
+        lessons = list(Lesson.objects(section_id__in=section_ids).all())
+        tests = list(Test.objects(section_id__in=section_ids).all())
+        
+        # Group by section
+        lessons_by_section = {}
+        tests_by_section = {}
+        tests_by_lesson = {}
+        
+        for lesson in lessons:
+            section_id = lesson.section_id.id
+            if section_id not in lessons_by_section:
+                lessons_by_section[section_id] = []
+            lessons_by_section[section_id].append(lesson)
+        
+        for test in tests:
+            section_id = test.section_id.id
+            if section_id not in tests_by_section:
+                tests_by_section[section_id] = []
+            tests_by_section[section_id].append(test)
+            
+            # Also group by lesson if test is linked to lesson
+            if test.lesson_id:
+                lesson_id = test.lesson_id.id
+                if lesson_id not in tests_by_lesson:
+                    tests_by_lesson[lesson_id] = []
+                tests_by_lesson[lesson_id].append(test)
+        
+        # Attach to subjects for template use
+        for subject in subjects:
+            subject._cached_sections = sections_by_subject.get(subject.id, [])
+            for section in subject._cached_sections:
+                section._cached_lessons = lessons_by_section.get(section.id, [])
+                section._cached_tests = tests_by_section.get(section.id, [])
+                # Also attach test counts to lessons
+                for lesson in section._cached_lessons:
+                    lesson._cached_test_count = len(tests_by_lesson.get(lesson.id, []))
     
     # Calculate pagination info
     total_pages = (total_subjects + per_page - 1) // per_page
