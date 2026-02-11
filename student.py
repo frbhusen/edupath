@@ -594,22 +594,30 @@ def test_result(attempt_id):
     if str(attempt.student_id.id) != str(current_user.id) and current_user.role != "teacher":
         flash("غير مسموح", "error")
         return redirect(url_for("student.subjects"))
-    questions = attempt.test.questions
+    
+    # Get only the questions that were answered in this attempt
     answers = AttemptAnswer.objects(attempt_id=attempt.id).all()
-    answers_map = {str(a.question_id.id): a for a in answers if a.question_id}
-
+    question_ids = [a.question_id.id for a in answers if a.question_id]
+    questions = Question.objects(id__in=question_ids).all()
+    questions_map = {str(q.id): q for q in questions}
+    
+    # Build review in the order of answers
     review = []
-    for q in questions:
-        ans = answers_map.get(str(q.id))
+    for ans in answers:
+        if not ans.question_id:
+            continue
+        q = questions_map.get(str(ans.question_id.id))
+        if not q:
+            continue
         selected_choice = None
-        if ans and ans.choice_id:
+        if ans.choice_id:
             selected_choice = next((c for c in q.choices if c.choice_id == ans.choice_id), None)
         correct_choice = next((c for c in q.choices if c.is_correct), None)
         review.append({
             "question": q,
             "selected_choice": selected_choice,
             "correct_choice": correct_choice,
-            "is_correct": ans.is_correct if ans else False,
+            "is_correct": ans.is_correct,
         })
 
     return render_template("student/test_result.html", attempt=attempt, review=review)
