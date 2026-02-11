@@ -153,6 +153,7 @@ def get_unlocked_lessons(student_id: int):
 
 @student_bp.route("/subjects")
 @login_required
+@cache.cached(timeout=60, key_prefix=lambda: f"subjects_{current_user.id}_{current_user.role}")
 def subjects():
     subs = list(Subject.objects().order_by('-created_at').all())
     
@@ -190,6 +191,7 @@ def student_root():
 
 @student_bp.route("/subjects/<subject_id>")
 @login_required
+@cache.cached(timeout=60, key_prefix=lambda: f"subject_detail_{subject_id}_{current_user.id}")
 def subject_detail(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:
@@ -262,6 +264,7 @@ def subject_detail(subject_id):
 
 @student_bp.route("/sections/<section_id>")
 @login_required
+@cache.cached(timeout=60, key_prefix=lambda: f"section_detail_{section_id}_{current_user.id}")
 def section_detail(section_id):
     section = Section.objects(id=section_id).first()
     if not section:

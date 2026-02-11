@@ -50,10 +50,11 @@ def role_required(role):
 @teacher_bp.route("/dashboard")
 @login_required
 @role_required("teacher")
+@cache.cached(timeout=60, key_prefix=lambda: f"teacher_dashboard_{current_user.id}_{request.args.get('page', 1)}")
 def dashboard():
-    # Pagination for better performance
+    # Pagination for better performance - reduced to 10 for faster loading
     page = request.args.get('page', 1, type=int)
-    per_page = 50
+    per_page = 10
     
     subjects_query = Subject.objects().order_by('-created_at')
     total_subjects = subjects_query.count()
