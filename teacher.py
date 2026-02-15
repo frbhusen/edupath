@@ -878,11 +878,12 @@ def new_test(section_id):
 @teacher_bp.route("/tests/<test_id>")
 @login_required
 @role_required("teacher")
+@cache.cached(timeout=30, key_prefix=lambda: f"test_detail_{test_id}")
 def test_detail(test_id):
     test = Test.objects(id=test_id).first()
     if not test:
         raise NotFound()
-    questions = Question.objects(test_id=test.id).all()
+    questions = list(Question.objects(test_id=test.id).order_by('created_at').all())
     return render_template("teacher/test_detail.html", test=test, questions=questions)
 
 
@@ -1174,6 +1175,7 @@ def new_question(test_id):
                 correct_choice_id=correct_choice.choice_id if correct_choice else None,
             )
             question.save()
+            cache.delete(f"test_detail_{str(test.id)}")  # Clear test detail cache
             flash("تم إنشاء السؤال بنجاح.", "success")
             return redirect(url_for("teacher.test_detail", test_id=test.id))
     
@@ -1216,8 +1218,9 @@ def edit_question(question_id):
             correct_choice = next((c for c in question.choices if c.is_correct), None)
             question.correct_choice_id = correct_choice.choice_id if correct_choice else None
             question.save()
+            cache.delete(f"test_detail_{str(question.test_id.id)}")  # Clear test detail cache
             flash("تم تحديث السؤال بنجاح.", "success")
-            return redirect(url_for("teacher.test_detail", test_id=question.test_id))
+            return redirect(url_for("teacher.test_detail", test_id=str(question.test_id.id)))
     
     return render_template("teacher/question_edit.html", question=question)
 
@@ -1229,8 +1232,9 @@ def delete_question(question_id):
     question = Question.objects(id=question_id).first()
     if not question:
         raise NotFound()
-    test_id = question.test_id
+    test_id = str(question.test_id.id)
     question.delete()
+    cache.delete(f"test_detail_{test_id}")  # Clear test detail cache
     flash("تم حذف السؤال بنجاح.", "success")
     return redirect(url_for("teacher.test_detail", test_id=test_id))
 
