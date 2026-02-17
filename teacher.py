@@ -1024,8 +1024,7 @@ def edit_test(test_id):
             if import_level not in {"from_json", "easy", "medium", "hard"}:
                 import_level = "from_json"
             if upload and upload.filename:
-                        i = 1
-                        while f"choice_{i}" in request.form:
+                raw_json = upload.read().decode("utf-8")
 
             try:
                 payload = json.loads(raw_json) if raw_json.strip() else None
