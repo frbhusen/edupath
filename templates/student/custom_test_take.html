@@ -29,7 +29,7 @@
           {% for c in item.choices %}
             <label class="list-group-item">
               <div class="d-flex align-items-center gap-2 flex-wrap">
-                <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.id }}">
+                <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.choice_id }}">
                 <span>{{ c.text }}</span>
                 {% if c.image_url %}
                   <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;">
