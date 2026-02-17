@@ -920,8 +920,20 @@ def edit_test(test_id):
                 return redirect(url_for("teacher.test_detail", test_id=test.id))
 
         elif form_name == "upsert_question":
+            def _parse_images(raw):
+                if not raw:
+                    return []
+                parts = []
+                for line in str(raw).splitlines():
+                    for chunk in line.split(","):
+                        val = chunk.strip()
+                        if val:
+                            parts.append(val)
+                return parts
+
             question_id = request.form.get("question_id")
             text = (request.form.get("question_text") or "").strip()
+            question_images = _parse_images(request.form.get("question_images"))
             hint = (request.form.get("question_hint") or "").strip() or None
             difficulty = (request.form.get("difficulty") or "medium").strip().lower()
             if difficulty not in {"easy", "medium", "hard"}:
@@ -932,8 +944,9 @@ def edit_test(test_id):
             choices = []
             for i in range(1, 5):
                 choice_text = (request.form.get(f"choice_{i}") or "").strip()
+                choice_image = (request.form.get(f"choice_{i}_image") or "").strip() or None
                 if choice_text:
-                    choices.append(Choice(text=choice_text, is_correct=(correct_index == i)))
+                    choices.append(Choice(text=choice_text, image_url=choice_image, is_correct=(correct_index == i)))
 
             if not text:
                 flash("نص السؤال مطلوب.", "error")
@@ -952,6 +965,7 @@ def edit_test(test_id):
 
             if question:
                 question.text = text
+                question.question_images = question_images
                 question.hint = hint
                 question.difficulty = difficulty
                 question.choices = choices
@@ -964,6 +978,7 @@ def edit_test(test_id):
                 question = Question(
                     test_id=test.id,
                     text=text,
+                    question_images=question_images,
                     hint=hint,
                     difficulty=difficulty,
                     choices=choices,
@@ -992,6 +1007,15 @@ def edit_test(test_id):
                 if isinstance(val, str):
                     return val.strip().lower() in {"true", "1", "yes", "on"}
                 return False
+
+            def _normalize_images(raw):
+                if not raw:
+                    return []
+                if isinstance(raw, str):
+                    raw = [raw]
+                if not isinstance(raw, list):
+                    return []
+                return [str(u).strip() for u in raw if str(u).strip()]
 
             raw_json = request.form.get("questions_json") or ""
             upload = request.files.get("questions_file")
@@ -1025,6 +1049,11 @@ def edit_test(test_id):
                 if not isinstance(item, dict):
                     continue
                 q_text = (item.get("question") or item.get("text") or "").strip()
+                question_images = _normalize_images(
+                    item.get("questionImages")
+                    or item.get("question_images")
+                    or item.get("images")
+                )
                 q_hint = (item.get("hint") or "").strip() if include_hints else None
                 if import_level == "from_json":
                     difficulty = (item.get("difficulty") or item.get("level") or "medium").strip().lower()
@@ -1064,18 +1093,41 @@ def edit_test(test_id):
                         opt_text = str(opt.get("text", "")).strip()
                         if not opt_text:
                             continue
+                        opt_image = (
+                            opt.get("image")
+                            or opt.get("imageUrl")
+                            or opt.get("image_url")
+                            or opt.get("imageUri")
+                            or opt.get("image_uri")
+                        )
+                        opt_image = str(opt_image).strip() if opt_image else None
                         is_correct = _to_bool(opt.get("isCorrect") if "isCorrect" in opt else opt.get("is_correct"))
                         if is_correct:
                             has_correct = True
-                        choices.append(Choice(text=opt_text, is_correct=is_correct))
+                        choices.append(Choice(text=opt_text, image_url=opt_image, is_correct=is_correct))
                 else:
                     for idx, opt in enumerate(choices_list, start=1):
                         if opt is None:
                             continue
+                        if isinstance(opt, dict):
+                            opt_text = str(opt.get("text", "")).strip()
+                            opt_image = (
+                                opt.get("image")
+                                or opt.get("imageUrl")
+                                or opt.get("image_url")
+                                or opt.get("imageUri")
+                                or opt.get("image_uri")
+                            )
+                            opt_image = str(opt_image).strip() if opt_image else None
+                        else:
+                            opt_text = str(opt).strip()
+                            opt_image = None
+                        if not opt_text:
+                            continue
                         is_correct = (idx in correct_indices)
                         if is_correct:
                             has_correct = True
-                        choices.append(Choice(text=str(opt), is_correct=is_correct))
+                        choices.append(Choice(text=opt_text, image_url=opt_image, is_correct=is_correct))
 
                 if choices and not has_correct:
                     choices[0].is_correct = True
@@ -1086,6 +1138,7 @@ def edit_test(test_id):
                 q = Question(
                     test_id=test.id,
                     text=q_text,
+                    question_images=question_images,
                     hint=q_hint,
                     difficulty=difficulty,
                     choices=choices,
@@ -1141,6 +1194,14 @@ def new_question(test_id):
     
     if request.method == "POST":
         text = request.form.get("text")
+        raw_images = request.form.get("question_images")
+        question_images = []
+        if raw_images:
+            for line in str(raw_images).splitlines():
+                for chunk in line.split(","):
+                    val = chunk.strip()
+                    if val:
+                        question_images.append(val)
         hint = request.form.get("hint")
         difficulty = (request.form.get("difficulty") or "medium").strip().lower()
         if difficulty not in {"easy", "medium", "hard"}:
@@ -1150,10 +1211,12 @@ def new_question(test_id):
         i = 0
         while f"choice_{i}" in request.form:
             choice_text = request.form.get(f"choice_{i}")
+            choice_image = (request.form.get(f"choice_{i}_image") or "").strip() or None
             is_correct = request.form.get(f"is_correct_{i}") == "on"
             if choice_text:
                 choices_data.append({
                     "text": choice_text,
+                    "image_url": choice_image,
                     "is_correct": is_correct
                 })
             i += 1
@@ -1164,11 +1227,12 @@ def new_question(test_id):
             from bson import ObjectId
             from .models import Choice
             
-            choices = [Choice(text=c["text"], is_correct=c["is_correct"]) for c in choices_data]
+            choices = [Choice(text=c["text"], image_url=c["image_url"], is_correct=c["is_correct"]) for c in choices_data]
             correct_choice = next((c for c in choices if c.is_correct), None)
             question = Question(
                 test_id=test.id,
                 text=text,
+                question_images=question_images,
                 hint=hint,
                 difficulty=difficulty,
                 choices=choices,
@@ -1192,6 +1256,15 @@ def edit_question(question_id):
     
     if request.method == "POST":
         question.text = request.form.get("text")
+        raw_images = request.form.get("question_images")
+        question_images = []
+        if raw_images:
+            for line in str(raw_images).splitlines():
+                for chunk in line.split(","):
+                    val = chunk.strip()
+                    if val:
+                        question_images.append(val)
+        question.question_images = question_images
         question.hint = request.form.get("hint")
         difficulty = (request.form.get("difficulty") or "medium").strip().lower()
         if difficulty not in {"easy", "medium", "hard"}:
@@ -1202,10 +1275,12 @@ def edit_question(question_id):
         i = 0
         while f"choice_{i}" in request.form:
             choice_text = request.form.get(f"choice_{i}")
+            choice_image = (request.form.get(f"choice_{i}_image") or "").strip() or None
             is_correct = request.form.get(f"is_correct_{i}") == "on"
             if choice_text:
                 choices_data.append({
                     "text": choice_text,
+                    "image_url": choice_image,
                     "is_correct": is_correct
                 })
             i += 1
@@ -1214,7 +1289,7 @@ def edit_question(question_id):
             flash("يجب إضافة خيار واحد على الأقل.", "error")
         else:
             from .models import Choice
-            question.choices = [Choice(text=c["text"], is_correct=c["is_correct"]) for c in choices_data]
+            question.choices = [Choice(text=c["text"], image_url=c["image_url"], is_correct=c["is_correct"]) for c in choices_data]
             correct_choice = next((c for c in question.choices if c.is_correct), None)
             question.correct_choice_id = correct_choice.choice_id if correct_choice else None
             question.save()

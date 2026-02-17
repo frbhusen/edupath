@@ -174,6 +174,7 @@ class Test(Document):
 class Choice(EmbeddedDocument):
     choice_id = ObjectIdField(default=ObjectId)
     text = StringField(required=True, max_length=400)
+    image_url = StringField(max_length=500, null=True)
     is_correct = BooleanField(default=False, required=True)
 
 
@@ -181,6 +182,7 @@ class Question(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     test_id = ReferenceField(Test, required=True)
     text = StringField(required=True)
+    question_images = ListField(StringField(max_length=500))
     hint = StringField(null=True)
     difficulty = StringField(default="medium", choices=["easy", "medium", "hard"])
     choices = ListField(EmbeddedDocumentField(Choice), required=True)

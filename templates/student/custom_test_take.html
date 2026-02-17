@@ -18,11 +18,23 @@
     <div class="card shadow-sm mb-3">
       <div class="card-body">
         <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
+        {% if q.question_images %}
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            {% for img in q.question_images %}
+              <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 240px;">
+            {% endfor %}
+          </div>
+        {% endif %}
         <div class="list-group">
           {% for c in item.choices %}
-            <label class="list-group-item d-flex align-items-center gap-2">
-              <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.id }}">
-              <span>{{ c.text }}</span>
+            <label class="list-group-item">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.id }}">
+                <span>{{ c.text }}</span>
+                {% if c.image_url %}
+                  <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;">
+                {% endif %}
+              </div>
             </label>
           {% endfor %}
         </div>

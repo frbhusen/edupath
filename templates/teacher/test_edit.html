@@ -94,12 +94,17 @@
                         {% endfor %}
                         <option value="{{ q.id }}"
                           data-text="{{ q.text }}"
+                          data-images='{{ (q.question_images or [])|tojson|e }}'
                           data-hint="{{ q.hint or '' }}"
                           data-difficulty="{{ q.difficulty or 'medium' }}"
                           data-choice1="{{ c1.text if c1 else '' }}"
+                          data-choice1img="{{ c1.image_url if c1 else '' }}"
                           data-choice2="{{ c2.text if c2 else '' }}"
+                          data-choice2img="{{ c2.image_url if c2 else '' }}"
                           data-choice3="{{ c3.text if c3 else '' }}"
+                          data-choice3img="{{ c3.image_url if c3 else '' }}"
                           data-choice4="{{ c4.text if c4 else '' }}"
+                          data-choice4img="{{ c4.image_url if c4 else '' }}"
                           data-correct="{{ correct_idx.value }}">
                           Q{{ loop.index }} - {{ q.text[:40] ~ ('...' if q.text|length > 40 else '') }}
                         </option>
@@ -113,6 +118,10 @@
                     <div class="mb-3">
                       <label class="form-label">السؤال</label>
                       <textarea class="form-control" id="question_text" name="question_text" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">صور السؤال (رابط لكل سطر)</label>
+                      <textarea class="form-control" id="question_images" name="question_images" rows="2" placeholder="https://..."></textarea>
                     </div>
                     <div class="row g-3">
                       <div class="col-12 col-md-6">
@@ -143,6 +152,7 @@
                             </div>
                             <input type="text" class="form-control" name="choice_{{ i }}" id="choice_{{ i }}" placeholder="الخيار {{ i }}">
                           </div>
+                          <input type="text" class="form-control mt-2" name="choice_{{ i }}_image" id="choice_{{ i }}_image" placeholder="رابط صورة الخيار {{ i }} (اختياري)">
                         </div>
                         {% endfor %}
                       </div>
@@ -272,9 +282,11 @@
     const selectEl = document.getElementById('questionSelect');
     const idField = document.getElementById('question_id');
     const questionField = document.getElementById('question_text');
+    const questionImagesField = document.getElementById('question_images');
     const hintField = document.getElementById('question_hint');
     const difficultyField = document.getElementById('question_difficulty');
     const choiceFields = [1,2,3,4].map(i => document.getElementById(`choice_${i}`));
+    const choiceImageFields = [1,2,3,4].map(i => document.getElementById(`choice_${i}_image`));
     const correctRadios = [1,2,3,4].map(i => document.getElementById(`correct_choice_${i}`));
     const resetBtn = document.getElementById('resetBtn');
     const deleteBtn = document.getElementById('deleteBtn');
@@ -290,9 +302,11 @@
       if(!opt || !opt.value){
         idField.value = '';
         questionField.value = '';
+        if (questionImagesField) questionImagesField.value = '';
         hintField.value = '';
         if (difficultyField) difficultyField.value = 'medium';
         choiceFields.forEach(f => f.value='');
+        choiceImageFields.forEach(f => f.value='');
         correctRadios.forEach(r => r.checked=false);
         deleteBtn.disabled = true;
         updatePreview();
@@ -300,10 +314,24 @@
       }
       idField.value = opt.value;
       questionField.value = opt.dataset.text || '';
+      if (questionImagesField) {
+        let images = [];
+        if (opt.dataset.images) {
+          try {
+            images = JSON.parse(opt.dataset.images) || [];
+          } catch (err) {
+            images = [];
+          }
+        }
+        questionImagesField.value = images.join('\n');
+      }
       hintField.value = opt.dataset.hint || '';
       if (difficultyField) difficultyField.value = opt.dataset.difficulty || 'medium';
       choiceFields.forEach((f, idx) => {
         f.value = opt.dataset[`choice${idx+1}`] || '';
+      });
+      choiceImageFields.forEach((f, idx) => {
+        f.value = opt.dataset[`choice${idx+1}img`] || '';
       });
       correctRadios.forEach(r => r.checked = false);
       const cIdx = parseInt(opt.dataset.correct || '0');
@@ -351,7 +379,8 @@
       }
     }
 
-    [questionField, hintField, ...choiceFields].forEach(el => {
+    [questionField, questionImagesField, hintField, ...choiceFields, ...choiceImageFields].forEach(el => {
+      if (!el) return;
       el.addEventListener('input', updatePreview);
     });
     correctRadios.forEach(r => r.addEventListener('change', updatePreview));

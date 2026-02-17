@@ -15,6 +15,10 @@
         <textarea name="hint" class="form-control" rows="2"></textarea>
       </div>
       <div class="mb-3">
+        <label class="form-label">صور السؤال (رابط لكل سطر)</label>
+        <textarea name="question_images" class="form-control" rows="2" placeholder="https://..."></textarea>
+      </div>
+      <div class="mb-3">
         <label class="form-label">مستوى السؤال</label>
         <select class="form-select" name="difficulty">
           <option value="easy">سهل</option>
@@ -29,6 +33,10 @@
           <div class="mb-2">
             <label class="form-label">الخيار {{ i + 1 }}</label>
             <input type="text" name="choice_{{ i }}" class="form-control" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">رابط صورة الخيار (اختياري)</label>
+            <input type="text" name="choice_{{ i }}_image" class="form-control">
           </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" name="is_correct_{{ i }}" id="correct_{{ i }}">
@@ -54,6 +62,10 @@ function addChoice() {
     <div class="mb-2">
       <label class="form-label">الخيار ${choiceIndex + 1}</label>
       <input type="text" name="choice_${choiceIndex}" class="form-control" required>
+    </div>
+    <div class="mb-2">
+      <label class="form-label">رابط صورة الخيار (اختياري)</label>
+      <input type="text" name="choice_${choiceIndex}_image" class="form-control">
     </div>
     <div class="form-check">
       <input class="form-check-input" type="checkbox" name="is_correct_${choiceIndex}" id="correct_${choiceIndex}">
