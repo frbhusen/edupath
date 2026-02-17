@@ -876,7 +876,7 @@ def custom_test_take(attempt_id):
     attempt = CustomTestAttempt.objects(id=attempt_id).first()
     if not attempt:
         return "404", 404
-    if attempt.student_id != current_user.id:
+    if str(attempt.student_id.id) != str(current_user.id):
         flash("غير مسموح.", "error")
         return redirect(url_for("student.subjects"))
 
@@ -910,7 +910,7 @@ def custom_test_submit(attempt_id):
     attempt = CustomTestAttempt.objects(id=attempt_id).first()
     if not attempt:
         return "404", 404
-    if attempt.student_id != current_user.id:
+    if str(attempt.student_id.id) != str(current_user.id):
         flash("غير مسموح.", "error")
         return redirect(url_for("student.subjects"))
     if attempt.status != "active":
@@ -954,7 +954,7 @@ def custom_test_result(attempt_id):
     attempt = CustomTestAttempt.objects(id=attempt_id).first()
     if not attempt:
         return "404", 404
-    if attempt.student_id != current_user.id:
+    if str(attempt.student_id.id) != str(current_user.id):
         flash("غير مسموح.", "error")
         return redirect(url_for("student.subjects"))
 
