@@ -1024,7 +1024,8 @@ def edit_test(test_id):
             if import_level not in {"from_json", "easy", "medium", "hard"}:
                 import_level = "from_json"
             if upload and upload.filename:
-                raw_json = upload.read().decode("utf-8")
+                        i = 1
+                        while f"choice_{i}" in request.form:
 
             try:
                 payload = json.loads(raw_json) if raw_json.strip() else None
@@ -1180,124 +1181,6 @@ def delete_test(test_id):
     if lesson_id:
         return redirect(url_for("teacher.lesson_detail", lesson_id=lesson_id))
     return redirect(url_for("teacher.section_detail", section_id=section_id))
-
-
-# Question CRUD
-
-@teacher_bp.route("/tests/<test_id>/questions/new", methods=["GET", "POST"])
-@login_required
-@role_required("teacher")
-def new_question(test_id):
-    test = Test.objects(id=test_id).first()
-    if not test:
-        raise NotFound()
-    
-    if request.method == "POST":
-        text = request.form.get("text")
-        raw_images = request.form.get("question_images")
-        question_images = []
-        if raw_images:
-            for line in str(raw_images).splitlines():
-                for chunk in line.split(","):
-                    val = chunk.strip()
-                    if val:
-                        question_images.append(val)
-        hint = request.form.get("hint")
-        difficulty = (request.form.get("difficulty") or "medium").strip().lower()
-        if difficulty not in {"easy", "medium", "hard"}:
-            difficulty = "medium"
-        
-        choices_data = []
-        i = 0
-        while f"choice_{i}" in request.form:
-            choice_text = request.form.get(f"choice_{i}")
-            choice_image = (request.form.get(f"choice_{i}_image") or "").strip() or None
-            is_correct = request.form.get(f"is_correct_{i}") == "on"
-            if choice_text:
-                choices_data.append({
-                    "text": choice_text,
-                    "image_url": choice_image,
-                    "is_correct": is_correct
-                })
-            i += 1
-        
-        if not choices_data:
-            flash("يجب إضافة خيار واحد على الأقل.", "error")
-        else:
-            from bson import ObjectId
-            from .models import Choice
-            
-            choices = [Choice(text=c["text"], image_url=c["image_url"], is_correct=c["is_correct"]) for c in choices_data]
-            correct_choice = next((c for c in choices if c.is_correct), None)
-            question = Question(
-                test_id=test.id,
-                text=text,
-                question_images=question_images,
-                hint=hint,
-                difficulty=difficulty,
-                choices=choices,
-                correct_choice_id=correct_choice.choice_id if correct_choice else None,
-            )
-            question.save()
-            cache.delete(f"test_detail_{str(test.id)}")  # Clear test detail cache
-            flash("تم إنشاء السؤال بنجاح.", "success")
-            return redirect(url_for("teacher.test_detail", test_id=test.id))
-    
-    return render_template("teacher/question_form.html", test=test)
-
-
-@teacher_bp.route("/questions/<question_id>/edit", methods=["GET", "POST"])
-@login_required
-@role_required("teacher")
-def edit_question(question_id):
-    question = Question.objects(id=question_id).first()
-    if not question:
-        raise NotFound()
-    
-    if request.method == "POST":
-        question.text = request.form.get("text")
-        raw_images = request.form.get("question_images")
-        question_images = []
-        if raw_images:
-            for line in str(raw_images).splitlines():
-                for chunk in line.split(","):
-                    val = chunk.strip()
-                    if val:
-                        question_images.append(val)
-        question.question_images = question_images
-        question.hint = request.form.get("hint")
-        difficulty = (request.form.get("difficulty") or "medium").strip().lower()
-        if difficulty not in {"easy", "medium", "hard"}:
-            difficulty = "medium"
-        question.difficulty = difficulty
-        
-        choices_data = []
-        i = 0
-        while f"choice_{i}" in request.form:
-            choice_text = request.form.get(f"choice_{i}")
-            choice_image = (request.form.get(f"choice_{i}_image") or "").strip() or None
-            is_correct = request.form.get(f"is_correct_{i}") == "on"
-            if choice_text:
-                choices_data.append({
-                    "text": choice_text,
-                    "image_url": choice_image,
-                    "is_correct": is_correct
-                })
-            i += 1
-        
-        if not choices_data:
-            flash("يجب إضافة خيار واحد على الأقل.", "error")
-        else:
-            from .models import Choice
-            question.choices = [Choice(text=c["text"], image_url=c["image_url"], is_correct=c["is_correct"]) for c in choices_data]
-            correct_choice = next((c for c in question.choices if c.is_correct), None)
-            question.correct_choice_id = correct_choice.choice_id if correct_choice else None
-            question.save()
-            cache.delete(f"test_detail_{str(question.test_id.id)}")  # Clear test detail cache
-            flash("تم تحديث السؤال بنجاح.", "success")
-            return redirect(url_for("teacher.test_detail", test_id=str(question.test_id.id)))
-    
-    return render_template("teacher/question_edit.html", question=question)
 
 
 @teacher_bp.route("/questions/<question_id>/delete", methods=["POST"])

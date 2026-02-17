@@ -84,6 +84,11 @@
                         {% set c2 = choices[1] if choices|length > 1 else None %}
                         {% set c3 = choices[2] if choices|length > 2 else None %}
                         {% set c4 = choices[3] if choices|length > 3 else None %}
+                        {% set choices_json = '[' %}
+                        {% for ch in choices %}
+                          {% set choices_json = choices_json + '{"text":' + (ch.text|tojson) + ',"image_url":' + ((ch.image_url|tojson) if ch.image_url else 'null') + ',"is_correct":' + ('true' if ch.is_correct else 'false') + '}' + (',' if not loop.last else '') %}
+                        {% endfor %}
+                        {% set choices_json = choices_json + ']' %}
                         {% set correct_idx = namespace(value=0) %}
                         {% for ch in choices %}
                           {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
@@ -97,6 +102,7 @@
                           data-images='{{ (q.question_images or [])|tojson|e }}'
                           data-hint="{{ q.hint or '' }}"
                           data-difficulty="{{ q.difficulty or 'medium' }}"
+                          data-choices='{{ choices_json|e }}'
                           data-choice1="{{ c1.text if c1 else '' }}"
                           data-choice1img="{{ c1.image_url if c1 else '' }}"
                           data-choice2="{{ c2.text if c2 else '' }}"
@@ -143,18 +149,21 @@
 
                     <div class="mt-3">
                       <label class="form-label">الإجابات</label>
-                      <div class="row g-2">
+                      <div class="row g-2" id="choicesContainer">
                         {% for i in range(1,5) %}
-                        <div class="col-12">
+                        <div class="col-12 choice-row" data-choice-index="{{ i }}">
                           <div class="input-group">
                             <div class="input-group-text">
-                              <input class="form-check-input mt-0" type="radio" name="correct_choice" id="correct_choice_{{ i }}" value="{{ i }}" aria-label="Correct choice">
+                              <input class="form-check-input mt-0 choice-correct" type="radio" name="correct_choice" id="correct_choice_{{ i }}" value="{{ i }}" aria-label="Correct choice">
                             </div>
-                            <input type="text" class="form-control" name="choice_{{ i }}" id="choice_{{ i }}" placeholder="الخيار {{ i }}">
+                            <input type="text" class="form-control choice-text" name="choice_{{ i }}" id="choice_{{ i }}" placeholder="الخيار {{ i }}">
                           </div>
-                          <input type="text" class="form-control mt-2" name="choice_{{ i }}_image" id="choice_{{ i }}_image" placeholder="رابط صورة الخيار {{ i }} (اختياري)">
+                          <input type="text" class="form-control mt-2 choice-image" name="choice_{{ i }}_image" id="choice_{{ i }}_image" placeholder="رابط صورة الخيار {{ i }} (اختياري)">
                         </div>
                         {% endfor %}
+                      </div>
+                      <div class="d-flex gap-2 mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="addChoiceBtn">إضافة خيار</button>
                       </div>
                     </div>
 
@@ -285,9 +294,8 @@
     const questionImagesField = document.getElementById('question_images');
     const hintField = document.getElementById('question_hint');
     const difficultyField = document.getElementById('question_difficulty');
-    const choiceFields = [1,2,3,4].map(i => document.getElementById(`choice_${i}`));
-    const choiceImageFields = [1,2,3,4].map(i => document.getElementById(`choice_${i}_image`));
-    const correctRadios = [1,2,3,4].map(i => document.getElementById(`correct_choice_${i}`));
+    const choicesContainer = document.getElementById('choicesContainer');
+    const addChoiceBtn = document.getElementById('addChoiceBtn');
     const resetBtn = document.getElementById('resetBtn');
     const deleteBtn = document.getElementById('deleteBtn');
     const toggleHintBtn = document.getElementById('toggleHintBtn');
@@ -298,6 +306,55 @@
     const previewHint = document.getElementById('previewHint');
     const previewChoices = document.getElementById('previewChoices');
 
+    function getChoiceFields(){
+      return Array.from(document.querySelectorAll('.choice-text'));
+    }
+
+    function getChoiceImageFields(){
+      return Array.from(document.querySelectorAll('.choice-image'));
+    }
+
+    function getCorrectRadios(){
+      return Array.from(document.querySelectorAll('.choice-correct'));
+    }
+
+    function createChoiceRow(index, text, imageUrl, isCorrect){
+      const wrapper = document.createElement('div');
+      wrapper.className = 'col-12 choice-row';
+      wrapper.dataset.choiceIndex = index;
+      wrapper.innerHTML = `
+        <div class="input-group">
+          <div class="input-group-text">
+            <input class="form-check-input mt-0 choice-correct" type="radio" name="correct_choice" id="correct_choice_${index}" value="${index}" aria-label="Correct choice">
+          </div>
+          <input type="text" class="form-control choice-text" name="choice_${index}" id="choice_${index}" placeholder="الخيار ${index}">
+        </div>
+        <input type="text" class="form-control mt-2 choice-image" name="choice_${index}_image" id="choice_${index}_image" placeholder="رابط صورة الخيار ${index} (اختياري)">
+      `;
+      choicesContainer.appendChild(wrapper);
+      const textField = wrapper.querySelector('.choice-text');
+      const imageField = wrapper.querySelector('.choice-image');
+      const radioField = wrapper.querySelector('.choice-correct');
+      if (textField) textField.value = text || '';
+      if (imageField) imageField.value = imageUrl || '';
+      if (radioField) radioField.checked = Boolean(isCorrect);
+      if (textField) textField.addEventListener('input', updatePreview);
+      if (imageField) imageField.addEventListener('input', updatePreview);
+      if (radioField) radioField.addEventListener('change', updatePreview);
+    }
+
+    function resetChoices(){
+      if (!choicesContainer) return;
+      choicesContainer.innerHTML = '';
+    }
+
+    function seedDefaultChoices(){
+      resetChoices();
+      for (let i = 1; i <= 4; i += 1){
+        createChoiceRow(i, '', '', false);
+      }
+    }
+
     function fillFormFromOption(opt){
       if(!opt || !opt.value){
         idField.value = '';
@@ -305,9 +362,7 @@
         if (questionImagesField) questionImagesField.value = '';
         hintField.value = '';
         if (difficultyField) difficultyField.value = 'medium';
-        choiceFields.forEach(f => f.value='');
-        choiceImageFields.forEach(f => f.value='');
-        correctRadios.forEach(r => r.checked=false);
+        seedDefaultChoices();
         deleteBtn.disabled = true;
         updatePreview();
         return;
@@ -327,15 +382,31 @@
       }
       hintField.value = opt.dataset.hint || '';
       if (difficultyField) difficultyField.value = opt.dataset.difficulty || 'medium';
-      choiceFields.forEach((f, idx) => {
-        f.value = opt.dataset[`choice${idx+1}`] || '';
-      });
-      choiceImageFields.forEach((f, idx) => {
-        f.value = opt.dataset[`choice${idx+1}img`] || '';
-      });
-      correctRadios.forEach(r => r.checked = false);
-      const cIdx = parseInt(opt.dataset.correct || '0');
-      if(cIdx >=1 && cIdx <=4){ correctRadios[cIdx-1].checked = true; }
+      let choicesData = [];
+      if (opt.dataset.choices) {
+        try {
+          choicesData = JSON.parse(opt.dataset.choices) || [];
+        } catch (err) {
+          choicesData = [];
+        }
+      }
+      if (choicesData.length === 0) {
+        const fallback = [
+          { text: opt.dataset.choice1 || '', image_url: opt.dataset.choice1img || '', is_correct: false },
+          { text: opt.dataset.choice2 || '', image_url: opt.dataset.choice2img || '', is_correct: false },
+          { text: opt.dataset.choice3 || '', image_url: opt.dataset.choice3img || '', is_correct: false },
+          { text: opt.dataset.choice4 || '', image_url: opt.dataset.choice4img || '', is_correct: false }
+        ].filter(c => c.text);
+        choicesData = fallback;
+      }
+      resetChoices();
+      if (choicesData.length === 0) {
+        seedDefaultChoices();
+      } else {
+        choicesData.forEach((choice, idx) => {
+          createChoiceRow(idx + 1, choice.text, choice.image_url, choice.is_correct);
+        });
+      }
       deleteBtn.disabled = false;
       updatePreview();
     }
@@ -366,10 +437,12 @@
       if(previewHint) previewHint.textContent = hintField.value || '';
       if(previewChoices){
         previewChoices.innerHTML = '';
-        choiceFields.forEach((field, idx) => {
+        const fields = getChoiceFields();
+        const radios = getCorrectRadios();
+        fields.forEach((field, idx) => {
           if(!field.value) return;
           const li = document.createElement('li');
-          const prefix = correctRadios[idx] && correctRadios[idx].checked ? '✅ ' : '';
+          const prefix = radios[idx] && radios[idx].checked ? '✅ ' : '';
           li.textContent = `${prefix}${field.value}`;
           previewChoices.appendChild(li);
         });
@@ -379,11 +452,24 @@
       }
     }
 
-    [questionField, questionImagesField, hintField, ...choiceFields, ...choiceImageFields].forEach(el => {
+    [questionField, questionImagesField, hintField].forEach(el => {
       if (!el) return;
       el.addEventListener('input', updatePreview);
     });
-    correctRadios.forEach(r => r.addEventListener('change', updatePreview));
+
+    function bindChoiceListeners(){
+      getChoiceFields().forEach(el => el.addEventListener('input', updatePreview));
+      getChoiceImageFields().forEach(el => el.addEventListener('input', updatePreview));
+      getCorrectRadios().forEach(r => r.addEventListener('change', updatePreview));
+    }
+
+    if (addChoiceBtn) {
+      addChoiceBtn.addEventListener('click', () => {
+        const count = document.querySelectorAll('.choice-row').length;
+        createChoiceRow(count + 1, '', '', false);
+        bindChoiceListeners();
+      });
+    }
 
     if(toggleHintBtn && hintWrapper){
       toggleHintBtn.addEventListener('click', ()=>{
@@ -412,6 +498,8 @@
     }
     window.selectQuestion = selectQuestion;
 
+    seedDefaultChoices();
+    bindChoiceListeners();
     fillFormFromOption(selectEl.selectedOptions[0]);
     updatePreview();
   </script>
