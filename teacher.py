@@ -1115,7 +1115,7 @@ def edit_test(test_id):
                     q.delete()
 
             flash("تم حفظ الأسئلة بنجاح.", "success")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
+            return redirect(url_for("teacher.edit_test", test_id=test.id, draft="refresh"))
 
         elif form_name == "import_json":
             def _to_bool(val):
@@ -1199,9 +1199,12 @@ def edit_test(test_id):
                         if isinstance(c, int):
                             correct_indices.add(c if c >= 1 else c + 1)
                 elif isinstance(correct, str):
-                    for idx, opt in enumerate(choices_list, start=1):
-                        if str(opt).strip() == correct.strip():
-                            correct_indices.add(idx)
+                    if correct.strip().isdigit():
+                        correct_indices.add(int(correct.strip()))
+                    else:
+                        for idx, opt in enumerate(choices_list, start=1):
+                            if str(opt).strip() == correct.strip():
+                                correct_indices.add(idx)
 
                 choices = []
                 has_correct = False
@@ -1273,7 +1276,7 @@ def edit_test(test_id):
                 imported += 1
 
             flash(f"تم استيراد {imported} سؤال.", "success")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
+            return redirect(url_for("teacher.edit_test", test_id=test.id, draft="refresh"))
     elif request.method == "GET":
         form.title.data = test.title
         form.description.data = test.description
