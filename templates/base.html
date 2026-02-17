@@ -64,11 +64,6 @@
 
   <main class="container py-4 flex-grow-1">
     {% set hide_back = request.endpoint in ['index', 'auth.login', 'auth.register'] or request.path == '/' %}
-    {% if not hide_back %}
-      <div class="d-flex justify-content-start mb-3">
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="upNavigate()">رجوع</button>
-      </div>
-    {% endif %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
