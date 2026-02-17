@@ -232,44 +232,17 @@
 </style>
 
 <script>
-    window.MathJax = {
-        tex: {
-            inlineMath: [['$', '$'], ['\\(', '\\)']],
-            displayMath: [['$$', '$$'], ['\\[', '\\]']],
-            processEscapes: true
-        },
-        options: {
-            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
-        },
-        startup: {
-            typeset: false
-        }
-    };
-</script>
-<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-
-<script>
     document.addEventListener('DOMContentLoaded', function() {
         // Flashcard flip functionality
         const flashcards = document.querySelectorAll('.flashcard-wrapper');
 
-        function typesetMath(rootElement) {
-            if (!window.MathJax) {
-                return;
-            }
-
-            if (MathJax.typesetPromise) {
-                MathJax.typesetPromise(rootElement ? [rootElement] : undefined);
-                return;
-            }
-
-            if (MathJax.startup && MathJax.startup.promise) {
-                MathJax.startup.promise.then(() => {
-                    if (MathJax.typesetPromise) {
-                        MathJax.typesetPromise(rootElement ? [rootElement] : undefined);
-                    }
-                });
+        function renderMathSafe(rootElement) {
+            if (!window.renderMath) return;
+            const ok = window.renderMath(rootElement || document.body);
+            if (!ok) {
+                setTimeout(() => {
+                    if (window.renderMath) window.renderMath(rootElement || document.body);
+                }, 200);
             }
         }
 
@@ -279,13 +252,13 @@
                 this.querySelector('.flashcard-inner').classList.toggle('flipped');
                 // Re-render math when card is flipped to show answer
                 setTimeout(() => {
-                    typesetMath(this.querySelector('.flashcard-inner'));
+                    renderMathSafe(this.querySelector('.flashcard-inner'));
                 }, 50);
             });
         });
 
         // Initial render of all math
-        typesetMath(document.body);
+        renderMathSafe(document.body);
     });
 </script>
 {% endblock %}
