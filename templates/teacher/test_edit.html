@@ -118,17 +118,21 @@
                     </select>
                   </div>
 
-                  <form method="post" id="batchDeleteForm" class="mb-3">
-                    <input type="hidden" name="form_name" value="batch_delete_questions" />
-                    <input type="hidden" name="question_ids" id="batchQuestionIds" />
+                  <form method="post" id="saveTestQuestionsForm" class="mb-3">
+                    <input type="hidden" name="form_name" value="save_test_questions" />
+                    <input type="hidden" name="draft_questions" id="draftQuestionsField" />
                     <div class="d-flex flex-wrap gap-2 align-items-center">
-                      <button type="button" class="btn btn-outline-danger btn-sm" id="batchDeleteBtn" disabled>حذف الأسئلة المحددة</button>
-                      <span class="small text-muted">حدد الأسئلة من القائمة أدناه.</span>
+                      <button type="button" class="btn btn-success btn-sm" id="saveTestBtn">حفظ الاختبار</button>
+                      <span class="small text-muted">يرفع جميع الأسئلة دفعة واحدة.</span>
                     </div>
                   </form>
 
+                  <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="batchDeleteBtn" disabled>حذف الأسئلة المحددة</button>
+                    <span class="small text-muted">حدد الأسئلة من القائمة أدناه.</span>
+                  </div>
+
                   <form method="post" id="questionForm">
-                    <input type="hidden" name="form_name" value="upsert_question" />
                     <input type="hidden" name="question_id" id="question_id" />
                     <div class="mb-3">
                       <label class="form-label">السؤال</label>
@@ -179,7 +183,7 @@
                     </div>
 
                     <div class="d-flex gap-2 mt-3">
-                      <button type="submit" class="btn btn-primary w-100">حفظ السؤال</button>
+                      <button type="button" class="btn btn-primary w-100" id="saveQuestionBtn">حفظ السؤال</button>
                       <button type="button" id="resetBtn" class="btn btn-outline-secondary">تفريغ</button>
                     </div>
                     <div class="d-flex gap-2 mt-2">
@@ -211,43 +215,8 @@
                     <h6 class="card-title mb-0">قائمة الأسئلة</h6>
                     <span class="badge text-bg-secondary">{{ test.questions|length }}</span>
                   </div>
-                  {% if test.questions %}
-                    <div class="list-group list-group-flush">
-                      {% for q in test.questions %}
-                        {% set choices = q.choices|list %}
-                        {% set correct_idx = namespace(value=0) %}
-                        {% for ch in choices %}
-                          {% if q.correct_choice_id and ch.choice_id == q.correct_choice_id %}
-                            {% set correct_idx.value = loop.index %}
-                          {% elif ch.is_correct %}
-                            {% set correct_idx.value = loop.index %}
-                          {% endif %}
-                        {% endfor %}
-                        {% set diff_label = 'متوسط' %}
-                        {% if q.difficulty == 'easy' %}{% set diff_label = 'سهل' %}{% endif %}
-                        {% if q.difficulty == 'hard' %}{% set diff_label = 'صعب' %}{% endif %}
-                        <div class="list-group-item">
-                          <div class="d-flex align-items-start gap-2">
-                            <input class="form-check-input mt-1 question-select" type="checkbox" value="{{ q.id }}" aria-label="Select question" />
-                            <button class="btn btn-link p-0 text-start flex-grow-1 text-decoration-none" type="button" onclick="selectQuestion('{{ q.id }}')">
-                              <div class="d-flex justify-content-between align-items-start">
-                                <div class="me-2">
-                                  <div class="fw-semibold">س{{ loop.index }}. {{ q.text }}</div>
-                                  {% if q.hint %}
-                                    <div class="small text-muted">التلميح: {{ q.hint }}</div>
-                                  {% endif %}
-                                  <div class="small text-muted">صحيح: {{ choices[correct_idx.value-1].text if correct_idx.value > 0 else 'غير محدد' }}</div>
-                                </div>
-                                <span class="badge text-bg-light">{{ diff_label }}</span>
-                              </div>
-                            </button>
-                          </div>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  {% else %}
-                    <div class="alert alert-info mb-0">لا توجد أسئلة حتى الآن. قم بإضافة سؤالك الأول.</div>
-                  {% endif %}
+                  <div class="list-group list-group-flush" id="questionList"></div>
+                  <div class="alert alert-info mb-0 d-none" id="emptyQuestions">لا توجد أسئلة حتى الآن. قم بإضافة سؤالك الأول.</div>
                 </div>
               </div>
             </div>
@@ -314,9 +283,16 @@
     const addChoiceBtn = document.getElementById('addChoiceBtn');
     const removeChoiceBtn = document.getElementById('removeChoiceBtn');
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
-    const batchQuestionIds = document.getElementById('batchQuestionIds');
     const resetBtn = document.getElementById('resetBtn');
     const deleteBtn = document.getElementById('deleteBtn');
+    const saveQuestionBtn = document.getElementById('saveQuestionBtn');
+    const saveTestBtn = document.getElementById('saveTestBtn');
+    const questionForm = document.getElementById('questionForm');
+    const saveTestForm = document.getElementById('saveTestQuestionsForm');
+    const draftQuestionsField = document.getElementById('draftQuestionsField');
+    const questionList = document.getElementById('questionList');
+    const emptyQuestions = document.getElementById('emptyQuestions');
+    const testId = "{{ test.id }}";
     const toggleHintBtn = document.getElementById('toggleHintBtn');
     const hintWrapper = document.getElementById('hintWrapper');
     const toggleImportHintBtn = document.getElementById('toggleImportHintBtn');
@@ -335,6 +311,138 @@
 
     function getCorrectRadios(){
       return Array.from(document.querySelectorAll('.choice-correct'));
+    }
+
+    let draftQuestions = [];
+    const draftKey = `test_draft_${testId}`;
+
+    function buildDraftFromOptions(){
+      return Array.from(selectEl.options)
+        .filter(opt => opt.value)
+        .map((opt) => {
+          let images = [];
+          if (opt.dataset.images) {
+            try {
+              images = JSON.parse(opt.dataset.images) || [];
+            } catch (err) {
+              images = [];
+            }
+          }
+          let choices = [];
+          if (opt.dataset.choices) {
+            try {
+              choices = JSON.parse(opt.dataset.choices) || [];
+            } catch (err) {
+              choices = [];
+            }
+          }
+          if (choices.length === 0) {
+            const fallback = [
+              { text: opt.dataset.choice1 || '', image_url: opt.dataset.choice1img || '', is_correct: false },
+              { text: opt.dataset.choice2 || '', image_url: opt.dataset.choice2img || '', is_correct: false },
+              { text: opt.dataset.choice3 || '', image_url: opt.dataset.choice3img || '', is_correct: false },
+              { text: opt.dataset.choice4 || '', image_url: opt.dataset.choice4img || '', is_correct: false }
+            ].filter(c => c.text);
+            choices = fallback;
+          }
+          return {
+            id: opt.value,
+            text: opt.dataset.text || '',
+            hint: opt.dataset.hint || '',
+            difficulty: opt.dataset.difficulty || 'medium',
+            question_images: images,
+            choices: choices
+          };
+        });
+    }
+
+    function loadDraft(){
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            draftQuestions = parsed;
+            return;
+          }
+        } catch (err) {
+          // ignore invalid cache
+        }
+      }
+      draftQuestions = buildDraftFromOptions();
+    }
+
+    function saveDraft(){
+      localStorage.setItem(draftKey, JSON.stringify(draftQuestions));
+    }
+
+    function rebuildQuestionSelect(){
+      const current = selectEl.value;
+      selectEl.innerHTML = '';
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = 'سؤال جديد';
+      selectEl.appendChild(emptyOpt);
+      draftQuestions.forEach((q, idx) => {
+        const opt = document.createElement('option');
+        opt.value = q.id;
+        opt.dataset.text = q.text || '';
+        opt.dataset.hint = q.hint || '';
+        opt.dataset.difficulty = q.difficulty || 'medium';
+        opt.dataset.images = JSON.stringify(q.question_images || []);
+        opt.dataset.choices = JSON.stringify(q.choices || []);
+        opt.textContent = `Q${idx + 1} - ${q.text ? q.text.slice(0, 40) : ''}${q.text && q.text.length > 40 ? '...' : ''}`;
+        selectEl.appendChild(opt);
+      });
+      if (current && Array.from(selectEl.options).some(opt => opt.value === current)) {
+        selectEl.value = current;
+      } else {
+        selectEl.value = '';
+      }
+    }
+
+    function renderQuestionList(){
+      if (!questionList) return;
+      questionList.innerHTML = '';
+      if (draftQuestions.length === 0) {
+        if (emptyQuestions) emptyQuestions.classList.remove('d-none');
+        return;
+      }
+      if (emptyQuestions) emptyQuestions.classList.add('d-none');
+      draftQuestions.forEach((q, idx) => {
+        const correct = (q.choices || []).find(c => c.is_correct);
+        const diffLabel = q.difficulty === 'easy' ? 'سهل' : q.difficulty === 'hard' ? 'صعب' : 'متوسط';
+        const item = document.createElement('div');
+        item.className = 'list-group-item';
+        item.innerHTML = `
+          <div class="d-flex align-items-start gap-2">
+            <input class="form-check-input mt-1 question-select" type="checkbox" value="${q.id}" aria-label="Select question" />
+            <button class="btn btn-link p-0 text-start flex-grow-1 text-decoration-none" type="button" data-question-id="${q.id}">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="me-2">
+                  <div class="fw-semibold">س${idx + 1}. ${q.text || ''}</div>
+                  ${q.hint ? `<div class="small text-muted">التلميح: ${q.hint}</div>` : ''}
+                  <div class="small text-muted">صحيح: ${correct ? correct.text : 'غير محدد'}</div>
+                </div>
+                <span class="badge text-bg-light">${diffLabel}</span>
+              </div>
+            </button>
+          </div>
+        `;
+        questionList.appendChild(item);
+      });
+
+      questionList.querySelectorAll('button[data-question-id]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          selectQuestion(btn.dataset.questionId);
+        });
+      });
+
+      questionList.querySelectorAll('.question-select').forEach((el) => {
+        el.addEventListener('change', updateBatchDeleteState);
+      });
+
+      updateBatchDeleteState();
     }
 
     function createChoiceRow(index, text, imageUrl, isCorrect){
@@ -425,9 +533,63 @@
         choicesData.forEach((choice, idx) => {
           createChoiceRow(idx + 1, choice.text, choice.image_url, choice.is_correct);
         });
+        const rows = document.querySelectorAll('.choice-row');
+        if (rows.length < 2) {
+          for (let i = rows.length + 1; i <= 2; i += 1) {
+            createChoiceRow(i, '', '', false);
+          }
+        }
       }
       deleteBtn.disabled = false;
       updatePreview();
+    }
+
+    function collectQuestionFromForm(){
+      const text = (questionField.value || '').trim();
+      const hint = (hintField.value || '').trim();
+      const difficulty = (difficultyField && difficultyField.value) ? difficultyField.value : 'medium';
+      const images = (questionImagesField && questionImagesField.value)
+        ? questionImagesField.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean)
+        : [];
+
+      const fields = getChoiceFields();
+      const imageFields = getChoiceImageFields();
+      const radios = getCorrectRadios();
+      const choices = [];
+      fields.forEach((field, idx) => {
+        const val = (field.value || '').trim();
+        if (!val) return;
+        const imageVal = imageFields[idx] ? (imageFields[idx].value || '').trim() : '';
+        choices.push({
+          text: val,
+          image_url: imageVal || null,
+          is_correct: Boolean(radios[idx] && radios[idx].checked)
+        });
+      });
+
+      if (!text) {
+        alert('نص السؤال مطلوب.');
+        return null;
+      }
+
+      if (choices.length < 2) {
+        alert('يجب إضافة خيارين على الأقل.');
+        return null;
+      }
+
+      if (!choices.some(c => c.is_correct)) {
+        choices[0].is_correct = true;
+      }
+
+      const id = idField.value || `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      return {
+        id,
+        text,
+        hint,
+        difficulty,
+        question_images: images,
+        choices
+      };
     }
 
     selectEl.addEventListener('change', (e)=>{
@@ -443,13 +605,46 @@
     deleteBtn.addEventListener('click', ()=>{
       const qid = idField.value;
       if(!qid) return;
-      if(!confirm('Delete this question?')) return;
-      const form = document.createElement('form');
-      form.method = 'post';
-      form.innerHTML = `<input type="hidden" name="form_name" value="delete_question"/><input type="hidden" name="question_id" value="${qid}"/>`;
-      document.body.appendChild(form);
-      form.submit();
+      if(!confirm('حذف السؤال؟')) return;
+      draftQuestions = draftQuestions.filter(q => q.id !== qid);
+      saveDraft();
+      rebuildQuestionSelect();
+      renderQuestionList();
+      selectEl.value = '';
+      fillFormFromOption(selectEl.selectedOptions[0]);
     });
+
+    if (saveQuestionBtn) {
+      saveQuestionBtn.addEventListener('click', () => {
+        const draft = collectQuestionFromForm();
+        if (!draft) return;
+        const idx = draftQuestions.findIndex(q => q.id === draft.id);
+        if (idx >= 0) {
+          draftQuestions[idx] = draft;
+        } else {
+          draftQuestions.push(draft);
+        }
+        saveDraft();
+        rebuildQuestionSelect();
+        renderQuestionList();
+        selectEl.value = draft.id;
+        fillFormFromOption(selectEl.selectedOptions[0]);
+      });
+    }
+
+    if (questionForm) {
+      questionForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (saveQuestionBtn) saveQuestionBtn.click();
+      });
+    }
+
+    if (saveTestBtn && saveTestForm && draftQuestionsField) {
+      saveTestBtn.addEventListener('click', () => {
+        draftQuestionsField.value = JSON.stringify(draftQuestions);
+        saveTestForm.submit();
+      });
+    }
 
     function updatePreview(){
       if(previewQuestion) previewQuestion.textContent = questionField.value || '';
@@ -506,21 +701,26 @@
     }
 
     function updateBatchDeleteState(){
-      if (!batchDeleteBtn || !batchQuestionIds) return;
+      if (!batchDeleteBtn) return [];
       const selected = Array.from(document.querySelectorAll('.question-select:checked')).map(el => el.value);
-      batchQuestionIds.value = selected.join(',');
       batchDeleteBtn.disabled = selected.length === 0;
+      return selected;
     }
-
-    document.querySelectorAll('.question-select').forEach((el) => {
-      el.addEventListener('change', updateBatchDeleteState);
-    });
 
     if (batchDeleteBtn) {
       batchDeleteBtn.addEventListener('click', () => {
         if (batchDeleteBtn.disabled) return;
         if (!confirm('حذف الأسئلة المحددة؟')) return;
-        document.getElementById('batchDeleteForm').submit();
+        const selected = updateBatchDeleteState();
+        if (selected.length === 0) return;
+        draftQuestions = draftQuestions.filter(q => !selected.includes(q.id));
+        saveDraft();
+        rebuildQuestionSelect();
+        renderQuestionList();
+        if (selected.includes(idField.value)) {
+          selectEl.value = '';
+          fillFormFromOption(selectEl.selectedOptions[0]);
+        }
       });
     }
 
@@ -551,10 +751,13 @@
     }
     window.selectQuestion = selectQuestion;
 
+    loadDraft();
+    saveDraft();
+    rebuildQuestionSelect();
+    renderQuestionList();
     seedDefaultChoices();
     bindChoiceListeners();
     fillFormFromOption(selectEl.selectedOptions[0]);
     updatePreview();
-    updateBatchDeleteState();
   </script>
   {% endblock %}

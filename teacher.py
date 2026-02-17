@@ -1008,6 +1008,115 @@ def edit_test(test_id):
                 flash("لم يتم اختيار أي سؤال.", "warning")
             return redirect(url_for("teacher.edit_test", test_id=test.id))
 
+        elif form_name == "save_test_questions":
+            raw_questions = request.form.get("draft_questions") or "[]"
+            try:
+                items = json.loads(raw_questions)
+            except Exception as exc:
+                flash(f"فشل حفظ الأسئلة: {exc}", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            if not isinstance(items, list):
+                flash("تنسيق الأسئلة غير صالح.", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            sanitized = []
+            for idx, item in enumerate(items, start=1):
+                if not isinstance(item, dict):
+                    continue
+                text = (item.get("text") or "").strip()
+                if not text:
+                    flash(f"نص السؤال مطلوب (سؤال {idx}).", "error")
+                    return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+                question_images = item.get("question_images") or []
+                if not isinstance(question_images, list):
+                    question_images = [question_images]
+                question_images = [str(u).strip() for u in question_images if str(u).strip()]
+
+                hint = (item.get("hint") or "").strip() or None
+                difficulty = (item.get("difficulty") or "medium").strip().lower()
+                if difficulty not in {"easy", "medium", "hard"}:
+                    difficulty = "medium"
+
+                choices_in = item.get("choices") or []
+                if not isinstance(choices_in, list):
+                    choices_in = []
+                choices = []
+                for choice in choices_in:
+                    if not isinstance(choice, dict):
+                        continue
+                    choice_text = str(choice.get("text") or "").strip()
+                    if not choice_text:
+                        continue
+                    choice_image = choice.get("image_url")
+                    choice_image = str(choice_image).strip() if choice_image else None
+                    is_correct = bool(choice.get("is_correct"))
+                    choices.append({
+                        "text": choice_text,
+                        "image_url": choice_image,
+                        "is_correct": is_correct,
+                    })
+
+                if len(choices) < 2:
+                    flash(f"يجب أن يحتوي كل سؤال على خيارين على الأقل (سؤال {idx}).", "error")
+                    return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+                if not any(c["is_correct"] for c in choices):
+                    choices[0]["is_correct"] = True
+
+                sanitized.append({
+                    "id": item.get("id"),
+                    "text": text,
+                    "question_images": question_images,
+                    "hint": hint,
+                    "difficulty": difficulty,
+                    "choices": choices,
+                })
+
+            existing = {str(q.id): q for q in Question.objects(test_id=test.id).all()}
+            keep_ids = set()
+            for item in sanitized:
+                q_id = str(item.get("id") or "")
+                question = existing.get(q_id)
+                choices_docs = [
+                    Choice(
+                        text=c["text"],
+                        image_url=c["image_url"],
+                        is_correct=c["is_correct"],
+                    )
+                    for c in item["choices"]
+                ]
+                correct_choice = next((c for c in choices_docs if c.is_correct), None)
+                if question:
+                    question.text = item["text"]
+                    question.question_images = item["question_images"]
+                    question.hint = item["hint"]
+                    question.difficulty = item["difficulty"]
+                    question.choices = choices_docs
+                    question.correct_choice_id = correct_choice.choice_id if correct_choice else None
+                    question.save()
+                    keep_ids.add(str(question.id))
+                else:
+                    question = Question(
+                        test_id=test.id,
+                        text=item["text"],
+                        question_images=item["question_images"],
+                        hint=item["hint"],
+                        difficulty=item["difficulty"],
+                        choices=choices_docs,
+                        correct_choice_id=correct_choice.choice_id if correct_choice else None,
+                    )
+                    question.save()
+                    keep_ids.add(str(question.id))
+
+            for q in existing.values():
+                if str(q.id) not in keep_ids:
+                    q.delete()
+
+            flash("تم حفظ الأسئلة بنجاح.", "success")
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
+
         elif form_name == "import_json":
             def _to_bool(val):
                 if isinstance(val, bool):
