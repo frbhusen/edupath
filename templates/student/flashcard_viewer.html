@@ -150,16 +150,15 @@
 
     .flashcard-content {
         flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        width: 100%;
+        display: block;
         text-align: center;
         direction: rtl;
+        unicode-bidi: plaintext;
         font-size: 1.02rem;
         line-height: 1.7;
         word-wrap: break-word;
         overflow-wrap: break-word;
-        gap: 6px;
     }
 
     .flashcard-content .katex {
@@ -167,7 +166,7 @@
         unicode-bidi: isolate;
         display: inline-block;
         vertical-align: middle;
-        margin: 0 4px;
+        margin: 0 2px;
     }
 
     .flashcard-content .katex-display {
