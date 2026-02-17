@@ -443,6 +443,9 @@
       });
 
       updateBatchDeleteState();
+      if (window.renderMath) {
+        window.renderMath(questionList);
+      }
     }
 
     function createChoiceRow(index, text, imageUrl, isCorrect){
@@ -661,8 +664,8 @@
           previewChoices.appendChild(li);
         });
       }
-      if(window.MathJax && MathJax.typesetPromise){
-        MathJax.typesetPromise([previewQuestion, previewHint, previewChoices]);
+      if (window.renderMath) {
+        window.renderMath(previewQuestion?.parentElement || document.body);
       }
     }
 

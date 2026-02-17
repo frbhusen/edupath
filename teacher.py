@@ -1206,7 +1206,7 @@ def edit_test(test_id):
                 choices = []
                 has_correct = False
                 if answer_options is not None:
-                    for opt in answer_options[:4]:
+                    for idx, opt in enumerate(answer_options, start=1):
                         if not isinstance(opt, dict):
                             continue
                         opt_text = str(opt.get("text", "")).strip()
@@ -1221,6 +1221,12 @@ def edit_test(test_id):
                         )
                         opt_image = str(opt_image).strip() if opt_image else None
                         is_correct = _to_bool(opt.get("isCorrect") if "isCorrect" in opt else opt.get("is_correct"))
+                        if not is_correct and correct_indices:
+                            if idx in correct_indices:
+                                is_correct = True
+                        if not is_correct and isinstance(correct, str) and correct.strip():
+                            if opt_text == correct.strip():
+                                is_correct = True
                         if is_correct:
                             has_correct = True
                         choices.append(Choice(text=opt_text, image_url=opt_image, is_correct=is_correct))
