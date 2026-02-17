@@ -73,10 +73,13 @@
 
 <div class="row g-3">
   <div class="col-12">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="card-title mb-0">الاختبارات</h5>
-      <span class="badge text-bg-secondary">{{ tests_data|length }}</span>
-    </div>
+    {% set section_wide_tests = tests_data|selectattr('test.lesson', 'equalto', None)|list %}
+    {% if section_wide_tests|length > 0 %}
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="card-title mb-0">الاختبارات</h5>
+        <span class="badge text-bg-secondary">{{ tests_data|length }}</span>
+      </div>
+    {% endif %}
     <div class="row g-3">
       {% if tests_data %}
         {% for item in tests_data %}
