@@ -118,6 +118,15 @@
                     </select>
                   </div>
 
+                  <form method="post" id="batchDeleteForm" class="mb-3">
+                    <input type="hidden" name="form_name" value="batch_delete_questions" />
+                    <input type="hidden" name="question_ids" id="batchQuestionIds" />
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                      <button type="button" class="btn btn-outline-danger btn-sm" id="batchDeleteBtn" disabled>حذف الأسئلة المحددة</button>
+                      <span class="small text-muted">حدد الأسئلة من القائمة أدناه.</span>
+                    </div>
+                  </form>
+
                   <form method="post" id="questionForm">
                     <input type="hidden" name="form_name" value="upsert_question" />
                     <input type="hidden" name="question_id" id="question_id" />
@@ -164,6 +173,8 @@
                       </div>
                       <div class="d-flex gap-2 mt-2">
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="addChoiceBtn">إضافة خيار</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="removeChoiceBtn">حذف خيار</button>
+                        <span class="small text-muted">الحد الأدنى: خياران.</span>
                       </div>
                     </div>
 
@@ -215,18 +226,23 @@
                         {% set diff_label = 'متوسط' %}
                         {% if q.difficulty == 'easy' %}{% set diff_label = 'سهل' %}{% endif %}
                         {% if q.difficulty == 'hard' %}{% set diff_label = 'صعب' %}{% endif %}
-                        <button class="list-group-item list-group-item-action" type="button" onclick="selectQuestion('{{ q.id }}')">
-                          <div class="d-flex justify-content-between align-items-start">
-                            <div class="me-2">
-                              <div class="fw-semibold">س{{ loop.index }}. {{ q.text }}</div>
-                              {% if q.hint %}
-                                <div class="small text-muted">التلميح: {{ q.hint }}</div>
-                              {% endif %}
-                              <div class="small text-muted">صحيح: {{ choices[correct_idx.value-1].text if correct_idx.value > 0 else 'غير محدد' }}</div>
-                            </div>
-                            <span class="badge text-bg-light">{{ diff_label }}</span>
+                        <div class="list-group-item">
+                          <div class="d-flex align-items-start gap-2">
+                            <input class="form-check-input mt-1 question-select" type="checkbox" value="{{ q.id }}" aria-label="Select question" />
+                            <button class="btn btn-link p-0 text-start flex-grow-1 text-decoration-none" type="button" onclick="selectQuestion('{{ q.id }}')">
+                              <div class="d-flex justify-content-between align-items-start">
+                                <div class="me-2">
+                                  <div class="fw-semibold">س{{ loop.index }}. {{ q.text }}</div>
+                                  {% if q.hint %}
+                                    <div class="small text-muted">التلميح: {{ q.hint }}</div>
+                                  {% endif %}
+                                  <div class="small text-muted">صحيح: {{ choices[correct_idx.value-1].text if correct_idx.value > 0 else 'غير محدد' }}</div>
+                                </div>
+                                <span class="badge text-bg-light">{{ diff_label }}</span>
+                              </div>
+                            </button>
                           </div>
-                        </button>
+                        </div>
                       {% endfor %}
                     </div>
                   {% else %}
@@ -296,6 +312,9 @@
     const difficultyField = document.getElementById('question_difficulty');
     const choicesContainer = document.getElementById('choicesContainer');
     const addChoiceBtn = document.getElementById('addChoiceBtn');
+    const removeChoiceBtn = document.getElementById('removeChoiceBtn');
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    const batchQuestionIds = document.getElementById('batchQuestionIds');
     const resetBtn = document.getElementById('resetBtn');
     const deleteBtn = document.getElementById('deleteBtn');
     const toggleHintBtn = document.getElementById('toggleHintBtn');
@@ -471,6 +490,40 @@
       });
     }
 
+    if (removeChoiceBtn) {
+      removeChoiceBtn.addEventListener('click', () => {
+        const rows = document.querySelectorAll('.choice-row');
+        if (rows.length <= 2) {
+          alert('لا يمكن أن يقل عدد الخيارات عن خيارين.');
+          return;
+        }
+        const last = rows[rows.length - 1];
+        if (last) {
+          last.remove();
+          updatePreview();
+        }
+      });
+    }
+
+    function updateBatchDeleteState(){
+      if (!batchDeleteBtn || !batchQuestionIds) return;
+      const selected = Array.from(document.querySelectorAll('.question-select:checked')).map(el => el.value);
+      batchQuestionIds.value = selected.join(',');
+      batchDeleteBtn.disabled = selected.length === 0;
+    }
+
+    document.querySelectorAll('.question-select').forEach((el) => {
+      el.addEventListener('change', updateBatchDeleteState);
+    });
+
+    if (batchDeleteBtn) {
+      batchDeleteBtn.addEventListener('click', () => {
+        if (batchDeleteBtn.disabled) return;
+        if (!confirm('حذف الأسئلة المحددة؟')) return;
+        document.getElementById('batchDeleteForm').submit();
+      });
+    }
+
     if(toggleHintBtn && hintWrapper){
       toggleHintBtn.addEventListener('click', ()=>{
         hintWrapper.classList.toggle('d-none');
@@ -502,5 +555,6 @@
     bindChoiceListeners();
     fillFormFromOption(selectEl.selectedOptions[0]);
     updatePreview();
+    updateBatchDeleteState();
   </script>
   {% endblock %}

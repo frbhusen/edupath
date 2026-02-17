@@ -998,6 +998,16 @@ def edit_test(test_id):
                     flash("تم حذف السؤال.", "success")
             return redirect(url_for("teacher.edit_test", test_id=test.id))
 
+        elif form_name == "batch_delete_questions":
+            raw_ids = request.form.get("question_ids") or ""
+            question_ids = [qid for qid in raw_ids.split(",") if qid.strip()]
+            if question_ids:
+                deleted = Question.objects(id__in=question_ids, test_id=test.id).delete()
+                flash(f"تم حذف {deleted} سؤال.", "success")
+            else:
+                flash("لم يتم اختيار أي سؤال.", "warning")
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
+
         elif form_name == "import_json":
             def _to_bool(val):
                 if isinstance(val, bool):
