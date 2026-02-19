@@ -24,7 +24,7 @@
         {% for attempt in attempts %}
           {% set pct = (attempt.score / attempt.total * 100) if attempt.total else 0 %}
           <tr>
-            <td>{{ attempt.test.title if attempt.test else 'اختبار غير متوفر' }}</td>
+            <td>{{ attempt.test.title if attempt.test else 'اختبار مخصص' }}</td>
             <td class="text-muted small">
               {% if attempt.test and attempt.test.section %}
                 {{ attempt.test.section.title }}{% if attempt.test.lesson %} · {{ attempt.test.lesson.title }}{% else %} · Section-wide{% endif %}
