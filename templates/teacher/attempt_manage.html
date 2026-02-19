@@ -22,7 +22,7 @@
 </div>
 
 <form method="post">
-  <input type="hidden" name="action" value="update" />
+  <input type="hidden" name="action" value="save_scores" />
   {% for q in questions %}
     {% set ans = answers.get(q.id) %}
     <div class="card mb-2">
@@ -30,8 +30,8 @@
         <div class="fw-semibold mb-2">Q{{ loop.index }}. {{ q.text }}</div>
         {% for choice in q.choices %}
           <div class="form-check">
-            <input class="form-check-input" type="radio" name="question_{{ q.id }}" id="q{{ q.id }}c{{ choice.id }}" value="{{ choice.id }}" {% if ans and ans.choice_id == choice.id %}checked{% endif %}>
-            <label class="form-check-label" for="q{{ q.id }}c{{ choice.id }}">{{ choice.text }}{% if choice.is_correct %} <span class="text-success small">(correct)</span>{% endif %}</label>
+            <input class="form-check-input" type="radio" name="question_{{ q.id }}" id="q{{ q.id }}c{{ choice.choice_id }}" value="{{ choice.choice_id }}" {% if ans and ans.choice_id == choice.choice_id %}checked{% endif %}>
+            <label class="form-check-label" for="q{{ q.id }}c{{ choice.choice_id }}">{{ choice.text }}{% if choice.is_correct %} <span class="text-success small">(correct)</span>{% endif %}</label>
           </div>
         {% endfor %}
       </div>

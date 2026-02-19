@@ -202,7 +202,6 @@ def student_results(student_id):
         has_prev=has_prev,
         has_next=has_next
     )
-    return render_template("teacher/student_results.html", student=student, attempts=attempts)
 
 
 @teacher_bp.route("/attempts/<attempt_id>", methods=["GET", "POST"])
@@ -242,6 +241,7 @@ def manage_attempt(attempt_id):
             attempt.score = sum(1 for aa in AttemptAnswer.objects(attempt_id=attempt.id) if aa.is_correct)
             attempt.save()
             flash("تم حفظ الدرجات بنجاح.", "success")
+            return redirect(url_for("teacher.student_results", student_id=student.id))
 
     answers = {aa.question_id: aa for aa in AttemptAnswer.objects(attempt_id=attempt.id).all()}
     return render_template("teacher/attempt_manage.html", attempt=attempt, student=student, test=test, questions=questions, answers=answers)
