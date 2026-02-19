@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header">
+    <h2 class="h5 mb-0">إضافة سؤال</h2>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">نص السؤال</label>
+        <textarea name="text" class="form-control" rows="3" required></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">تلميح (اختياري)</label>
+        <textarea name="hint" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">صور السؤال (رابط لكل سطر)</label>
+        <textarea name="question_images" class="form-control" rows="2" placeholder="https://..."></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">مستوى السؤال</label>
+        <select class="form-select" name="difficulty">
+          <option value="easy">سهل</option>
+          <option value="medium" selected>متوسط</option>
+          <option value="hard">صعب</option>
+        </select>
+      </div>
+
+      <div id="choices-container">
+        {% for i in range(4) %}
+        <div class="choice-row border rounded p-3 mb-2">
+          <div class="mb-2">
+            <label class="form-label">الخيار {{ i + 1 }}</label>
+            <input type="text" name="choice_{{ i }}" class="form-control" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">رابط صورة الخيار (اختياري)</label>
+            <input type="text" name="choice_{{ i }}_image" class="form-control">
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_correct_{{ i }}" id="correct_{{ i }}">
+            <label class="form-check-label" for="correct_{{ i }}">إجابة صحيحة</label>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addChoice()">إضافة خيار</button>
+      <button type="submit" class="btn btn-cta">حفظ السؤال</button>
+    </form>
+  </div>
+</div>
+
+<script>
+let choiceIndex = 4;
+function addChoice() {
+  const container = document.getElementById('choices-container');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'choice-row border rounded p-3 mb-2';
+  wrapper.innerHTML = `
+    <div class="mb-2">
+      <label class="form-label">الخيار ${choiceIndex + 1}</label>
+      <input type="text" name="choice_${choiceIndex}" class="form-control" required>
+    </div>
+    <div class="mb-2">
+      <label class="form-label">رابط صورة الخيار (اختياري)</label>
+      <input type="text" name="choice_${choiceIndex}_image" class="form-control">
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="is_correct_${choiceIndex}" id="correct_${choiceIndex}">
+      <label class="form-check-label" for="correct_${choiceIndex}">إجابة صحيحة</label>
+    </div>
+  `;
+  container.appendChild(wrapper);
+  choiceIndex++;
+}
+</script>
+{% endblock %}
