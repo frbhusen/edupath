@@ -146,7 +146,18 @@ def results_overview():
     
     attempts_query = Attempt.objects().order_by('-started_at')
     total_attempts = attempts_query.count()
-    attempts = attempts_query.skip((page - 1) * per_page).limit(per_page)
+    attempts_raw = attempts_query.skip((page - 1) * per_page).limit(per_page)
+    
+    # Filter out attempts with deleted students (handle orphaned references)
+    attempts = []
+    for attempt in attempts_raw:
+        try:
+            # Try to access student to ensure it exists
+            _ = attempt.student_id.id
+            attempts.append(attempt)
+        except:
+            # Skip attempts where student has been deleted
+            continue
     
     total_pages = (total_attempts + per_page - 1) // per_page
     has_prev = page > 1

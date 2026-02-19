@@ -678,6 +678,8 @@ def results():
         for attempt in attempts:
             try:
                 _ = attempt.test
+                # Also check if student exists
+                _ = attempt.student_id.id
                 filtered.append(attempt)
             except Exception:
                 continue
