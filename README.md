@@ -2,6 +2,21 @@
 
 A simple study platform where teachers manage subjects, sections, lessons, and MCQ tests; students take tests and see their marks.
 
+## Languages and Technologies
+
+- Python
+- HTML
+- CSS
+- Flask
+- MongoDB
+- MongoEngine
+- PyMongo
+- Flask-Login
+- Flask-WTF
+- Flask-Caching
+- Jinja2
+- Gunicorn
+
 ## Features
 - Register/login with roles: teacher or student
 - Teacher: create/edit subjects, sections, lessons, tests, questions and choices
