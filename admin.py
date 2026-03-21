@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from bson import ObjectId
+from mongoengine.errors import DoesNotExist
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
@@ -121,7 +122,48 @@ def table_view(table_name):
     rows = model.objects().limit(100).all()
     # Get field names from model
     columns = list(model._fields.keys()) if hasattr(model, '_fields') else []
-    return render_template("admin/table.html", table_name=table_name, columns=columns, rows=rows)
+
+    def _safe_cell_value(row, col):
+        try:
+            val = getattr(row, col, None)
+        except DoesNotExist:
+            return "[مرجع مفقود]"
+        except Exception:
+            return "[خطأ في القراءة]"
+
+        if isinstance(val, datetime):
+            return val.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(val, ObjectId):
+            return str(val)
+        if isinstance(val, list):
+            return ", ".join(str(v) for v in val)
+        if isinstance(val, dict):
+            return json.dumps(val, ensure_ascii=False)
+        if hasattr(val, "id"):
+            try:
+                label = getattr(val, "username", None) or getattr(val, "title", None) or getattr(val, "name", None)
+                if label:
+                    return f"{label} ({val.id})"
+                return str(val.id)
+            except Exception:
+                return "[مرجع غير صالح]"
+        return str(val) if val is not None else ""
+
+    safe_rows = []
+    for row in rows:
+        safe_rows.append(
+            {
+                "id": row.id,
+                "cells": {col: _safe_cell_value(row, col) for col in columns},
+            }
+        )
+
+    return render_template(
+        "admin/table.html",
+        table_name=table_name,
+        columns=columns,
+        rows=safe_rows,
+    )
 
 
 @admin_bp.route("/table/<table_name>/new", methods=["GET", "POST"])

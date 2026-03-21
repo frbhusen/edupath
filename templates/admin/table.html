@@ -20,8 +20,7 @@
       {% for row in rows %}
       <tr>
         {% for col in columns %}
-          {% set val = row|attr(col) %}
-          <td class="small" style="max-width:240px;">{{ val }}</td>
+          <td class="small" style="max-width:240px;">{{ row.cells[col] }}</td>
         {% endfor %}
         <td class="text-end">
           <a class="btn btn-outline-primary btn-sm" href="{{ url_for('admin.table_edit', table_name=table_name, row_id=row.id) }}">تعديل</a>
