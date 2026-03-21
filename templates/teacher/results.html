@@ -11,8 +11,14 @@
 {% if attempts %}
   {% set grouped = {} %}
   {% for a in attempts %}
-    {% set _ = grouped.setdefault(a.student.id, {'student': a.student, 'count': 0}) %}
-    {% set _ = grouped[a.student.id].update({'count': grouped[a.student.id]['count'] + 1, 'latest': a.started_at}) %}
+    {% set _ = grouped.setdefault(a.student.id, {'student': a.student, 'count': 0, 'custom_count': 0, 'latest': a._taken_at}) %}
+    {% set _ = grouped[a.student.id].update({'count': grouped[a.student.id]['count'] + 1}) %}
+    {% if a._result_type == 'custom' %}
+      {% set _ = grouped[a.student.id].update({'custom_count': grouped[a.student.id]['custom_count'] + 1}) %}
+    {% endif %}
+    {% if a._taken_at and (not grouped[a.student.id]['latest'] or a._taken_at > grouped[a.student.id]['latest']) %}
+      {% set _ = grouped[a.student.id].update({'latest': a._taken_at}) %}
+    {% endif %}
   {% endfor %}
 
   <div class="row g-3">
@@ -24,6 +30,9 @@
               <div>
                 <h5 class="card-title mb-1">{{ bundle.student.username }}</h5>
                 <div class="text-muted small">{{ bundle.count }} محاولة{% if bundle.count != 1 %}،{% endif %}</div>
+                {% if bundle.custom_count %}
+                  <div class="text-muted small">{{ bundle.custom_count }} اختبار مخصص</div>
+                {% endif %}
               </div>
               <span class="badge text-bg-secondary">الأحدث: {{ bundle.latest.strftime('%Y-%m-%d') if bundle.latest else 'N/A' }}</span>
             </div>

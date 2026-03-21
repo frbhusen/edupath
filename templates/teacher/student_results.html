@@ -24,19 +24,31 @@
         {% for attempt in attempts %}
           {% set pct = (attempt.score / attempt.total * 100) if attempt.total else 0 %}
           <tr>
-            <td>{{ attempt.test.title if attempt.test else 'اختبار مخصص' }}</td>
+            <td>
+              {% if attempt._result_type == 'custom' %}
+                {{ attempt.label or 'اختبار مخصص' }}
+              {% else %}
+                {{ attempt.test.title if attempt.test else 'اختبار غير متوفر' }}
+              {% endif %}
+            </td>
             <td class="text-muted small">
-              {% if attempt.test and attempt.test.section %}
+              {% if attempt._result_type == 'custom' %}
+                اختبار مخصص
+              {% elif attempt.test and attempt.test.section %}
                 {{ attempt.test.section.title }}{% if attempt.test.lesson %} · {{ attempt.test.lesson.title }}{% else %} · Section-wide{% endif %}
               {% else %}
                 —
               {% endif %}
             </td>
             <td><span class="badge text-bg-primary">{{ pct|round(0) }}%</span></td>
-            <td class="text-muted small">{{ attempt.started_at.strftime('%Y-%m-%d %H:%M') if attempt.started_at else 'Unknown' }}</td>
+            <td class="text-muted small">{{ attempt._taken_at.strftime('%Y-%m-%d %H:%M') if attempt._taken_at else 'Unknown' }}</td>
             <td class="text-end">
-              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.test_result', attempt_id=attempt.id) }}">عرض الإجابات</a>
-              <a class="btn btn-outline-primary btn-sm ms-1" href="{{ url_for('teacher.manage_attempt', attempt_id=attempt.id) }}">إدارة</a>
+              {% if attempt._result_type == 'custom' %}
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.custom_test_result', attempt_id=attempt.id) }}">عرض الإجابات</a>
+              {% else %}
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.test_result', attempt_id=attempt.id) }}">عرض الإجابات</a>
+                <a class="btn btn-outline-primary btn-sm ms-1" href="{{ url_for('teacher.manage_attempt', attempt_id=attempt.id) }}">إدارة</a>
+              {% endif %}
             </td>
           </tr>
         {% endfor %}

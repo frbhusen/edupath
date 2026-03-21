@@ -191,7 +191,10 @@ def student_root():
 
 @student_bp.route("/subjects/<subject_id>")
 @login_required
-@cache.cached(timeout=60, key_prefix=lambda: f"subject_detail_{subject_id}_{current_user.id}")
+@cache.cached(
+    timeout=60,
+    key_prefix=lambda: f"subject_detail_{request.view_args.get('subject_id', '')}_{current_user.id}",
+)
 def subject_detail(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:
@@ -264,7 +267,10 @@ def subject_detail(subject_id):
 
 @student_bp.route("/sections/<section_id>")
 @login_required
-@cache.cached(timeout=60, key_prefix=lambda: f"section_detail_{section_id}_{current_user.id}")
+@cache.cached(
+    timeout=60,
+    key_prefix=lambda: f"section_detail_{request.view_args.get('section_id', '')}_{current_user.id}",
+)
 def section_detail(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
@@ -690,6 +696,14 @@ def results():
         .order_by("-started_at")
         .all()
     )
+    own_custom_attempts = list(
+        CustomTestAttempt.objects(
+            student_id=current_user.id,
+            status="submitted",
+        )
+        .order_by("-created_at")
+        .all()
+    )
     other_attempts = _filter_missing_tests(
         Attempt.objects(student_id__ne=current_user.id)
         .order_by("-started_at")
@@ -698,6 +712,7 @@ def results():
     return render_template(
         "student/results.html",
         own_attempts=own_attempts,
+        own_custom_attempts=own_custom_attempts,
         other_attempts=other_attempts,
     )
 
@@ -763,6 +778,7 @@ def custom_test_new():
 
     # Bulk load tests and question counts for all unlocked lessons
     lesson_question_counts = {}
+    lesson_difficulty_counts = {}
     if unlocked_lessons:
         lesson_ids = [l.id for l in unlocked_lessons]
         tests = list(Test.objects(lesson_id__in=lesson_ids).all())
@@ -776,10 +792,24 @@ def custom_test_new():
                     tests_by_lesson[lesson_id] = []
                 tests_by_lesson[lesson_id].append(test.id)
         
-        # Bulk count questions for each lesson
+        # Bulk count questions for each lesson (total and by difficulty)
         for lesson in unlocked_lessons:
             test_ids = tests_by_lesson.get(lesson.id, [])
-            lesson_question_counts[lesson.id] = Question.objects(test_id__in=test_ids).count() if test_ids else 0
+            if test_ids:
+                lesson_questions = list(Question.objects(test_id__in=test_ids).all())
+                lesson_question_counts[lesson.id] = len(lesson_questions)
+                
+                # Count by difficulty
+                difficulty_count = {'easy': 0, 'medium': 0, 'hard': 0}
+                for q in lesson_questions:
+                    diff = (getattr(q, "difficulty", "medium") or "medium").lower()
+                    if diff not in difficulty_count:
+                        diff = "medium"
+                    difficulty_count[diff] += 1
+                lesson_difficulty_counts[lesson.id] = difficulty_count
+            else:
+                lesson_question_counts[lesson.id] = 0
+                lesson_difficulty_counts[lesson.id] = {'easy': 0, 'medium': 0, 'hard': 0}
     
     total_available_questions = sum(lesson_question_counts.values())
 
@@ -791,20 +821,72 @@ def custom_test_new():
         selections = []
         total_questions = 0
         for lesson in unlocked_lessons:
-            raw = request.form.get(f"lesson_{lesson.id}")
-            if not raw:
-                continue
+            # Check if difficulty-based selection is used for this lesson
+            easy_raw = request.form.get(f"lesson_{lesson.id}_easy", "").strip()
+            medium_raw = request.form.get(f"lesson_{lesson.id}_medium", "").strip()
+            hard_raw = request.form.get(f"lesson_{lesson.id}_hard", "").strip()
+            
+            # Parse difficulty counts
             try:
-                count = int(raw)
+                easy_count = int(easy_raw) if easy_raw else 0
+                medium_count = int(medium_raw) if medium_raw else 0
+                hard_count = int(hard_raw) if hard_raw else 0
             except ValueError:
-                count = 0
+                easy_count = medium_count = hard_count = 0
+            
+            # Total for this lesson (difficulty-based)
+            difficulty_total = easy_count + medium_count + hard_count
+            
+            # Check legacy total count input (fallback)
+            raw = request.form.get(f"lesson_{lesson.id}")
+            try:
+                legacy_count = int(raw) if raw else 0
+            except ValueError:
+                legacy_count = 0
+            
+            # Use difficulty-based if any difficulty is specified, otherwise use legacy
+            if difficulty_total > 0:
+                count = difficulty_total
+                use_difficulty = True
+                
+                # Validate difficulty counts against available
+                available_diff = lesson_difficulty_counts.get(lesson.id, {'easy': 0, 'medium': 0, 'hard': 0})
+                if easy_count > available_diff['easy']:
+                    flash(f"طلب {easy_count} أسئلة سهلة من {lesson.title}، لكن {available_diff['easy']} فقط متاحة.", "error")
+                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                if medium_count > available_diff['medium']:
+                    flash(f"طلب {medium_count} أسئلة متوسطة من {lesson.title}، لكن {available_diff['medium']} فقط متاحة.", "error")
+                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                if hard_count > available_diff['hard']:
+                    flash(f"طلب {hard_count} أسئلة صعبة من {lesson.title}، لكن {available_diff['hard']} فقط متاحة.", "error")
+                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+            elif legacy_count > 0:
+                count = legacy_count
+                use_difficulty = False
+            else:
+                continue
+            
             if count <= 0:
                 continue
+                
             max_available = lesson_question_counts.get(lesson.id, 0)
             if count > max_available:
                 flash(f"تم طلب {count} أسئلة لـ {lesson.title}، ولكن {max_available} فقط متاحة.", "error")
                 return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
-            selections.append({"lesson_id": str(lesson.id), "count": count})
+            
+            selection = {
+                "lesson_id": str(lesson.id),
+                "count": count,
+            }
+            
+            if use_difficulty:
+                selection["difficulty"] = {
+                    "easy": easy_count,
+                    "medium": medium_count,
+                    "hard": hard_count
+                }
+            
+            selections.append(selection)
             total_questions += count
 
         if total_questions == 0:
@@ -824,12 +906,45 @@ def custom_test_new():
         for sel in selections:
             tests = Test.objects(lesson_id=sel["lesson_id"]).all()
             test_ids = [t.id for t in tests]
-            lesson_questions = list(Question.objects(test_id__in=test_ids)) if test_ids else []
-            if len(lesson_questions) < sel["count"]:
-                flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
-                return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
-            picked = random.sample(lesson_questions, sel["count"])
-            selected_questions.extend(picked)
+            all_lesson_questions = list(Question.objects(test_id__in=test_ids)) if test_ids else []
+            
+            if "difficulty" in sel:
+                # Use difficulty-based selection
+                diff_spec = sel["difficulty"]
+                level_map = {"easy": [], "medium": [], "hard": []}
+                
+                for q in all_lesson_questions:
+                    diff = (getattr(q, "difficulty", "medium") or "medium").lower()
+                    if diff not in level_map:
+                        diff = "medium"
+                    level_map[diff].append(q)
+                
+                picked = []
+                if diff_spec["easy"] > 0:
+                    if len(level_map["easy"]) < diff_spec["easy"]:
+                        flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
+                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                    picked.extend(random.sample(level_map["easy"], diff_spec["easy"]))
+                if diff_spec["medium"] > 0:
+                    if len(level_map["medium"]) < diff_spec["medium"]:
+                        flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
+                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                    picked.extend(random.sample(level_map["medium"], diff_spec["medium"]))
+                if diff_spec["hard"] > 0:
+                    if len(level_map["hard"]) < diff_spec["hard"]:
+                        flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
+                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                    picked.extend(random.sample(level_map["hard"], diff_spec["hard"]))
+                
+                selected_questions.extend(picked)
+            else:
+                # Legacy: random selection without difficulty filter
+                lesson_questions = all_lesson_questions
+                if len(lesson_questions) < sel["count"]:
+                    flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
+                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                picked = random.sample(lesson_questions, sel["count"])
+                selected_questions.extend(picked)
 
         # Ensure no duplicates
         selected_questions = list({q.id: q for q in selected_questions}.values())
@@ -868,6 +983,7 @@ def custom_test_new():
         selected_subject_id=selected_subject_id,
         lessons=unlocked_lessons,
         lesson_question_counts=lesson_question_counts,
+        lesson_difficulty_counts=lesson_difficulty_counts,
         total_available_questions=total_available_questions,
     )
 
@@ -956,7 +1072,7 @@ def custom_test_result(attempt_id):
     attempt = CustomTestAttempt.objects(id=attempt_id).first()
     if not attempt:
         return "404", 404
-    if str(attempt.student_id.id) != str(current_user.id):
+    if str(attempt.student_id.id) != str(current_user.id) and current_user.role not in {"teacher", "admin"}:
         flash("غير مسموح.", "error")
         return redirect(url_for("student.subjects"))
 

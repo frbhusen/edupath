@@ -1,12 +1,13 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 import json
+from datetime import datetime
 from flask_login import login_required, current_user
 from werkzeug.exceptions import NotFound
 
 from .models import (
     User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, 
     ActivationCode, SectionActivation, LessonActivation, LessonActivationCode,
-    SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer
+    SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt
 )
 from .activation_utils import (
     cascade_subject_activation, cascade_section_activation, cascade_lesson_activation,
@@ -143,21 +144,33 @@ def results_overview():
     # Pagination for performance
     page = request.args.get('page', 1, type=int)
     per_page = 50
-    
-    attempts_query = Attempt.objects().order_by('-started_at')
-    total_attempts = attempts_query.count()
-    attempts_raw = attempts_query.skip((page - 1) * per_page).limit(per_page)
-    
-    # Filter out attempts with deleted students (handle orphaned references)
+
+    regular_attempts = list(Attempt.objects().all())
+    custom_attempts = list(CustomTestAttempt.objects(status="submitted").all())
+
+    # Merge both regular and custom attempts for the management overview.
     attempts = []
-    for attempt in attempts_raw:
+    for attempt in regular_attempts:
         try:
-            # Try to access student to ensure it exists
             _ = attempt.student_id.id
+            attempt._result_type = "regular"
+            attempt._taken_at = attempt.started_at
             attempts.append(attempt)
-        except:
-            # Skip attempts where student has been deleted
+        except Exception:
             continue
+
+    for attempt in custom_attempts:
+        try:
+            _ = attempt.student_id.id
+            attempt._result_type = "custom"
+            attempt._taken_at = attempt.created_at
+            attempts.append(attempt)
+        except Exception:
+            continue
+
+    attempts.sort(key=lambda a: a._taken_at or datetime.min, reverse=True)
+    total_attempts = len(attempts)
+    attempts = attempts[(page - 1) * per_page : page * per_page]
     
     total_pages = (total_attempts + per_page - 1) // per_page
     has_prev = page > 1
@@ -184,10 +197,26 @@ def student_results(student_id):
     # Pagination
     page = request.args.get('page', 1, type=int)
     per_page = 30
-    
-    attempts_query = Attempt.objects(student_id=student.id).order_by('-started_at')
-    total_attempts = attempts_query.count()
-    attempts = attempts_query.skip((page - 1) * per_page).limit(per_page)
+
+    regular_attempts = list(Attempt.objects(student_id=student.id).all())
+    custom_attempts = list(
+        CustomTestAttempt.objects(student_id=student.id, status="submitted").all()
+    )
+
+    attempts = []
+    for attempt in regular_attempts:
+        attempt._result_type = "regular"
+        attempt._taken_at = attempt.started_at
+        attempts.append(attempt)
+
+    for attempt in custom_attempts:
+        attempt._result_type = "custom"
+        attempt._taken_at = attempt.created_at
+        attempts.append(attempt)
+
+    attempts.sort(key=lambda a: a._taken_at or datetime.min, reverse=True)
+    total_attempts = len(attempts)
+    attempts = attempts[(page - 1) * per_page : page * per_page]
     
     total_pages = (total_attempts + per_page - 1) // per_page
     has_prev = page > 1
