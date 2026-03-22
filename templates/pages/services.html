@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+
+  .services-wrap {
+    --svc-ink: #0f2a2f;
+    --svc-muted: #4c676d;
+    --svc-a: #eef6f7;
+    --svc-b: #d7ebe8;
+    --svc-card: #ffffff;
+    --svc-accent: #0f766e;
+    font-family: 'Tajawal', sans-serif;
+    color: var(--svc-ink);
+    border-radius: 1.2rem;
+    padding: 1.6rem;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.7), transparent 36%),
+      linear-gradient(145deg, var(--svc-a), var(--svc-b));
+    box-shadow: 0 14px 36px rgba(15, 42, 47, 0.08);
+  }
+
+  .services-title {
+    font-weight: 800;
+    letter-spacing: 0.2px;
+  }
+
+  .services-sub {
+    color: var(--svc-muted);
+    max-width: 780px;
+    margin: 0 auto;
+  }
+
+  .svc-card {
+    border: 0;
+    border-radius: 1rem;
+    background: var(--svc-card);
+    box-shadow: 0 10px 24px rgba(15, 42, 47, 0.07);
+    height: 100%;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+  }
+
+  .svc-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 28px rgba(15, 42, 47, 0.12);
+  }
+
+  .svc-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: var(--svc-accent);
+    background: #e8f5f3;
+    margin-bottom: 0.6rem;
+  }
+
+  .svc-head {
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+
+  .svc-text {
+    color: var(--svc-muted);
+    margin-bottom: 0;
+    line-height: 1.8;
+  }
+
+  .svc-footer {
+    margin-top: 1.3rem;
+    padding: 0.9rem 1rem;
+    border-radius: 0.9rem;
+    border: 1px dashed rgba(15, 118, 110, 0.35);
+    background: rgba(255, 255, 255, 0.65);
+    color: var(--svc-muted);
+  }
+</style>
+
+<div class="services-wrap">
+  <div class="text-center mb-4">
+    <h1 class="h3 services-title mb-2">خدمات المنصة للطلاب</h1>
+    <p class="services-sub mb-0">تم تصميم EduPath لمساعدة الطالب على التعلم خطوة بخطوة من خلال محتوى منظم، اختبارات ذكية، ونتائج واضحة تساعده على التحسن المستمر.</p>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-journal-text"></i></div>
+        <h5 class="svc-head">دروس منظمة حسب المادة</h5>
+        <p class="svc-text">الوصول إلى المحتوى التعليمي بشكل هرمي: مادة ثم قسم ثم درس، مما يسهل المذاكرة والمتابعة.</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-shield-lock"></i></div>
+        <h5 class="svc-head">تفعيل المحتوى بالأكواد</h5>
+        <p class="svc-text">إمكانية فتح المادة أو القسم أو الدرس من خلال رموز تفعيل، مع التحكم الدقيق في صلاحيات الوصول.</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-ui-checks-grid"></i></div>
+        <h5 class="svc-head">اختبارات MCQ تفاعلية</h5>
+        <p class="svc-text">حل اختبارات متعددة الخيارات مع ترتيب واضح للأسئلة وإرسال مباشر للإجابات داخل المنصة.</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-sliders2"></i></div>
+        <h5 class="svc-head">اختبارات مخصصة</h5>
+        <p class="svc-text">إنشاء اختبار خاص من الدروس المفتوحة مع تحديد عدد الأسئلة وتوزيع الصعوبة (سهل/متوسط/صعب).</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-arrow-repeat"></i></div>
+        <h5 class="svc-head">إعادة الاختبار بمرونة</h5>
+        <p class="svc-text">إعادة المحاولة بنفس الأسئلة أو بأسئلة جديدة وفق نفس الإعدادات، مع حفظ كل محاولة كسجل مستقل.</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-graph-up-arrow"></i></div>
+        <h5 class="svc-head">نتائج ومراجعة الإجابات</h5>
+        <p class="svc-text">عرض الدرجة والنسبة المئوية ومراجعة الإجابة الصحيحة لكل سؤال، لمساعدة الطالب على تحسين مستواه.</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-collection-play"></i></div>
+        <h5 class="svc-head">موارد تعليمية متنوعة</h5>
+        <p class="svc-text">محتوى داعم مثل الفيديوهات والملفات والروابط وبطاقات المراجعة، ليكون التعلم أعمق وأكثر تفاعلاً.</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-phone"></i></div>
+        <h5 class="svc-head">تجربة مناسبة للجوال</h5>
+        <p class="svc-text">واجهة متجاوبة تعمل بسلاسة على الهاتف والكمبيوتر، حتى تتابع الدراسة من أي مكان.</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="svc-card p-3">
+        <div class="svc-icon"><i class="bi bi-person-check"></i></div>
+        <h5 class="svc-head">متابعة تقدمك بوضوح</h5>
+        <p class="svc-text">سجل نتائجك وملاحظات كل اختبار يساعدك على معرفة نقاط القوة والمواضيع التي تحتاج مراجعة.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="svc-footer text-center mt-4">
+    هدفنا أن يحصل الطالب على رحلة تعلم واضحة، منظمة، وفعالة من أول درس حتى آخر اختبار.
+  </div>
+</div>
+{% endblock %}
