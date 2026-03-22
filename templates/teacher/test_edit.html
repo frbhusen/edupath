@@ -205,6 +205,55 @@
                 </div>
               </div>
 
+              <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-title mb-0">الأسئلة غير الاختيارية (نصية)</h6>
+                    <span class="badge text-bg-secondary">{{ text_questions|length if text_questions else 0 }}</span>
+                  </div>
+
+                  <form method="post" class="mb-3">
+                    <input type="hidden" name="form_name" value="upsert_text_question" />
+                    <div class="mb-2">
+                      <label class="form-label">نص السؤال النصي</label>
+                      <textarea class="form-control" name="text_question_text" rows="2" required></textarea>
+                    </div>
+                    <div class="row g-2 mb-2">
+                      <div class="col-12 col-md-8">
+                      <label class="form-label">تلميح (اختياري)</label>
+                      <input class="form-control" name="text_question_hint" />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label">الدرجة القصوى</label>
+                        <input type="number" min="1" class="form-control" name="text_question_max_score" value="5" required />
+                      </div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary btn-sm">إضافة سؤال نصي</button>
+                  </form>
+
+                  {% if text_questions %}
+                    <div class="list-group list-group-flush">
+                      {% for tq in text_questions %}
+                        <div class="list-group-item px-0">
+                          <div class="fw-semibold">{{ tq.text }}</div>
+                          {% if tq.hint %}
+                            <div class="small text-muted">التلميح: {{ tq.hint }}</div>
+                          {% endif %}
+                          <div class="small text-muted">الدرجة القصوى: {{ tq.max_score|default(5) }}</div>
+                          <form method="post" class="mt-2" onsubmit="return confirm('حذف السؤال النصي؟');">
+                            <input type="hidden" name="form_name" value="delete_text_question" />
+                            <input type="hidden" name="text_question_id" value="{{ tq.id }}" />
+                            <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+                          </form>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="text-muted small">لا توجد أسئلة نصية بعد.</div>
+                  {% endif %}
+                </div>
+              </div>
+
               <div class="card border-0 shadow-sm">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center mb-3">

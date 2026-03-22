@@ -65,12 +65,14 @@ def create_app():
                     "student_gamification_nav": {
                         "level": 1,
                         "xp_total": 0,
+                        "current_streak": 0,
                     }
                 }
             return {
                 "student_gamification_nav": {
                     "level": profile.level,
                     "xp_total": profile.xp_total,
+                    "current_streak": profile.current_streak,
                 }
             }
         except Exception:

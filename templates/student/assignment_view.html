@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">عرض الواجب: {{ assignment.title }}</h1>
+    <p class="mb-0">مراجعة الأسئلة وإجاباتك.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.assignments') }}">العودة للواجبات</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="mb-3">أسئلة MCQ</h5>
+    {% if questions %}
+      {% for q in questions %}
+        {% set ans = mcq_answers.get(q.id|string) %}
+        {% set selected_id = ans.selected_choice_id if ans else None %}
+        <div class="border rounded p-3 mb-2">
+          <div class="fw-semibold">{{ loop.index }}. {{ q.text }}</div>
+          <ul class="mt-2 mb-0">
+            {% for c in q.choices %}
+              <li class="{{ 'text-success fw-semibold' if c.is_correct else '' }}">
+                {% if selected_id and selected_id == c.choice_id|string %}👉 {% endif %}
+                {{ c.text }}
+                {% if c.is_correct %}<span class="badge text-bg-success">صحيح</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          {% if ans and attempt and attempt.status == 'graded' %}
+            <div class="small mt-2">الدرجة: {{ ans.score_awarded or 0 }} / {{ ans.max_score or 1 }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-muted">لا توجد أسئلة MCQ.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">الأسئلة الكتابية</h5>
+    {% if written_items %}
+      {% for item in written_items %}
+        {% set ans = text_answers[loop.index0] if loop.index0 < text_answers|length else None %}
+        <div class="border rounded p-3 mb-2">
+          <div class="fw-semibold">{{ loop.index }}. {{ item.prompt }}</div>
+          <div class="small text-muted mb-2">الدرجة القصوى: {{ item.max_score or 5 }}</div>
+          <div class="small" style="white-space: pre-wrap;">إجابتك: {{ ans.text_answer if ans else 'لا توجد إجابة بعد' }}</div>
+          {% if ans and attempt and attempt.status == 'graded' %}
+            <div class="small mt-2">الدرجة: {{ ans.score_awarded or 0 }} / {{ ans.max_score or 5 }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-muted">لا توجد أسئلة كتابية.</div>
+    {% endif %}
+
+    {% if teacher_note %}
+      <div class="alert alert-info mt-3 mb-0">ملاحظة المعلم: {{ teacher_note }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

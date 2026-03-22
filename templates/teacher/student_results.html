@@ -2,7 +2,7 @@
 {% block content %}
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
-    <h1 class="h4 mb-1">نتائج {{ student.username }}</h1>
+    <h1 class="h4 mb-1">نتائج {{ student.full_name }}</h1>
     <p class="mb-0">عرض جميع المحاولات؛ الإجابات متاحة عبر تفاصيل المحاولة.</p>
   </div>
   <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.results_overview') }}">العودة للنتائج</a>
@@ -45,9 +45,18 @@
             <td class="text-end">
               {% if attempt._result_type == 'custom' %}
                 <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.custom_test_result', attempt_id=attempt.id) }}">عرض الإجابات</a>
+                <form method="post" action="{{ url_for('teacher.delete_custom_attempt', attempt_id=attempt.id) }}" class="d-inline ms-1" onsubmit="return confirm('حذف هذه المحاولة؟');">
+                  <input type="hidden" name="return_student_id" value="{{ student.id }}">
+                  <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                </form>
               {% else %}
                 <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.test_result', attempt_id=attempt.id) }}">عرض الإجابات</a>
                 <a class="btn btn-outline-primary btn-sm ms-1" href="{{ url_for('teacher.manage_attempt', attempt_id=attempt.id) }}">إدارة</a>
+                <form method="post" action="{{ url_for('teacher.manage_attempt', attempt_id=attempt.id) }}" class="d-inline ms-1" onsubmit="return confirm('حذف هذه المحاولة؟');">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="return_student_id" value="{{ student.id }}">
+                  <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                </form>
               {% endif %}
             </td>
           </tr>

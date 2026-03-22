@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">تصحيح واجب: {{ assignment.title }}</h1>
+    <p class="mb-0">الطالب: {{ attempt.student_id.full_name if attempt.student_id else '-' }}</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.assignment_submissions', assignment_id=assignment.id) }}">العودة للتسليمات</a>
+</div>
+
+<form method="post" class="card shadow-sm">
+  <div class="card-body">
+    {% if prepared_answers %}
+      {% for row in prepared_answers %}
+        <div class="border rounded p-3 mb-3">
+          {% if row.type == 'mcq' %}
+            <div class="fw-semibold mb-2">سؤال MCQ: {{ row.question.text if row.question else 'سؤال محذوف' }}</div>
+            <div class="small text-muted mb-2">إجابة الطالب: {{ row.answer.selected_choice_id or 'لم يجب' }}</div>
+          {% else %}
+            <div class="fw-semibold mb-2">سؤال كتابي: {{ row.answer.prompt }}</div>
+            <div class="small mb-2" style="white-space: pre-wrap;">{{ row.answer.text_answer or 'لا توجد إجابة' }}</div>
+          {% endif %}
+          <label class="form-label small">الدرجة (من {{ row.max_score }})</label>
+          <input type="number" class="form-control form-control-sm" name="score_{{ row.index }}" min="0" max="{{ row.max_score }}" value="{{ row.answer.score_awarded or 0 }}" required>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-warning">لا توجد إجابات للتصحيح.</div>
+    {% endif %}
+
+    <div class="mb-3">
+      <label class="form-label">ملاحظة المعلم</label>
+      <textarea class="form-control" rows="3" name="teacher_note" placeholder="ملاحظة اختيارية للطالب">{{ attempt.teacher_note or '' }}</textarea>
+    </div>
+
+    <div class="d-flex justify-content-end">
+      <button type="submit" class="btn btn-cta">حفظ التصحيح</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

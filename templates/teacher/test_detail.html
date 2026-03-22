@@ -72,4 +72,23 @@
 {% else %}
   <div class="alert alert-light">لا توجد أسئلة بعد.</div>
 {% endif %}
+
+<div class="mt-4 d-flex justify-content-between align-items-center mb-3">
+  <h3 class="h6 mb-0">الأسئلة النصية</h3>
+</div>
+
+{% if text_questions %}
+  <div class="list-group">
+    {% for question in text_questions %}
+      <div class="list-group-item">
+        <div class="fw-semibold">{{ question.text }}</div>
+        {% if question.hint %}
+          <div class="text-muted small mt-1">{{ question.hint }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-light">لا توجد أسئلة نصية بعد.</div>
+{% endif %}
 {% endblock %}

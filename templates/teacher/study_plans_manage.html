@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة الخطط الدراسية</h1>
+    <p class="mb-0">إنشاء خطة أسبوعية للطالب وإضافة مهام قابلة للمتابعة.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h5 class="mb-3">إنشاء خطة جديدة</h5>
+    <form method="post" class="row g-2">
+      <input type="hidden" name="action" value="create_plan">
+      <div class="col-12 col-md-3">
+        <select class="form-select" name="student_id" required>
+          <option value="">اختر الطالب</option>
+          {% for st in students %}<option value="{{ st.id }}">{{ st.full_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3"><input class="form-control" name="title" placeholder="عنوان الخطة" required></div>
+      <div class="col-12 col-md-2"><input type="datetime-local" class="form-control" name="week_start"></div>
+      <div class="col-12 col-md-2"><input type="datetime-local" class="form-control" name="week_end"></div>
+      <div class="col-12 col-md-2"><button class="btn btn-cta btn-sm" type="submit">إنشاء</button></div>
+      <div class="col-12"><textarea class="form-control" rows="2" name="description" placeholder="وصف مختصر"></textarea></div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">الخطط الحالية</h5>
+    {% if plans %}
+      {% for p in plans %}
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <div class="fw-semibold">{{ p.title }} - {{ p.student_id.full_name if p.student_id else '-' }}</div>
+              <div class="text-muted small">{{ p.description or 'بدون وصف' }}</div>
+            </div>
+            <form method="post">
+              <input type="hidden" name="action" value="toggle_plan">
+              <input type="hidden" name="plan_id" value="{{ p.id }}">
+              <button class="btn btn-sm {% if p.is_active %}btn-outline-success{% else %}btn-outline-secondary{% endif %}" type="submit">{{ 'نشطة' if p.is_active else 'مغلقة' }}</button>
+            </form>
+          </div>
+
+          <form method="post" class="row g-2 mb-2">
+            <input type="hidden" name="action" value="add_item">
+            <input type="hidden" name="plan_id" value="{{ p.id }}">
+            <div class="col-12 col-md-3"><input class="form-control form-control-sm" name="item_title" placeholder="عنوان المهمة" required></div>
+            <div class="col-12 col-md-3"><select class="form-select form-select-sm" name="lesson_id"><option value="">درس (اختياري)</option>{% for l in lessons %}<option value="{{ l.id }}">{{ l.title }}</option>{% endfor %}</select></div>
+            <div class="col-12 col-md-3"><select class="form-select form-select-sm" name="test_id"><option value="">اختبار (اختياري)</option>{% for t in tests %}<option value="{{ t.id }}">{{ t.title }}</option>{% endfor %}</select></div>
+            <div class="col-12 col-md-2"><input type="datetime-local" class="form-control form-control-sm" name="due_at"></div>
+            <div class="col-12 col-md-1"><button class="btn btn-outline-primary btn-sm" type="submit">+</button></div>
+          </form>
+
+          {% set p_items = items_by_plan.get(p.id, []) %}
+          {% if p_items %}
+            <ul class="mb-0 small">
+              {% for it in p_items %}
+                <li>{{ it.title }} {% if it.is_done %}<span class="badge text-bg-success">منجز</span>{% endif %}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="text-muted small">لا توجد مهام بعد.</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد خطط دراسية حتى الآن.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

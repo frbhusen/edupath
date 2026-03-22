@@ -17,6 +17,9 @@ from .models import (
     Choice,
     Attempt,
     AttemptAnswer,
+    AttemptTextAnswer,
+    CustomTestAttempt,
+    CustomTestAnswer,
     SectionActivation,
     ActivationCode,
     LessonActivation,
@@ -110,6 +113,85 @@ def dashboard():
         except Exception:
             counts[name] = "?"
     return render_template("admin/dashboard.html", counts=counts)
+
+
+@admin_bp.route("/results")
+@login_required
+def results_manage():
+    admin_required()
+
+    selected_student_id = (request.args.get("student_id") or "").strip()
+    selected_student = None
+    if selected_student_id and ObjectId.is_valid(selected_student_id):
+        selected_student = User.objects(id=selected_student_id, role="student").first()
+
+    students = list(User.objects(role="student").order_by("first_name", "last_name").all())
+
+    regular_q = Attempt.objects().order_by("-started_at")
+    custom_q = CustomTestAttempt.objects(status="submitted").order_by("-created_at")
+
+    if selected_student:
+        regular_q = regular_q.filter(student_id=selected_student.id)
+        custom_q = custom_q.filter(student_id=selected_student.id)
+
+    regular_attempts = list(regular_q.limit(300).all())
+    custom_attempts = list(custom_q.limit(300).all())
+
+    text_answers = list(
+        AttemptTextAnswer.objects(attempt_id__in=[a.id for a in regular_attempts]).all()
+    ) if regular_attempts else []
+    text_by_attempt = {}
+    for ta in text_answers:
+        if not ta.attempt_id:
+            continue
+        aid = ta.attempt_id.id
+        text_by_attempt.setdefault(aid, []).append(ta)
+
+    for attempt in regular_attempts:
+        tas = text_by_attempt.get(attempt.id, [])
+        pending = bool(tas) and any(getattr(ta, "score_awarded", None) is None for ta in tas)
+        attempt._pending_text_grading = pending
+
+    return render_template(
+        "admin/results.html",
+        students=students,
+        selected_student=selected_student,
+        regular_attempts=regular_attempts,
+        custom_attempts=custom_attempts,
+    )
+
+
+@admin_bp.route("/results/<attempt_id>/delete", methods=["POST"])
+@login_required
+def delete_regular_result(attempt_id):
+    admin_required()
+    attempt = Attempt.objects(id=attempt_id).first() if ObjectId.is_valid(attempt_id) else None
+    if not attempt:
+        flash("محاولة الاختبار غير موجودة.", "error")
+        return redirect(url_for("admin.results_manage"))
+
+    AttemptAnswer.objects(attempt_id=attempt.id).delete()
+    AttemptTextAnswer.objects(attempt_id=attempt.id).delete()
+    attempt.delete()
+    flash("تم حذف نتيجة الاختبار العادي.", "success")
+    student_id = (request.form.get("student_id") or "").strip()
+    return redirect(url_for("admin.results_manage", student_id=student_id) if student_id else url_for("admin.results_manage"))
+
+
+@admin_bp.route("/custom-results/<attempt_id>/delete", methods=["POST"])
+@login_required
+def delete_custom_result(attempt_id):
+    admin_required()
+    attempt = CustomTestAttempt.objects(id=attempt_id).first() if ObjectId.is_valid(attempt_id) else None
+    if not attempt:
+        flash("محاولة الاختبار المخصص غير موجودة.", "error")
+        return redirect(url_for("admin.results_manage"))
+
+    CustomTestAnswer.objects(attempt_id=attempt.id).delete()
+    attempt.delete()
+    flash("تم حذف نتيجة الاختبار المخصص.", "success")
+    student_id = (request.form.get("student_id") or "").strip()
+    return redirect(url_for("admin.results_manage", student_id=student_id) if student_id else url_for("admin.results_manage"))
 
 
 @admin_bp.route("/table/<table_name>")

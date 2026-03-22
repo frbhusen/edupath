@@ -26,6 +26,9 @@
       {% if current_profile %}
         <span id="my-xp-chip" class="chip stat-chip">XP ({{ scope }}): {{ current_scope_xp }}</span>
       {% endif %}
+      {% if current_user.role|lower == 'student' %}
+        <span id="my-cert-chip" class="chip stat-chip">شهاداتك المعتمدة: {{ current_certificates_count }}</span>
+      {% endif %}
     </div>
   </section>
 
@@ -43,12 +46,18 @@
             <div class="fw-semibold">{{ entry.username }}</div>
             <div class="meta-row">
               <span class="meta-chip">Lvl {{ entry.level }}</span>
+              <span class="meta-chip">الشهادات: {{ entry.certificates_count|default(0) }}</span>
               {% if entry.badges %}
                 {% for badge in entry.badges[:3] %}
                   <span class="meta-chip badge-chip">{{ badge }}</span>
                 {% endfor %}
               {% endif %}
             </div>
+            {% if entry.student_id %}
+              <div class="mt-1">
+                <a class="small" href="{{ url_for('student.leaderboard_student_certificates', student_id=entry.student_id) }}">عرض الشهادات</a>
+              </div>
+            {% endif %}
           </div>
           <div class="xp-col">
             <span class="xp-pill">{{ entry.xp }} XP</span>
@@ -219,6 +228,7 @@
     const scope = list.dataset.scope || 'all';
     const endpoint = "{{ url_for('student.leaderboard_data') }}" + `?page=${page}&per_page=${perPage}&scope=${scope}`;
     const streamEndpoint = "{{ url_for('student.leaderboard_stream') }}" + `?page=${page}&per_page=${perPage}&scope=${scope}`;
+    const certificatesBaseUrl = "{{ url_for('student.leaderboard_student_certificates', student_id='__student_id__') }}";
 
     const scopeSelect = document.getElementById('scope-select');
     if (scopeSelect) {
@@ -235,6 +245,7 @@
     function buildRow(entry) {
       const topClass = entry.rank === 1 ? 'top-1' : (entry.rank === 2 ? 'top-2' : (entry.rank === 3 ? 'top-3' : ''));
       const badges = (entry.badges || []).slice(0, 3).map((b) => `<span class="meta-chip badge-chip">${b}</span>`).join('');
+      const certificatesUrl = entry.student_id ? certificatesBaseUrl.replace('__student_id__', entry.student_id) : '';
       return `
         <article class="leaderboard-row ${topClass}" data-student-id="${entry.student_id}" data-rank="${entry.rank}">
           <div class="rank-col">#${entry.rank}</div>
@@ -243,8 +254,10 @@
             <div class="fw-semibold">${entry.username}</div>
             <div class="meta-row">
               <span class="meta-chip">Lvl ${entry.level}</span>
+              <span class="meta-chip">الشهادات: ${entry.certificates_count || 0}</span>
               ${badges}
             </div>
+            ${entry.student_id ? `<div class="mt-1"><a class="small" href="${certificatesUrl}">عرض الشهادات</a></div>` : ''}
           </div>
           <div class="xp-col"><span class="xp-pill">${entry.xp} XP</span></div>
         </article>
@@ -279,6 +292,10 @@
       const xpChip = document.getElementById('my-xp-chip');
       if (xpChip && typeof payload.current_xp === 'number') {
         xpChip.textContent = `XP (${scope}): ${payload.current_xp}`;
+      }
+      const certChip = document.getElementById('my-cert-chip');
+      if (certChip && typeof payload.current_certificates_count === 'number') {
+        certChip.textContent = `شهاداتك المعتمدة: ${payload.current_certificates_count}`;
       }
     }
 

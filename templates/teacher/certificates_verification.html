@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">التحقق من الشهادات</h1>
+    <p class="mb-0">اعتماد شهادات الطلاب أو إلغاء الاعتماد.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('teacher.certificates_manage') }}">إدارة الشهادات</a>
+    <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if certificates %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>الطالب</th>
+              <th>الدرس</th>
+              <th>الحالة</th>
+              <th>تم الاعتماد بواسطة</th>
+              <th>تاريخ الاعتماد</th>
+              <th class="text-end">إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in certificates %}
+              {% set student = students_map.get(c.student_id.id) if c.student_id else None %}
+              {% set lesson = lessons_map.get(c.lesson_id.id) if c.lesson_id else None %}
+              {% set verifier = verifiers_map.get(c.verified_by.id) if c.verified_by else None %}
+              <tr>
+                <td>{{ student.full_name if student else '-' }}</td>
+                <td>{{ lesson.title if lesson else '-' }}</td>
+                <td>
+                  <span class="badge {% if c.is_verified %}text-bg-success{% else %}text-bg-warning{% endif %}">{{ 'معتمدة' if c.is_verified else 'غير معتمدة' }}</span>
+                </td>
+                <td>{{ verifier.full_name if verifier else '-' }}</td>
+                <td>{{ c.verified_at.strftime('%Y-%m-%d %H:%M') if c.verified_at else '-' }}</td>
+                <td class="text-end">
+                  {% if c.is_verified %}
+                    <form method="post" class="d-inline">
+                      <input type="hidden" name="action" value="mark_unverified">
+                      <input type="hidden" name="certificate_id" value="{{ c.id }}">
+                      <button type="submit" class="btn btn-outline-danger btn-sm">إلغاء الاعتماد</button>
+                    </form>
+                  {% else %}
+                    <form method="post" class="d-inline">
+                      <input type="hidden" name="action" value="mark_verified">
+                      <input type="hidden" name="certificate_id" value="{{ c.id }}">
+                      <button type="submit" class="btn btn-outline-success btn-sm">اعتماد</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد شهادات حالياً.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

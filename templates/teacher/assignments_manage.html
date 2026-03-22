@@ -1,0 +1,373 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة الواجبات</h1>
+    <p class="mb-0">إنشاء واجبات ومتابعة التسليمات.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">العودة للوحة المعلم</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h5 class="mb-3">إنشاء واجب جديد</h5>
+    <form method="post" class="row g-2">
+      <input type="hidden" name="action" value="create">
+      <div class="col-12 col-md-6">
+        <input type="text" class="form-control" name="title" placeholder="عنوان الواجب" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <input type="datetime-local" class="form-control" name="due_at">
+      </div>
+      <div class="col-12">
+        <textarea class="form-control" name="description" rows="2" placeholder="وصف الواجب"></textarea>
+      </div>
+      <div class="col-12 col-md-3">
+        <select class="form-select" name="target_student_id">
+          <option value="">لكل الطلاب</option>
+          {% for st in students %}
+            <option value="{{ st.id }}">{{ st.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <select class="form-select" name="subject_id" id="standard-subject-select">
+          <option value="">مادة (اختياري)</option>
+          {% for s in subjects %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <select class="form-select" name="section_id" id="standard-section-select">
+          <option value="">قسم (اختياري)</option>
+          {% for s in sections %}
+            <option value="{{ s.id }}" data-subject-id="{{ s.subject_id.id if s.subject_id else '' }}">{{ s.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <select class="form-select" name="lesson_id" id="standard-lesson-select">
+          <option value="">درس (اختياري)</option>
+          {% for l in lessons %}
+            <option value="{{ l.id }}" data-section-id="{{ l.section_id.id if l.section_id else '' }}">{{ l.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-cta btn-sm">إنشاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h5 class="mb-3">إنشاء واجب اختبار مخصص (MCQ + كتابي)</h5>
+
+    <form method="get" class="row g-2 align-items-end mb-3" id="questions-nav-form">
+      <div class="col-12 col-md-5">
+        <label class="form-label mb-1">اختيار الدرس لتحميل أسئلة MCQ</label>
+        <select class="form-select" id="custom-lesson-filter" name="custom_lesson_id">
+          <option value="">اختر درسًا</option>
+          {% for l in lessons %}
+            <option value="{{ l.id }}" {% if selected_custom_lesson_id and selected_custom_lesson_id == l.id|string %}selected{% endif %}>{{ l.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-7 d-flex gap-2 flex-wrap">
+        <input type="hidden" name="selected_question_ids" id="nav-selected-question-ids" value="{{ selected_question_ids|join(',') if selected_question_ids else '' }}">
+        <input type="hidden" name="questions_page" id="questions-page-input" value="{{ questions_page|default(1) }}">
+        <button type="submit" class="btn btn-outline-primary btn-sm">تحميل أسئلة الدرس</button>
+        <button type="submit" class="btn btn-outline-secondary btn-sm" {% if not selected_custom_lesson_id or questions_page|default(1) <= 1 %}disabled{% endif %} onclick="document.getElementById('questions-page-input').value='{{ (questions_page|default(1)) - 1 }}'">السابق</button>
+        <button type="submit" class="btn btn-outline-secondary btn-sm" {% if not selected_custom_lesson_id or questions_page|default(1) >= questions_total_pages|default(1) %}disabled{% endif %} onclick="document.getElementById('questions-page-input').value='{{ (questions_page|default(1)) + 1 }}'">التالي</button>
+        {% if selected_custom_lesson_id %}
+          <span class="small text-muted align-self-center">صفحة {{ questions_page|default(1) }} / {{ questions_total_pages|default(1) }} - إجمالي {{ questions_total|default(0) }} سؤال</span>
+        {% endif %}
+      </div>
+    </form>
+
+    <form method="post" class="row g-2">
+      <input type="hidden" name="action" value="create_custom_test">
+      <input type="hidden" name="selected_question_ids_csv" id="post-selected-question-ids" value="{{ selected_question_ids|join(',') if selected_question_ids else '' }}">
+      <div class="col-12 col-md-6">
+        <input type="text" class="form-control" name="title" placeholder="عنوان الواجب" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <input type="datetime-local" class="form-control" name="due_at">
+      </div>
+      <div class="col-12 col-md-6">
+        <select class="form-select" name="target_student_id">
+          <option value="">لكل الطلاب</option>
+          {% for st in students %}
+            <option value="{{ st.id }}">{{ st.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <textarea class="form-control" name="description" rows="2" placeholder="وصف الواجب"></textarea>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label mb-1">اختر أسئلة MCQ</label>
+        <div class="border rounded p-2" style="max-height: 280px; overflow:auto;" id="custom-questions-wrap">
+          {% if questions %}
+            {% for q in questions %}
+              <div class="form-check mb-1 question-item">
+                <input class="form-check-input" type="checkbox" value="{{ q.id }}" id="q_{{ q.id }}" name="question_ids" {% if selected_question_ids and (q.id|string) in selected_question_ids %}checked{% endif %}>
+                <label class="form-check-label small" for="q_{{ q.id }}">
+                  {{ q.text[:120] }}{% if q.text|length > 120 %}...{% endif %}
+                </label>
+              </div>
+            {% endfor %}
+            <div class="alert alert-light py-2 px-2 mt-2 mb-0 small" id="questions-filter-message">يتم عرض 25 سؤالًا فقط في كل صفحة. استخدم السابق/التالي للتنقل.</div>
+          {% elif selected_custom_lesson_id %}
+            <div class="text-muted small">لا توجد أسئلة في اختبارات هذا الدرس.</div>
+          {% else %}
+            <div class="text-muted small">اختر درسًا أولاً لتحميل الأسئلة (25 سؤال لكل صفحة).</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label mb-1">أسئلة كتابية (اختياري)</label>
+        <textarea
+          class="form-control"
+          name="written_questions"
+          rows="4"
+          placeholder="كل سطر = سؤال. لإضافة الدرجة القصوى استخدم: السؤال || 5"
+        ></textarea>
+      </div>
+
+      <div class="col-12">
+        <button type="submit" class="btn btn-cta btn-sm">إنشاء واجب اختبار</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">قائمة الواجبات</h5>
+    {% if assignments %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>العنوان</th>
+              <th>الموعد</th>
+              <th>المستهدف</th>
+              <th>الحالة</th>
+              <th>التسليمات</th>
+              <th class="text-end">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in assignments %}
+              {% set subs = submissions_by_assignment.get(a.id, []) %}
+              {% set done = subs|selectattr('status', 'equalto', 'completed')|list|length %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ a.title }}</div>
+                  <div class="text-muted small">{{ a.description or '-' }}</div>
+                  {% if a.assignment_mode == 'custom_test' %}
+                    <span class="badge text-bg-info mt-1">اختبار مخصص</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary mt-1">واجب عادي</span>
+                  {% endif %}
+                </td>
+                <td class="text-muted small">{{ a.due_at.strftime('%Y-%m-%d %H:%M') if a.due_at else 'بدون موعد' }}</td>
+                <td class="text-muted small">{{ a.target_student_id.full_name if a.target_student_id else 'كل الطلاب' }}</td>
+                <td>
+                  <span class="badge {% if a.is_active %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+                    {{ 'نشط' if a.is_active else 'مغلق' }}
+                  </span>
+                </td>
+                <td>
+                  {% if a.assignment_mode == 'custom_test' %}
+                    {% set attempts = attempts_by_assignment.get(a.id, []) %}
+                    {% set graded = attempts|selectattr('status', 'equalto', 'graded')|list|length %}
+                    {{ graded }} / {{ attempts|length }}
+                  {% else %}
+                    {{ done }} / {{ subs|length }}
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2 justify-content-end flex-wrap">
+                  {% if a.assignment_mode == 'custom_test' %}
+                    <a class="btn btn-outline-info btn-sm" href="{{ url_for('teacher.assignment_submissions', assignment_id=a.id) }}">التسليمات</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.assignment_questions', assignment_id=a.id) }}">الأسئلة</a>
+                  {% endif %}
+                  <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="toggle_active">
+                    <input type="hidden" name="assignment_id" value="{{ a.id }}">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">تبديل</button>
+                  </form>
+                  <form method="post" class="d-inline" onsubmit="return confirm('حذف الواجب؟')">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="assignment_id" value="{{ a.id }}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+                  </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد واجبات حتى الآن.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (function () {
+    function selectedValues(selectEl) {
+      if (!selectEl) return [];
+      return Array.from(selectEl.selectedOptions || []).map(function (o) { return o.value; }).filter(Boolean);
+    }
+
+    function setOptionVisibility(option, visible) {
+      if (!option) return;
+      if (!option.value) return;
+      option.hidden = !visible;
+      option.disabled = !visible;
+      if (!visible) option.selected = false;
+    }
+
+    function filterSectionsBySubject(subjectSelect, sectionSelect) {
+      if (!subjectSelect || !sectionSelect) return;
+      var subjectId = subjectSelect.value || "";
+      Array.from(sectionSelect.options).forEach(function (opt) {
+        if (!opt.value) return;
+        var visible = !subjectId || (opt.dataset.subjectId === subjectId);
+        setOptionVisibility(opt, visible);
+      });
+      if (!sectionSelect.multiple && sectionSelect.value && sectionSelect.selectedOptions.length === 0) {
+        sectionSelect.value = "";
+      }
+    }
+
+    function filterLessonsBySections(sectionSelect, lessonSelect, subjectSelect) {
+      if (!sectionSelect || !lessonSelect) return;
+      var selectedSectionIds = selectedValues(sectionSelect);
+      var subjectId = subjectSelect ? (subjectSelect.value || "") : "";
+
+      Array.from(lessonSelect.options).forEach(function (opt) {
+        if (!opt.value) return;
+        var lessonSectionId = opt.dataset.sectionId || "";
+        var lessonSubjectId = opt.dataset.subjectId || "";
+
+        var visibleBySection = selectedSectionIds.length === 0 || selectedSectionIds.indexOf(lessonSectionId) !== -1;
+        var visibleBySubject = !subjectId || (lessonSubjectId === subjectId);
+        setOptionVisibility(opt, visibleBySection && visibleBySubject);
+      });
+
+      if (!lessonSelect.multiple && lessonSelect.value && lessonSelect.selectedOptions.length === 0) {
+        lessonSelect.value = "";
+      }
+    }
+
+    function filterQuestions(customSubject, customSections, customLessons, questionItems, messageEl) {
+      var subjectId = customSubject ? (customSubject.value || "") : "";
+      var sectionIds = selectedValues(customSections);
+      var lessonIds = selectedValues(customLessons);
+      var hasAnyFilter = Boolean(subjectId || sectionIds.length || lessonIds.length);
+      var shownCount = 0;
+
+      questionItems.forEach(function (item) {
+        var qSubject = item.dataset.subjectId || "";
+        var qSection = item.dataset.sectionId || "";
+        var qLesson = item.dataset.lessonId || "";
+
+        var matchesSubject = !subjectId || qSubject === subjectId;
+        var matchesSection = sectionIds.length === 0 || sectionIds.indexOf(qSection) !== -1;
+        var matchesLesson = lessonIds.length === 0 || (qLesson && lessonIds.indexOf(qLesson) !== -1);
+        var visible = hasAnyFilter && matchesSubject && matchesSection && matchesLesson;
+
+        item.hidden = !visible;
+        if (!visible) {
+          var checkbox = item.querySelector('input[type="checkbox"]');
+          if (checkbox) checkbox.checked = false;
+        } else {
+          shownCount += 1;
+        }
+      });
+
+      if (!messageEl) return;
+      if (!hasAnyFilter) {
+        messageEl.hidden = false;
+        messageEl.textContent = "اختر مادة أو قسم أو درس لعرض الأسئلة.";
+      } else if (shownCount === 0) {
+        messageEl.hidden = false;
+        messageEl.textContent = "لا توجد أسئلة مطابقة للفلاتر المحددة.";
+      } else {
+        messageEl.hidden = false;
+        messageEl.textContent = "عدد الأسئلة المعروضة: " + shownCount;
+      }
+    }
+
+    var standardSubject = document.getElementById("standard-subject-select");
+    var standardSection = document.getElementById("standard-section-select");
+    var standardLesson = document.getElementById("standard-lesson-select");
+
+    function refreshStandard() {
+      filterSectionsBySubject(standardSubject, standardSection);
+      filterLessonsBySections(standardSection, standardLesson, standardSubject);
+    }
+
+    if (standardSubject && standardSection && standardLesson) {
+      standardSubject.addEventListener("change", refreshStandard);
+      standardSection.addEventListener("change", refreshStandard);
+      refreshStandard();
+    }
+
+    var lessonFilter = document.getElementById("custom-lesson-filter");
+    var navForm = document.getElementById("questions-nav-form");
+    var navSelectedInput = document.getElementById("nav-selected-question-ids");
+    var postSelectedInput = document.getElementById("post-selected-question-ids");
+    var questionCheckboxes = Array.from(document.querySelectorAll('input[name="question_ids"]'));
+
+    var selectedSet = new Set((postSelectedInput && postSelectedInput.value ? postSelectedInput.value.split(',') : []).filter(Boolean));
+
+    function syncSelectedInputs() {
+      var csv = Array.from(selectedSet).join(',');
+      if (navSelectedInput) navSelectedInput.value = csv;
+      if (postSelectedInput) postSelectedInput.value = csv;
+    }
+
+    questionCheckboxes.forEach(function (cb) {
+      var value = cb.value;
+      if (selectedSet.has(value)) {
+        cb.checked = true;
+      }
+      cb.addEventListener('change', function () {
+        if (cb.checked) {
+          selectedSet.add(value);
+        } else {
+          selectedSet.delete(value);
+        }
+        syncSelectedInputs();
+      });
+    });
+
+    if (lessonFilter && navForm) {
+      lessonFilter.addEventListener('change', function () {
+        var pageInput = document.getElementById('questions-page-input');
+        if (pageInput) pageInput.value = '1';
+        syncSelectedInputs();
+        navForm.submit();
+      });
+      navForm.addEventListener('submit', function () {
+        syncSelectedInputs();
+      });
+    }
+
+    syncSelectedInputs();
+  })();
+</script>
+{% endblock %}

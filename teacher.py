@@ -1,15 +1,24 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, Response
 import json
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
 from flask_login import login_required, current_user
 from werkzeug.exceptions import NotFound
 from mongoengine.errors import DoesNotExist
+from bson import ObjectId
+
+try:
+    from fpdf import FPDF
+except Exception:  # pragma: no cover
+    FPDF = None
 
 from .models import (
     User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, 
     ActivationCode, SectionActivation, LessonActivation, LessonActivationCode,
-    SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt,
-    StudentGamification, XPEvent
+    SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt, CustomTestAnswer,
+    StudentGamification, XPEvent, Assignment, AssignmentSubmission, LessonCompletion,
+    StudyPlan, StudyPlanItem, AssignmentAttempt, TestTextQuestion, AttemptTextAnswer,
+    DiscussionQuestion, DiscussionAnswer, Certificate
 )
 from .activation_utils import (
     cascade_subject_activation, cascade_section_activation, cascade_lesson_activation,
@@ -30,6 +39,38 @@ def _generate_unique_code(model_cls, length: int = 6) -> str:
     while model_cls.objects(code=code_value).first():
         code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
     return code_value
+
+
+def _award_certificate_xp_once(student_id, certificate_id, amount: int = 30):
+    if not student_id or not certificate_id:
+        return 0
+
+    source_id = str(certificate_id)
+    event = XPEvent.objects(
+        student_id=student_id,
+        event_type="certificate_earned",
+        source_id=source_id,
+    ).first()
+    if event:
+        return 0
+
+    xp_amount = max(0, int(amount or 0))
+    XPEvent(
+        student_id=student_id,
+        event_type="certificate_earned",
+        source_id=source_id,
+        xp=xp_amount,
+    ).save()
+
+    profile = StudentGamification.objects(student_id=student_id).first()
+    if not profile:
+        profile = StudentGamification(student_id=student_id, xp_total=0, level=1)
+
+    profile.xp_total = int(profile.xp_total or 0) + xp_amount
+    profile.level = (int(profile.xp_total or 0) // 200) + 1
+    profile.updated_at = datetime.utcnow()
+    profile.save()
+    return xp_amount
 
 # Role guard decorator
 
@@ -245,14 +286,19 @@ def manage_attempt(attempt_id):
     student = attempt.student_id
     test = attempt.test_id
     questions = Question.objects(test_id=test.id).all()
+    text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
 
     if request.method == "POST":
         action = request.form.get("action")
         if action == "delete":
             # Delete answers then attempt
             AttemptAnswer.objects(attempt_id=attempt.id).delete()
+            AttemptTextAnswer.objects(attempt_id=attempt.id).delete()
             attempt.delete()
             flash("تم حذف محاولة الاختبار بنجاح.", "success")
+            return_student_id = (request.form.get("return_student_id") or "").strip()
+            if return_student_id and ObjectId.is_valid(return_student_id):
+                return redirect(url_for("teacher.student_results", student_id=return_student_id))
             return redirect(url_for("teacher.results_overview"))
         elif action == "save_scores":
             # Update scores from form
@@ -269,13 +315,69 @@ def manage_attempt(attempt_id):
                 ans.is_correct = choice.is_correct if choice else False
                 ans.save()
 
-            attempt.score = sum(1 for aa in AttemptAnswer.objects(attempt_id=attempt.id) if aa.is_correct)
+            # Grade text answers (manual by teacher/admin)
+            text_total = 0
+            text_score = 0
+            for tq in text_questions:
+                ta = AttemptTextAnswer.objects(attempt_id=attempt.id, text_question_id=tq.id).first()
+                if not ta:
+                    continue
+                max_score = max(1, int(getattr(tq, 'max_score', 5) or 5))
+                text_total += max_score
+                ta.max_score = max_score
+
+                raw_val = request.form.get(f"text_score_{tq.id}")
+                if raw_val is not None and str(raw_val).strip() != "":
+                    try:
+                        awarded = int(raw_val)
+                    except Exception:
+                        awarded = 0
+                    awarded = max(0, min(awarded, max_score))
+                    ta.score_awarded = awarded
+                # Keep None when still not graded for this answer
+                ta.save()
+                if ta.score_awarded is not None:
+                    text_score += int(ta.score_awarded or 0)
+
+            mcq_score = sum(1 for aa in AttemptAnswer.objects(attempt_id=attempt.id) if aa.is_correct)
+            mcq_total = len(questions)
+            attempt.score = mcq_score + text_score
+            attempt.total = mcq_total + text_total
             attempt.save()
             flash("تم حفظ الدرجات بنجاح.", "success")
             return redirect(url_for("teacher.student_results", student_id=student.id))
 
     answers = {aa.question_id: aa for aa in AttemptAnswer.objects(attempt_id=attempt.id).all()}
-    return render_template("teacher/attempt_manage.html", attempt=attempt, student=student, test=test, questions=questions, answers=answers)
+    text_answers = {ta.text_question_id.id: ta for ta in AttemptTextAnswer.objects(attempt_id=attempt.id).all() if ta.text_question_id}
+    return render_template(
+        "teacher/attempt_manage.html",
+        attempt=attempt,
+        student=student,
+        test=test,
+        questions=questions,
+        answers=answers,
+        text_questions=text_questions,
+        text_answers=text_answers,
+    )
+
+
+@teacher_bp.route("/custom-attempts/<attempt_id>/delete", methods=["POST"])
+@login_required
+@role_required("teacher")
+def delete_custom_attempt(attempt_id):
+    attempt = CustomTestAttempt.objects(id=attempt_id).first() if ObjectId.is_valid(attempt_id) else None
+    if not attempt:
+        flash("محاولة الاختبار المخصص غير موجودة.", "error")
+        return redirect(url_for("teacher.results_overview"))
+
+    CustomTestAnswer.objects(attempt_id=attempt.id).delete()
+    attempt.delete()
+    flash("تم حذف محاولة الاختبار المخصص.", "success")
+
+    return_student_id = (request.form.get("return_student_id") or "").strip()
+    if return_student_id and ObjectId.is_valid(return_student_id):
+        return redirect(url_for("teacher.student_results", student_id=return_student_id))
+    return redirect(url_for("teacher.results_overview"))
 
 
 @teacher_bp.route("/students", methods=["GET"])
@@ -284,6 +386,1086 @@ def manage_attempt(attempt_id):
 def students():
     students = User.objects(role="student").order_by('-created_at').all()
     return render_template("teacher/students.html", students=students)
+
+
+@teacher_bp.route("/discussions", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def discussions_manage():
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+
+        if action == "add_answer":
+            question_id = (request.form.get("question_id") or "").strip()
+            body = (request.form.get("body") or "").strip()
+            question = DiscussionQuestion.objects(id=question_id).first() if ObjectId.is_valid(question_id) else None
+            if not question or not body:
+                flash("تعذر إضافة الرد. تأكد من صحة البيانات.", "error")
+                return redirect(url_for("teacher.discussions_manage"))
+
+            DiscussionAnswer(
+                question_id=question.id,
+                author_id=current_user.id,
+                body=body,
+            ).save()
+            flash("تمت إضافة الرد بنجاح.", "success")
+            return redirect(url_for("teacher.discussions_manage"))
+
+        if action == "toggle_pin":
+            question_id = (request.form.get("question_id") or "").strip()
+            question = DiscussionQuestion.objects(id=question_id).first() if ObjectId.is_valid(question_id) else None
+            if question:
+                question.is_pinned = not bool(getattr(question, "is_pinned", False))
+                question.save()
+                flash("تم تحديث حالة تثبيت السؤال.", "success")
+            return redirect(url_for("teacher.discussions_manage"))
+
+        if action == "toggle_resolved":
+            question_id = (request.form.get("question_id") or "").strip()
+            question = DiscussionQuestion.objects(id=question_id).first() if ObjectId.is_valid(question_id) else None
+            if question:
+                question.is_resolved = not bool(question.is_resolved)
+                question.save()
+                flash("تم تحديث حالة السؤال.", "success")
+            return redirect(url_for("teacher.discussions_manage"))
+
+        if action == "delete_question":
+            question_id = (request.form.get("question_id") or "").strip()
+            question = DiscussionQuestion.objects(id=question_id).first() if ObjectId.is_valid(question_id) else None
+            if question:
+                DiscussionAnswer.objects(question_id=question.id).delete()
+                question.delete()
+                flash("تم حذف السؤال وجميع الردود.", "success")
+            return redirect(url_for("teacher.discussions_manage"))
+
+        if action == "delete_answer":
+            answer_id = (request.form.get("answer_id") or "").strip()
+            answer = DiscussionAnswer.objects(id=answer_id).first() if ObjectId.is_valid(answer_id) else None
+            if answer:
+                answer.delete()
+                flash("تم حذف الرد.", "success")
+            return redirect(url_for("teacher.discussions_manage"))
+
+    lesson_id = (request.args.get("lesson_id") or "").strip()
+    questions_q = DiscussionQuestion.objects()
+    if lesson_id and ObjectId.is_valid(lesson_id):
+        questions_q = questions_q.filter(lesson_id=ObjectId(lesson_id))
+
+    questions = list(questions_q.order_by("-is_pinned", "is_resolved", "-created_at").all())
+    answers = list(DiscussionAnswer.objects(question_id__in=[q.id for q in questions]).order_by("created_at").all()) if questions else []
+
+    answers_by_question = {}
+    user_ids = set()
+    lesson_ids = set()
+    for q in questions:
+        if q.author_id:
+            user_ids.add(q.author_id.id)
+        if q.lesson_id:
+            lesson_ids.add(q.lesson_id.id)
+    for ans in answers:
+        qid = ans.question_id.id if ans.question_id else None
+        if qid is None:
+            continue
+        answers_by_question.setdefault(qid, []).append(ans)
+        if ans.author_id:
+            user_ids.add(ans.author_id.id)
+
+    users_by_id = {u.id: u for u in User.objects(id__in=list(user_ids)).all()} if user_ids else {}
+    lessons = list(Lesson.objects(id__in=list(lesson_ids)).all()) if lesson_ids else []
+    lessons_by_id = {l.id: l for l in lessons}
+    all_lessons = list(Lesson.objects().order_by("title").all())
+
+    return render_template(
+        "teacher/discussions_manage.html",
+        questions=questions,
+        answers_by_question=answers_by_question,
+        users_by_id=users_by_id,
+        lessons_by_id=lessons_by_id,
+        all_lessons=all_lessons,
+        selected_lesson_id=lesson_id,
+    )
+
+
+@teacher_bp.route("/certificates", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def certificates_manage():
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+
+        if action == "delete":
+            certificate_id = (request.form.get("certificate_id") or "").strip()
+            cert = Certificate.objects(id=certificate_id).first() if ObjectId.is_valid(certificate_id) else None
+            if cert:
+                cert.delete()
+                flash("تم حذف الشهادة.", "success")
+            return redirect(url_for("teacher.certificates_manage"))
+
+        if action == "issue":
+            student_id = (request.form.get("student_id") or "").strip()
+            lesson_id = (request.form.get("lesson_id") or "").strip()
+            certificate_url = (request.form.get("certificate_url") or "").strip()
+            student = User.objects(id=student_id, role="student").first() if ObjectId.is_valid(student_id) else None
+            lesson = Lesson.objects(id=lesson_id).first() if ObjectId.is_valid(lesson_id) else None
+            if not student or not lesson:
+                flash("بيانات الطالب أو الدرس غير صحيحة.", "error")
+                return redirect(url_for("teacher.certificates_manage"))
+            if not certificate_url or not (certificate_url.startswith("http://") or certificate_url.startswith("https://")):
+                flash("رابط الشهادة غير صالح. أدخل رابطًا يبدأ بـ http أو https.", "error")
+                return redirect(url_for("teacher.certificates_manage"))
+            existing = Certificate.objects(student_id=student.id, lesson_id=lesson.id).first()
+            if existing:
+                existing.certificate_url = certificate_url
+                existing.issued_at = datetime.utcnow()
+                existing.is_verified = False
+                existing.verified_by = None
+                existing.verified_at = None
+                existing.save()
+                flash("تم تحديث رابط الشهادة وإعادة تعيين حالة التحقق.", "success")
+            else:
+                Certificate(
+                    student_id=student.id,
+                    lesson_id=lesson.id,
+                    certificate_url=certificate_url,
+                    issued_at=datetime.utcnow(),
+                    is_verified=False,
+                ).save()
+                flash("تم إضافة الشهادة بالرابط بنجاح.", "success")
+            return redirect(url_for("teacher.certificates_manage"))
+
+    certificates = list(Certificate.objects().order_by("-issued_at").all())
+    student_ids = [c.student_id.id for c in certificates if c.student_id]
+    lesson_ids = [c.lesson_id.id for c in certificates if c.lesson_id]
+    students_map = {u.id: u for u in User.objects(id__in=student_ids).all()} if student_ids else {}
+    lessons_map = {l.id: l for l in Lesson.objects(id__in=lesson_ids).all()} if lesson_ids else {}
+
+    all_students = list(User.objects(role="student").order_by("first_name", "last_name").all())
+    all_lessons = list(Lesson.objects().order_by("title").all())
+
+    return render_template(
+        "teacher/certificates_manage.html",
+        certificates=certificates,
+        students_map=students_map,
+        lessons_map=lessons_map,
+        all_students=all_students,
+        all_lessons=all_lessons,
+    )
+
+
+@teacher_bp.route("/certificates/<certificate_id>/download", methods=["GET"])
+@login_required
+@role_required("teacher")
+def download_certificate_teacher(certificate_id):
+    cert = Certificate.objects(id=certificate_id).first() if ObjectId.is_valid(certificate_id) else None
+    if not cert:
+        raise NotFound()
+    cert_url = (getattr(cert, "certificate_url", "") or "").strip()
+    if not cert_url:
+        flash("لا يوجد رابط شهادة لهذا السجل.", "error")
+        return redirect(url_for("teacher.certificates_manage"))
+    return redirect(cert_url)
+
+
+@teacher_bp.route("/certificates/verification", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def certificates_verification():
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+        certificate_id = (request.form.get("certificate_id") or "").strip()
+        cert = Certificate.objects(id=certificate_id).first() if ObjectId.is_valid(certificate_id) else None
+        if not cert:
+            flash("الشهادة غير موجودة.", "error")
+            return redirect(url_for("teacher.certificates_verification"))
+
+        if action == "mark_verified":
+            cert.is_verified = True
+            cert.verified_at = datetime.utcnow()
+            cert.verified_by = current_user.id
+            cert.save()
+            xp_awarded = _award_certificate_xp_once(
+                student_id=(cert.student_id.id if cert.student_id else None),
+                certificate_id=cert.id,
+            )
+            if xp_awarded > 0:
+                flash(f"تم اعتماد الشهادة وإضافة {xp_awarded} XP للطالب.", "success")
+            else:
+                flash("تم اعتماد الشهادة.", "success")
+            return redirect(url_for("teacher.certificates_verification"))
+
+        if action == "mark_unverified":
+            cert.is_verified = False
+            cert.verified_at = None
+            cert.verified_by = None
+            cert.save()
+            flash("تم إلغاء اعتماد الشهادة.", "success")
+            return redirect(url_for("teacher.certificates_verification"))
+
+    certificates = list(Certificate.objects().order_by("-issued_at").all())
+    student_ids = [c.student_id.id for c in certificates if c.student_id]
+    lesson_ids = [c.lesson_id.id for c in certificates if c.lesson_id]
+    verifier_ids = [c.verified_by.id for c in certificates if getattr(c, "verified_by", None)]
+
+    students_map = {u.id: u for u in User.objects(id__in=student_ids).all()} if student_ids else {}
+    lessons_map = {l.id: l for l in Lesson.objects(id__in=lesson_ids).all()} if lesson_ids else {}
+    verifiers_map = {u.id: u for u in User.objects(id__in=verifier_ids).all()} if verifier_ids else {}
+
+    return render_template(
+        "teacher/certificates_verification.html",
+        certificates=certificates,
+        students_map=students_map,
+        lessons_map=lessons_map,
+        verifiers_map=verifiers_map,
+    )
+
+
+@teacher_bp.route("/assignments", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def assignments_manage():
+    if request.method == "POST":
+        action = (request.form.get("action") or "create").strip()
+        if action == "create":
+            title = (request.form.get("title") or "").strip()
+            description = (request.form.get("description") or "").strip() or None
+            due_at_raw = (request.form.get("due_at") or "").strip()
+            target_student_id = (request.form.get("target_student_id") or "").strip()
+            subject_id = (request.form.get("subject_id") or "").strip()
+            section_id = (request.form.get("section_id") or "").strip()
+            lesson_id = (request.form.get("lesson_id") or "").strip()
+
+            if not title:
+                flash("عنوان الواجب مطلوب.", "error")
+                return redirect(url_for("teacher.assignments_manage"))
+
+            due_at = None
+            if due_at_raw:
+                try:
+                    due_at = datetime.fromisoformat(due_at_raw)
+                except Exception:
+                    flash("تنسيق تاريخ الاستحقاق غير صحيح.", "error")
+                    return redirect(url_for("teacher.assignments_manage"))
+
+            assignment = Assignment(
+                title=title,
+                description=description,
+                created_by=current_user.id,
+                due_at=due_at,
+                is_active=True,
+            )
+
+            if target_student_id and ObjectId.is_valid(target_student_id):
+                target_student = User.objects(id=target_student_id, role="student").first()
+                if target_student:
+                    assignment.target_student_id = target_student.id
+            if subject_id and ObjectId.is_valid(subject_id):
+                subject = Subject.objects(id=subject_id).first()
+                if subject:
+                    assignment.subject_id = subject.id
+            if section_id and ObjectId.is_valid(section_id):
+                section = Section.objects(id=section_id).first()
+                if section:
+                    assignment.section_id = section.id
+            if lesson_id and ObjectId.is_valid(lesson_id):
+                lesson = Lesson.objects(id=lesson_id).first()
+                if lesson:
+                    assignment.lesson_id = lesson.id
+
+            assignment.save()
+            flash("تم إنشاء الواجب بنجاح.", "success")
+            return redirect(url_for("teacher.assignments_manage"))
+
+        if action == "create_custom_test":
+            title = (request.form.get("title") or "").strip()
+            description = (request.form.get("description") or "").strip() or None
+            due_at_raw = (request.form.get("due_at") or "").strip()
+            target_student_id = (request.form.get("target_student_id") or "").strip()
+            carried_ids_csv = (request.form.get("selected_question_ids_csv") or "").strip()
+            carried_ids = [qid.strip() for qid in carried_ids_csv.split(",") if ObjectId.is_valid(qid.strip())]
+            question_ids = [qid for qid in request.form.getlist("question_ids") if ObjectId.is_valid(qid)]
+            # Keep selected questions across paginated pages.
+            question_ids = list(dict.fromkeys(carried_ids + question_ids))
+            written_raw = (request.form.get("written_questions") or "").strip()
+
+            if not title:
+                flash("عنوان الواجب مطلوب.", "error")
+                return redirect(url_for("teacher.assignments_manage"))
+            if not question_ids and not written_raw:
+                flash("اختر أسئلة MCQ أو أضف سؤالاً كتابياً واحداً على الأقل.", "error")
+                return redirect(url_for("teacher.assignments_manage"))
+
+            due_at = None
+            if due_at_raw:
+                try:
+                    due_at = datetime.fromisoformat(due_at_raw)
+                except Exception:
+                    flash("تنسيق تاريخ الاستحقاق غير صحيح.", "error")
+                    return redirect(url_for("teacher.assignments_manage"))
+
+            written_items = []
+            for line in written_raw.splitlines():
+                text = line.strip()
+                if not text:
+                    continue
+                max_score = 5
+                prompt = text
+                if "||" in text:
+                    parts = text.split("||", 1)
+                    prompt = parts[0].strip()
+                    try:
+                        max_score = max(1, int(parts[1].strip()))
+                    except Exception:
+                        max_score = 5
+                written_items.append({"prompt": prompt, "max_score": max_score})
+
+            assignment = Assignment(
+                title=title,
+                description=description,
+                created_by=current_user.id,
+                due_at=due_at,
+                is_active=True,
+                assignment_mode="custom_test",
+                selected_question_ids_json=json.dumps(question_ids),
+                written_questions_json=json.dumps(written_items),
+                max_score=0,
+            )
+            if target_student_id and ObjectId.is_valid(target_student_id):
+                target_student = User.objects(id=target_student_id, role="student").first()
+                if target_student:
+                    assignment.target_student_id = target_student.id
+
+            total_score = 0
+            if question_ids:
+                total_score += len(question_ids)
+            total_score += sum(int(i.get("max_score", 0) or 0) for i in written_items)
+            assignment.max_score = total_score
+            assignment.save()
+
+            flash("تم إنشاء واجب اختبار مخصص.", "success")
+            return redirect(url_for("teacher.assignments_manage"))
+
+        if action == "toggle_active":
+            assignment_id = request.form.get("assignment_id")
+            assignment = Assignment.objects(id=assignment_id).first()
+            if assignment:
+                assignment.is_active = not assignment.is_active
+                assignment.save()
+                flash("تم تحديث حالة الواجب.", "success")
+            return redirect(url_for("teacher.assignments_manage"))
+
+        if action == "delete":
+            assignment_id = request.form.get("assignment_id")
+            assignment = Assignment.objects(id=assignment_id).first()
+            if assignment:
+                AssignmentSubmission.objects(assignment_id=assignment.id).delete()
+                AssignmentAttempt.objects(assignment_id=assignment.id).delete()
+                assignment.delete()
+                flash("تم حذف الواجب.", "success")
+            return redirect(url_for("teacher.assignments_manage"))
+
+    assignments = list(Assignment.objects().order_by("-created_at").all())
+    submissions = AssignmentSubmission.objects(assignment_id__in=[a.id for a in assignments]).all() if assignments else []
+    attempts = AssignmentAttempt.objects(assignment_id__in=[a.id for a in assignments]).all() if assignments else []
+    submissions_by_assignment = {}
+    for sub in submissions:
+        aid = sub.assignment_id.id if sub.assignment_id else None
+        if not aid:
+            continue
+        submissions_by_assignment.setdefault(aid, []).append(sub)
+
+    attempts_by_assignment = {}
+    for attempt in attempts:
+        aid = attempt.assignment_id.id if attempt.assignment_id else None
+        if not aid:
+            continue
+        attempts_by_assignment.setdefault(aid, []).append(attempt)
+
+    students = list(User.objects(role="student").order_by("username").all())
+    subjects = list(Subject.objects().order_by("name").all())
+    sections = list(Section.objects().order_by("title").all())
+    lessons = list(Lesson.objects().order_by("title").all())
+
+    selected_custom_lesson_id = (request.args.get("custom_lesson_id") or "").strip()
+    questions_page = max(1, int(request.args.get("questions_page", 1) or 1))
+    questions_per_page = 25
+    selected_question_ids = [
+        qid.strip()
+        for qid in (request.args.get("selected_question_ids") or "").split(",")
+        if ObjectId.is_valid(qid.strip())
+    ]
+
+    selected_custom_lesson = None
+    questions = []
+    questions_total = 0
+    questions_total_pages = 1
+
+    if selected_custom_lesson_id and ObjectId.is_valid(selected_custom_lesson_id):
+        selected_custom_lesson = Lesson.objects(id=selected_custom_lesson_id).first()
+        if selected_custom_lesson:
+            lesson_test_ids = [t.id for t in Test.objects(lesson_id=selected_custom_lesson.id).only("id").all()]
+            if lesson_test_ids:
+                q_query = Question.objects(test_id__in=lesson_test_ids).order_by("-created_at")
+                questions_total = q_query.count()
+                questions_total_pages = max(1, (questions_total + questions_per_page - 1) // questions_per_page)
+                if questions_page > questions_total_pages:
+                    questions_page = questions_total_pages
+                questions = list(
+                    q_query.skip((questions_page - 1) * questions_per_page).limit(questions_per_page).all()
+                )
+            else:
+                questions_total = 0
+                questions_total_pages = 1
+
+    return render_template(
+        "teacher/assignments_manage.html",
+        assignments=assignments,
+        submissions_by_assignment=submissions_by_assignment,
+        attempts_by_assignment=attempts_by_assignment,
+        students=students,
+        subjects=subjects,
+        sections=sections,
+        lessons=lessons,
+        questions=questions,
+        selected_custom_lesson_id=selected_custom_lesson_id,
+        selected_custom_lesson=selected_custom_lesson,
+        questions_page=questions_page,
+        questions_per_page=questions_per_page,
+        questions_total=questions_total,
+        questions_total_pages=questions_total_pages,
+        selected_question_ids=selected_question_ids,
+    )
+
+
+@teacher_bp.route("/assignments/<assignment_id>/submissions", methods=["GET"])
+@login_required
+@role_required("teacher")
+def assignment_submissions(assignment_id):
+    assignment = Assignment.objects(id=assignment_id).first()
+    if not assignment:
+        raise NotFound()
+
+    attempts = list(AssignmentAttempt.objects(assignment_id=assignment.id).order_by("-submitted_at").all())
+    return render_template("teacher/assignment_submissions.html", assignment=assignment, attempts=attempts)
+
+
+@teacher_bp.route("/assignments/<assignment_id>/questions", methods=["GET"])
+@login_required
+@role_required("teacher")
+def assignment_questions(assignment_id):
+    assignment = Assignment.objects(id=assignment_id, assignment_mode="custom_test").first()
+    if not assignment:
+        raise NotFound()
+
+    question_ids = []
+    if assignment.selected_question_ids_json:
+        try:
+            question_ids = [qid for qid in json.loads(assignment.selected_question_ids_json) if ObjectId.is_valid(qid)]
+        except Exception:
+            question_ids = []
+
+    questions = Question.objects(id__in=question_ids).all() if question_ids else []
+    questions_by_id = {str(q.id): q for q in questions}
+    ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
+
+    written_items = []
+    if assignment.written_questions_json:
+        try:
+            payload = json.loads(assignment.written_questions_json)
+            if isinstance(payload, list):
+                written_items = payload
+        except Exception:
+            written_items = []
+
+    return render_template(
+        "teacher/assignment_questions.html",
+        assignment=assignment,
+        questions=ordered_questions,
+        written_items=written_items,
+    )
+
+
+@teacher_bp.route("/assignment-attempts/<attempt_id>/grade", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def grade_assignment_attempt(attempt_id):
+    attempt = AssignmentAttempt.objects(id=attempt_id).first()
+    if not attempt:
+        raise NotFound()
+    assignment = attempt.assignment_id
+    if not assignment:
+        raise NotFound()
+
+    question_ids = []
+    if assignment.selected_question_ids_json:
+        try:
+            question_ids = [qid for qid in json.loads(assignment.selected_question_ids_json) if ObjectId.is_valid(qid)]
+        except Exception:
+            question_ids = []
+    questions = Question.objects(id__in=question_ids).all() if question_ids else []
+    questions_by_id = {str(q.id): q for q in questions}
+
+    written_items = []
+    if assignment.written_questions_json:
+        try:
+            payload = json.loads(assignment.written_questions_json)
+            if isinstance(payload, list):
+                written_items = payload
+        except Exception:
+            written_items = []
+
+    answers = []
+    try:
+        raw_answers = json.loads(attempt.answers_json or "[]")
+        if isinstance(raw_answers, list):
+            answers = raw_answers
+    except Exception:
+        answers = []
+
+    if request.method == "POST":
+        scored_answers = []
+        total_awarded = 0
+
+        for idx, ans in enumerate(answers):
+            score_val = request.form.get(f"score_{idx}")
+            try:
+                score = max(0, int(score_val or 0))
+            except Exception:
+                score = 0
+            max_for_answer = max(0, int(ans.get("max_score", 1) or 1))
+            if score > max_for_answer:
+                score = max_for_answer
+            ans["score_awarded"] = score
+            total_awarded += score
+            scored_answers.append(ans)
+
+        attempt.answers_json = json.dumps(scored_answers, ensure_ascii=False)
+        attempt.score_awarded = max(0, total_awarded)
+        attempt.total_score = int(assignment.max_score or 0)
+        attempt.teacher_note = (request.form.get("teacher_note") or "").strip() or None
+        attempt.status = "graded"
+        attempt.graded_by = current_user.id
+        attempt.graded_at = datetime.utcnow()
+        attempt.save()
+
+        flash("تم تصحيح المحاولة وإضافة الدرجة.", "success")
+        return redirect(url_for("teacher.assignment_submissions", assignment_id=assignment.id))
+
+    prepared_answers = []
+    for idx, ans in enumerate(answers):
+        item_type = ans.get("type")
+        row = {
+            "index": idx,
+            "type": item_type,
+            "answer": ans,
+            "question": None,
+            "max_score": int(ans.get("max_score", 1) or 1),
+        }
+        if item_type == "mcq":
+            qid = str(ans.get("question_id") or "")
+            row["question"] = questions_by_id.get(qid)
+            row["max_score"] = 1
+        prepared_answers.append(row)
+
+    return render_template(
+        "teacher/assignment_grade.html",
+        assignment=assignment,
+        attempt=attempt,
+        prepared_answers=prepared_answers,
+        written_items=written_items,
+    )
+
+
+def _pdf_font_candidates():
+    return [
+        ("C:\\Windows\\Fonts\\tahoma.ttf", "C:\\Windows\\Fonts\\tahomabd.ttf"),
+        ("C:\\Windows\\Fonts\\arial.ttf", "C:\\Windows\\Fonts\\arialbd.ttf"),
+    ]
+
+
+def _pdf_pick_font_paths():
+    for regular, bold in _pdf_font_candidates():
+        if os.path.exists(regular):
+            return regular, bold if os.path.exists(bold) else regular
+    return None, None
+
+
+def _shape_arabic_text(text):
+    value = str(text or "")
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+
+        return get_display(arabic_reshaper.reshape(value))
+    except Exception:
+        return value
+
+
+def _collect_report_data(filter_student=None):
+    attempts_q = Attempt.objects(student_id=filter_student.id) if filter_student else Attempt.objects()
+    custom_attempts_q = CustomTestAttempt.objects(student_id=filter_student.id, status="submitted") if filter_student else CustomTestAttempt.objects(status="submitted")
+    lessons_done_q = LessonCompletion.objects(student_id=filter_student.id) if filter_student else LessonCompletion.objects()
+    standard_assignments_done_q = AssignmentSubmission.objects(student_id=filter_student.id, status="completed") if filter_student else AssignmentSubmission.objects(status="completed")
+    custom_assignments_done_q = AssignmentAttempt.objects(student_id=filter_student.id, status="graded") if filter_student else AssignmentAttempt.objects(status="graded")
+    gamification_q = StudentGamification.objects(student_id=filter_student.id) if filter_student else StudentGamification.objects()
+
+    attempts = list(attempts_q.only("score", "total", "test_id", "student_id", "submitted_at").all())
+    avg_score = 0
+    pass_rate = 0
+    if attempts:
+        vals = [((a.score / a.total) * 100) for a in attempts if a.total]
+        if vals:
+            avg_score = round(sum(vals) / len(vals), 2)
+            pass_rate = round((len([x for x in vals if x >= 50]) / len(vals)) * 100, 2)
+
+    assignments_total_q = Assignment.objects()
+    if filter_student:
+        assignments_total_q = assignments_total_q.filter(__raw__={
+            "$or": [
+                {"target_student_id": filter_student.id},
+                {"target_student_id": None},
+                {"target_student_id": {"$exists": False}},
+            ]
+        })
+
+    assignments_total = assignments_total_q.count()
+    assignments_completed = int(standard_assignments_done_q.count() + custom_assignments_done_q.count())
+    assignment_completion_rate = round((assignments_completed / assignments_total) * 100, 2) if assignments_total else 0
+
+    profiles = list(gamification_q.only("xp_total").all())
+    avg_xp = round(sum(int(p.xp_total or 0) for p in profiles) / len(profiles), 2) if profiles else 0
+
+    by_test = {}
+    for a in attempts:
+        if not a.test_id or not a.total:
+            continue
+        tid = str(a.test_id.id)
+        pct = (a.score / a.total) * 100
+        bucket = by_test.setdefault(
+            tid,
+            {
+                "title": a.test_id.title if a.test_id else "-",
+                "sum": 0.0,
+                "count": 0,
+                "pass": 0,
+            },
+        )
+        bucket["sum"] += pct
+        bucket["count"] += 1
+        if pct >= 50:
+            bucket["pass"] += 1
+
+    tests_stats = []
+    for _, v in by_test.items():
+        avg = (v["sum"] / v["count"]) if v["count"] else 0
+        tests_stats.append(
+            {
+                "title": v["title"],
+                "avg": round(avg, 2),
+                "count": v["count"],
+                "pass_rate": round((v["pass"] / v["count"]) * 100, 2) if v["count"] else 0,
+            }
+        )
+    tests_stats.sort(key=lambda x: x["avg"])
+
+    top_students = []
+    if not filter_student:
+        top_profiles = list(StudentGamification.objects.order_by("-xp_total").limit(5).all())
+        user_map = {u.id: u for u in User.objects(id__in=[p.student_id.id for p in top_profiles if p.student_id]).all()}
+        for idx, profile in enumerate(top_profiles, start=1):
+            if not profile.student_id:
+                continue
+            top_students.append(
+                {
+                    "rank": idx,
+                    "name": (user_map.get(profile.student_id.id).full_name if user_map.get(profile.student_id.id) else "-") ,
+                    "xp": int(profile.xp_total or 0),
+                    "level": int(profile.level or 1),
+                }
+            )
+    elif filter_student:
+        profile = StudentGamification.objects(student_id=filter_student.id).first()
+        top_students.append(
+            {
+                "rank": 1,
+                "name": filter_student.full_name,
+                "xp": int(profile.xp_total or 0) if profile else 0,
+                "level": int(profile.level or 1) if profile else 1,
+            }
+        )
+
+    return {
+        "regular_attempts": attempts_q.count(),
+        "custom_attempts": custom_attempts_q.count(),
+        "lessons_completed": lessons_done_q.count(),
+        "assignments_completed": assignments_completed,
+        "avg_score": avg_score,
+        "students_count": gamification_q.count(),
+        "pass_rate": pass_rate,
+        "avg_xp": avg_xp,
+        "assignment_completion_rate": assignment_completion_rate,
+        "subjects_count": Subject.objects.count(),
+        "sections_count": Section.objects.count(),
+        "lessons_count": Lesson.objects.count(),
+        "tests_count": Test.objects.count(),
+        "weak_tests": tests_stats[:5],
+        "strong_tests": sorted(tests_stats, key=lambda x: x["avg"], reverse=True)[:5],
+        "top_students": top_students,
+        "generated_at": datetime.utcnow(),
+    }
+
+
+@teacher_bp.route("/reports", methods=["GET"])
+@login_required
+@role_required("teacher")
+def reports_dashboard():
+    student_id = (request.args.get("student_id") or "").strip()
+    students = list(User.objects(role="student").order_by("username").all())
+
+    filter_student = None
+    if student_id and ObjectId.is_valid(student_id):
+        filter_student = User.objects(id=student_id, role="student").first()
+    report = _collect_report_data(filter_student=filter_student)
+
+    return render_template(
+        "teacher/reports_dashboard.html",
+        report=report,
+        students=students,
+        selected_student=filter_student,
+    )
+
+
+@teacher_bp.route("/reports/download", methods=["GET"])
+@login_required
+@role_required("teacher")
+def reports_download_pdf():
+    if FPDF is None:
+        flash("مكتبة PDF غير متوفرة. ثبت fpdf2 أولاً.", "error")
+        return redirect(url_for("teacher.reports_dashboard"))
+
+    student_id = (request.args.get("student_id") or "").strip()
+    student = None
+    if student_id and ObjectId.is_valid(student_id):
+        student = User.objects(id=student_id, role="student").first()
+
+    report = _collect_report_data(filter_student=student)
+
+    pdf = FPDF()
+    if hasattr(pdf, "set_auto_page_break"):
+        pdf.set_auto_page_break(auto=True, margin=12)
+
+    regular_font, bold_font = _pdf_pick_font_paths()
+    using_ar_font = False
+    if regular_font:
+        try:
+            pdf.add_font("Arabic", "", regular_font)
+            pdf.add_font("Arabic", "B", bold_font or regular_font)
+            using_ar_font = True
+        except Exception:
+            using_ar_font = False
+
+    pdf.add_page()
+
+    logo_path = os.path.join(os.path.dirname(__file__), "static", "edupath-logo.png")
+    if os.path.exists(logo_path):
+        try:
+            pdf.image(logo_path, x=12, y=8, w=26)
+        except Exception:
+            pass
+
+    title_font = "Arabic" if using_ar_font else "Helvetica"
+    body_font = "Arabic" if using_ar_font else "Helvetica"
+    title = _shape_arabic_text("تقرير منصة EduPath") if using_ar_font else "EduPath Report"
+    scope_text = student.full_name if student else "كل الطلاب"
+
+    if using_ar_font and hasattr(pdf, "set_text_shaping"):
+        try:
+            pdf.set_text_shaping(True)
+        except Exception:
+            pass
+
+    pdf.set_font(title_font, "B", 17)
+    pdf.cell(0, 10, title, ln=1, align="R" if using_ar_font else "L")
+    pdf.set_font(body_font, "", 11)
+    generated_at_text = _shape_arabic_text(f"تاريخ الإنشاء: {report['generated_at'].strftime('%Y-%m-%d %H:%M UTC')}") if using_ar_font else f"Generated At: {report['generated_at'].strftime('%Y-%m-%d %H:%M UTC')}"
+    scope_line = _shape_arabic_text(f"نطاق التقرير: {scope_text}") if using_ar_font else f"Scope: {scope_text}"
+    pdf.cell(0, 8, generated_at_text, ln=1, align="R" if using_ar_font else "L")
+    pdf.cell(0, 8, scope_line, ln=1, align="R" if using_ar_font else "L")
+    pdf.ln(3)
+
+    metric_lines = [
+        ("عدد محاولات الاختبارات", report["regular_attempts"]),
+        ("عدد المحاولات المخصصة", report["custom_attempts"]),
+        ("عدد الدروس المكتملة", report["lessons_completed"]),
+        ("الواجبات المكتملة", report["assignments_completed"]),
+        ("متوسط النتائج", f"{report['avg_score']}%"),
+        ("نسبة النجاح", f"{report['pass_rate']}%"),
+        ("متوسط XP", report["avg_xp"]),
+        ("نسبة إنجاز الواجبات", f"{report['assignment_completion_rate']}%"),
+        ("عدد المواد", report["subjects_count"]),
+        ("عدد الأقسام", report["sections_count"]),
+        ("عدد الدروس", report["lessons_count"]),
+        ("عدد الاختبارات", report["tests_count"]),
+    ]
+
+    pdf.set_font(title_font, "B", 13)
+    section_title = _shape_arabic_text("المؤشرات الرئيسية") if using_ar_font else "Key Metrics"
+    pdf.cell(0, 8, section_title, ln=1, align="R" if using_ar_font else "L")
+    pdf.set_font(body_font, "", 11)
+    for key, value in metric_lines:
+        line = _shape_arabic_text(f"{key}: {value}") if using_ar_font else f"{key}: {value}"
+        pdf.cell(0, 7, line, ln=1, align="R" if using_ar_font else "L")
+
+    if report.get("weak_tests"):
+        pdf.ln(2)
+        pdf.set_font(title_font, "B", 13)
+        weak_title = _shape_arabic_text("أضعف الاختبارات") if using_ar_font else "Weakest Tests"
+        pdf.cell(0, 8, weak_title, ln=1, align="R" if using_ar_font else "L")
+        pdf.set_font(body_font, "", 10)
+        for t in report["weak_tests"][:5]:
+            line = _shape_arabic_text(f"- {t['title']} | متوسط: {t['avg']}% | محاولات: {t['count']}") if using_ar_font else f"- {t['title']} | Avg: {t['avg']}% | Attempts: {t['count']}"
+            pdf.multi_cell(0, 6, line, align="R" if using_ar_font else "L")
+
+    if report.get("top_students"):
+        pdf.ln(1)
+        pdf.set_font(title_font, "B", 13)
+        top_title = _shape_arabic_text("أفضل الطلاب (XP)") if using_ar_font else "Top Students (XP)"
+        pdf.cell(0, 8, top_title, ln=1, align="R" if using_ar_font else "L")
+        pdf.set_font(body_font, "", 10)
+        for st in report["top_students"][:5]:
+            line = _shape_arabic_text(f"#{st['rank']} - {st['name']} | XP: {st['xp']} | Level: {st['level']}") if using_ar_font else f"#{st['rank']} - {st['name']} | XP: {st['xp']} | Level: {st['level']}"
+            pdf.cell(0, 6, line, ln=1, align="R" if using_ar_font else "L")
+
+    out = pdf.output(dest="S")
+    if isinstance(out, bytearray):
+        out = bytes(out)
+    elif isinstance(out, str):
+        out = out.encode("latin-1", errors="ignore")
+
+    filename = f"report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf"
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    return Response(out, mimetype="application/pdf", headers=headers)
+
+
+@teacher_bp.route("/analytics", methods=["GET"])
+@login_required
+@role_required("teacher")
+def analytics_dashboard():
+    attempts = list(Attempt.objects().only("test_id", "student_id", "score", "total", "submitted_at").all())
+    lessons_completed = LessonCompletion.objects.count()
+    assignments_total = Assignment.objects.count()
+    assignments_done = int(AssignmentSubmission.objects(status="completed").count() + AssignmentAttempt.objects(status="graded").count())
+    students_count = User.objects(role="student").count()
+    subjects_count = Subject.objects.count()
+    sections_count = Section.objects.count()
+    lessons_count = Lesson.objects.count()
+    tests_count = Test.objects.count()
+    questions_count = int(Question.objects.count() + TestTextQuestion.objects.count())
+
+    overall_avg = 0
+    scored = [((a.score / a.total) * 100) for a in attempts if a.total]
+    if scored:
+        overall_avg = round(sum(scored) / len(scored), 2)
+    pass_rate = round((len([s for s in scored if s >= 50]) / len(scored)) * 100, 2) if scored else 0
+
+    by_test = {}
+    for a in attempts:
+        if not a.test_id or not a.total:
+            continue
+        tid = str(a.test_id.id)
+        bucket = by_test.setdefault(tid, {"title": a.test_id.title if a.test_id else "-", "sum": 0.0, "count": 0})
+        bucket["sum"] += (a.score / a.total) * 100
+        bucket["count"] += 1
+
+    weak_tests = []
+    for _, v in by_test.items():
+        avg = (v["sum"] / v["count"]) if v["count"] else 0
+        weak_tests.append({"title": v["title"], "avg": round(avg, 2), "count": v["count"]})
+    weak_tests.sort(key=lambda x: x["avg"])
+
+    strong_tests = sorted(weak_tests, key=lambda x: x["avg"], reverse=True)
+
+    diff_counts = {
+        "easy": Question.objects(difficulty="easy").count(),
+        "medium": Question.objects(difficulty="medium").count(),
+        "hard": Question.objects(difficulty="hard").count(),
+    }
+    diff_total = max(1, sum(diff_counts.values()))
+    difficulty_stats = {
+        "easy": {"count": diff_counts["easy"], "pct": round((diff_counts["easy"] / diff_total) * 100, 2)},
+        "medium": {"count": diff_counts["medium"], "pct": round((diff_counts["medium"] / diff_total) * 100, 2)},
+        "hard": {"count": diff_counts["hard"], "pct": round((diff_counts["hard"] / diff_total) * 100, 2)},
+    }
+
+    xp_profiles = list(StudentGamification.objects.only("student_id", "xp_total", "level").order_by("-xp_total").limit(5).all())
+    top_users = User.objects(id__in=[p.student_id.id for p in xp_profiles if p.student_id]).all() if xp_profiles else []
+    user_map = {u.id: u for u in top_users}
+    top_students = []
+    for idx, p in enumerate(xp_profiles, start=1):
+        if not p.student_id:
+            continue
+        user = user_map.get(p.student_id.id)
+        top_students.append(
+            {
+                "rank": idx,
+                "name": user.full_name if user else "-",
+                "xp": int(p.xp_total or 0),
+                "level": int(p.level or 1),
+            }
+        )
+
+    trend_points = []
+    for i in range(6, -1, -1):
+        day_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        trend_points.append(
+            {
+                "label": day_start.strftime("%m-%d"),
+                "attempts": Attempt.objects(submitted_at__gte=day_start, submitted_at__lt=day_end).count(),
+                "lessons": LessonCompletion.objects(completed_at__gte=day_start, completed_at__lt=day_end).count(),
+            }
+        )
+
+    metrics = {
+        "overall_avg": overall_avg,
+        "pass_rate": pass_rate,
+        "lessons_completed": lessons_completed,
+        "assignments_total": assignments_total,
+        "assignments_done": assignments_done,
+        "assignment_completion_rate": round((assignments_done / assignments_total) * 100, 2) if assignments_total else 0,
+        "active_study_plans": StudyPlan.objects(is_active=True).count(),
+        "students_count": students_count,
+        "subjects_count": subjects_count,
+        "sections_count": sections_count,
+        "lessons_count": lessons_count,
+        "tests_count": tests_count,
+        "questions_count": questions_count,
+        "attempts_total": len(attempts),
+        "avg_attempts_per_student": round((len(attempts) / students_count), 2) if students_count else 0,
+    }
+    return render_template(
+        "teacher/analytics_dashboard.html",
+        metrics=metrics,
+        weak_tests=weak_tests[:10],
+        strong_tests=strong_tests[:10],
+        top_students=top_students,
+        difficulty_stats=difficulty_stats,
+        trend_points=trend_points,
+    )
+
+
+@teacher_bp.route("/study-plans", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def study_plans_manage():
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+
+        if action == "create_plan":
+            student_id = request.form.get("student_id")
+            title = (request.form.get("title") or "").strip()
+            description = (request.form.get("description") or "").strip() or None
+            week_start_raw = (request.form.get("week_start") or "").strip()
+            week_end_raw = (request.form.get("week_end") or "").strip()
+
+            if not title:
+                flash("عنوان الخطة مطلوب.", "error")
+                return redirect(url_for("teacher.study_plans_manage"))
+
+            student = User.objects(id=student_id, role="student").first()
+            if not student:
+                flash("الطالب غير موجود.", "error")
+                return redirect(url_for("teacher.study_plans_manage"))
+
+            week_start = None
+            week_end = None
+            try:
+                if week_start_raw:
+                    week_start = datetime.fromisoformat(week_start_raw)
+                if week_end_raw:
+                    week_end = datetime.fromisoformat(week_end_raw)
+            except Exception:
+                flash("تنسيق تاريخ الخطة غير صحيح.", "error")
+                return redirect(url_for("teacher.study_plans_manage"))
+
+            plan = StudyPlan(
+                student_id=student.id,
+                title=title,
+                description=description,
+                week_start=week_start,
+                week_end=week_end,
+                created_by=current_user.id,
+                is_active=True,
+            )
+            plan.save()
+            flash("تم إنشاء الخطة الدراسية.", "success")
+            return redirect(url_for("teacher.study_plans_manage"))
+
+        if action == "add_item":
+            plan_id = request.form.get("plan_id")
+            title = (request.form.get("item_title") or "").strip()
+            lesson_id = (request.form.get("lesson_id") or "").strip()
+            test_id = (request.form.get("test_id") or "").strip()
+            due_at_raw = (request.form.get("due_at") or "").strip()
+
+            plan = StudyPlan.objects(id=plan_id).first()
+            if not plan:
+                flash("الخطة غير موجودة.", "error")
+                return redirect(url_for("teacher.study_plans_manage"))
+            if not title:
+                flash("عنوان المهمة مطلوب.", "error")
+                return redirect(url_for("teacher.study_plans_manage"))
+
+            due_at = None
+            if due_at_raw:
+                try:
+                    due_at = datetime.fromisoformat(due_at_raw)
+                except Exception:
+                    flash("تنسيق موعد المهمة غير صحيح.", "error")
+                    return redirect(url_for("teacher.study_plans_manage"))
+
+            item = StudyPlanItem(plan_id=plan.id, title=title, due_at=due_at)
+            if lesson_id and ObjectId.is_valid(lesson_id):
+                lesson = Lesson.objects(id=lesson_id).first()
+                if lesson:
+                    item.lesson_id = lesson.id
+            if test_id and ObjectId.is_valid(test_id):
+                test = Test.objects(id=test_id).first()
+                if test:
+                    item.test_id = test.id
+            item.save()
+            flash("تمت إضافة مهمة للخطة.", "success")
+            return redirect(url_for("teacher.study_plans_manage"))
+
+        if action == "toggle_plan":
+            plan_id = request.form.get("plan_id")
+            plan = StudyPlan.objects(id=plan_id).first()
+            if plan:
+                plan.is_active = not plan.is_active
+                plan.save()
+                flash("تم تحديث حالة الخطة.", "success")
+            return redirect(url_for("teacher.study_plans_manage"))
+
+    students = list(User.objects(role="student").order_by("username").all())
+    lessons = list(Lesson.objects().order_by("title").all())
+    tests = list(Test.objects().order_by("title").all())
+
+    plans = list(StudyPlan.objects().order_by("-created_at").all())
+    items = StudyPlanItem.objects(plan_id__in=[p.id for p in plans]).all() if plans else []
+    items_by_plan = {}
+    for item in items:
+        pid = item.plan_id.id if item.plan_id else None
+        if not pid:
+            continue
+        items_by_plan.setdefault(pid, []).append(item)
+
+    return render_template(
+        "teacher/study_plans_manage.html",
+        students=students,
+        lessons=lessons,
+        tests=tests,
+        plans=plans,
+        items_by_plan=items_by_plan,
+    )
 
 
 def _rebuild_ranked_students():
@@ -353,12 +1535,12 @@ def gamification_admin():
                 target_xp = max(0, int(request.form.get("target_xp") or 0))
                 delta = target_xp - int(profile.xp_total or 0)
                 applied = _apply_xp_delta(profile, delta, actor_label=f"set_xp:{current_user.id}")
-                flash(f"تم تحديث XP للطالب {student.username} (Δ {applied}).", "success")
+                flash(f"تم تحديث XP للطالب {student.full_name} (Δ {applied}).", "success")
 
             elif action == "adjust_student_xp":
                 delta = int(request.form.get("xp_delta") or 0)
                 applied = _apply_xp_delta(profile, delta, actor_label=f"delta_xp:{current_user.id}")
-                flash(f"تم تعديل XP للطالب {student.username} (Δ {applied}).", "success")
+                flash(f"تم تعديل XP للطالب {student.full_name} (Δ {applied}).", "success")
 
             elif action == "set_student_rank":
                 requested_rank = max(1, int(request.form.get("target_rank") or 1))
@@ -381,7 +1563,7 @@ def gamification_admin():
                 delta = desired_xp - int(profile.xp_total or 0)
                 applied = _apply_xp_delta(profile, delta, actor_label=f"set_rank:{current_user.id}")
                 flash(
-                    f"تم ضبط XP للطالب {student.username} لمحاولة الوصول للرتبة {requested_rank} (Δ {applied}).",
+                    f"تم ضبط XP للطالب {student.full_name} لمحاولة الوصول للرتبة {requested_rank} (Δ {applied}).",
                     "success",
                 )
 
@@ -1082,7 +2264,8 @@ def test_detail(test_id):
     if not test:
         raise NotFound()
     questions = list(Question.objects(test_id=test.id).order_by('created_at').all())
-    return render_template("teacher/test_detail.html", test=test, questions=questions)
+    text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
+    return render_template("teacher/test_detail.html", test=test, questions=questions, text_questions=text_questions)
 
 
 @teacher_bp.route("/tests/<test_id>/edit", methods=["GET", "POST"])
@@ -1204,6 +2387,49 @@ def edit_test(test_id):
                 flash(f"تم حذف {deleted} سؤال.", "success")
             else:
                 flash("لم يتم اختيار أي سؤال.", "warning")
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+        elif form_name == "upsert_text_question":
+            text_question_id = request.form.get("text_question_id")
+            text = (request.form.get("text_question_text") or "").strip()
+            hint = (request.form.get("text_question_hint") or "").strip() or None
+            try:
+                max_score = max(1, int(request.form.get("text_question_max_score") or 5))
+            except Exception:
+                max_score = 5
+
+            if not text:
+                flash("نص السؤال النصي مطلوب.", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            text_question = None
+            if text_question_id:
+                text_question = TestTextQuestion.objects(id=text_question_id, test_id=test.id).first()
+
+            if text_question:
+                text_question.text = text
+                text_question.hint = hint
+                text_question.max_score = max_score
+                text_question.save()
+                flash("تم تحديث السؤال النصي.", "success")
+            else:
+                TestTextQuestion(
+                    test_id=test.id,
+                    text=text,
+                    hint=hint,
+                    max_score=max_score,
+                ).save()
+                flash("تمت إضافة السؤال النصي.", "success")
+
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+        elif form_name == "delete_text_question":
+            text_question_id = request.form.get("text_question_id")
+            if text_question_id:
+                tq = TestTextQuestion.objects(id=text_question_id, test_id=test.id).first()
+                if tq:
+                    tq.delete()
+                    flash("تم حذف السؤال النصي.", "success")
             return redirect(url_for("teacher.edit_test", test_id=test.id))
 
         elif form_name == "import_json":
@@ -1380,7 +2606,8 @@ def edit_test(test_id):
                 q.correct_choice_id = correct_choice.choice_id
                 q.save()
 
-    return render_template("teacher/test_edit.html", form=form, meta_form=form, test=test)
+    text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
+    return render_template("teacher/test_edit.html", form=form, meta_form=form, test=test, text_questions=text_questions)
 
 
 @teacher_bp.route("/tests/<test_id>/delete", methods=["POST"])

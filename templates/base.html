@@ -31,21 +31,6 @@
         </div>
         <ul class="navbar-nav me-auto">
           <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">الرئيسية</a></li>
-          {% if current_user.is_authenticated %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('student.subjects') }}">المواد</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('student.leaderboard') }}">لوحة الصدارة</a></li>
-            {% if current_user.role|lower == 'student' %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('student.results') }}">النتائج</a></li>
-            {% endif %}
-            {% if current_user.role|lower in ['teacher', 'admin'] %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.dashboard') }}">لوحة المعلم</a></li>
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.results_overview') }}">النتائج</a></li>
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.gamification_admin') }}">إدارة XP</a></li>
-            {% endif %}
-            {% if current_user.role|lower in ['teacher', 'admin'] %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}">الإدارة</a></li>
-            {% endif %}
-          {% endif %}
         </ul>
         <ul class="navbar-nav align-items-center gap-2">
           {% if current_user.is_authenticated %}
@@ -53,7 +38,7 @@
               {% if student_gamification_nav %}
                 <li class="nav-item">
                   <span class="badge text-bg-light border border-success-subtle text-success-emphasis">
-                    Lvl {{ student_gamification_nav.level }} - XP {{ student_gamification_nav.xp_total }}
+                    Lvl {{ student_gamification_nav.level }} - XP {{ student_gamification_nav.xp_total }} - Streak {{ student_gamification_nav.current_streak|default(0) }}
                   </span>
                 </li>
               {% endif %}

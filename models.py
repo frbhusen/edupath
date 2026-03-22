@@ -3,7 +3,7 @@ from flask_login import UserMixin
 from mongoengine import (
     Document, StringField, IntField, BooleanField, DateTimeField,
     ReferenceField, ListField, EmbeddedDocument, EmbeddedDocumentField,
-    ObjectIdField
+    ObjectIdField, DictField
 )
 from mongoengine.errors import DoesNotExist
 from bson import ObjectId
@@ -36,6 +36,17 @@ class User(Document, UserMixin):
 
     def check_password(self, password: str) -> bool:
         return self.password_hash == password
+
+    @property
+    def full_name(self) -> str:
+        first = (self.first_name or "").strip()
+        last = (self.last_name or "").strip()
+        full = f"{first} {last}".strip()
+        return full or self.username
+
+    @property
+    def display_name(self) -> str:
+        return self.full_name
 
 
 class Subject(Document):
@@ -200,6 +211,23 @@ class Question(Document):
     }
 
 
+class TestTextQuestion(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    test_id = ReferenceField(Test, required=True)
+    text = StringField(required=True)
+    hint = StringField(null=True)
+    max_score = IntField(default=5, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'test_text_questions',
+        'indexes': [
+            'test_id',
+            'created_at'
+        ]
+    }
+
+
 class Attempt(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     test_id = ReferenceField(Test, required=True)
@@ -258,6 +286,25 @@ class AttemptAnswer(Document):
     @property
     def question(self):
         return self.question_id
+
+
+class AttemptTextAnswer(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    attempt_id = ReferenceField(Attempt, required=True)
+    text_question_id = ReferenceField(TestTextQuestion, required=True)
+    answer_text = StringField(required=True)
+    max_score = IntField(default=5, required=True)
+    score_awarded = IntField(null=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'attempt_text_answers',
+        'indexes': [
+            'attempt_id',
+            'text_question_id',
+            ('attempt_id', 'text_question_id')
+        ]
+    }
 
 
 class CustomTestAttempt(Document):
@@ -357,6 +404,194 @@ class LessonCompletion(Document):
             'lesson_id',
             'student_id',
             ('lesson_id', 'student_id')
+        ]
+    }
+
+
+class DiscussionQuestion(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    lesson_id = ReferenceField(Lesson, required=True)
+    author_id = ReferenceField(User, required=True)
+    title = StringField(required=True, max_length=220)
+    body = StringField(required=True)
+    is_pinned = BooleanField(default=False, required=True)
+    is_resolved = BooleanField(default=False, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'discussion_questions',
+        'indexes': [
+            'lesson_id',
+            'author_id',
+            'is_pinned',
+            'is_resolved',
+            'created_at'
+        ]
+    }
+
+
+class DiscussionAnswer(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    question_id = ReferenceField(DiscussionQuestion, required=True)
+    author_id = ReferenceField(User, required=True)
+    body = StringField(required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'discussion_answers',
+        'indexes': [
+            'question_id',
+            'author_id',
+            'created_at'
+        ]
+    }
+
+
+class Certificate(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    student_id = ReferenceField(User, required=True)
+    lesson_id = ReferenceField(Lesson, required=True)
+    certificate_url = StringField(max_length=1000, null=True)
+    is_verified = BooleanField(default=False, required=True)
+    verified_by = ReferenceField(User, null=True)
+    verified_at = DateTimeField(null=True)
+    issued_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'certificates',
+        'indexes': [
+            'student_id',
+            'lesson_id',
+            'is_verified',
+            ('student_id', 'lesson_id'),
+            'issued_at'
+        ]
+    }
+
+
+class Assignment(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    title = StringField(required=True, max_length=200)
+    description = StringField(null=True)
+    subject_id = ReferenceField(Subject, null=True)
+    section_id = ReferenceField(Section, null=True)
+    lesson_id = ReferenceField(Lesson, null=True)
+    target_student_id = ReferenceField(User, null=True)
+    assignment_mode = StringField(default="standard", required=True, choices=["standard", "custom_test"])
+    selected_question_ids_json = StringField(null=True)
+    written_questions_json = StringField(null=True)
+    max_score = IntField(default=0, required=True)
+    due_at = DateTimeField(null=True)
+    is_active = BooleanField(default=True, required=True)
+    created_by = ReferenceField(User, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'assignments',
+        'indexes': [
+            'target_student_id',
+            'subject_id',
+            'section_id',
+            'lesson_id',
+            'due_at',
+            'assignment_mode',
+            'is_active',
+            'created_at'
+        ]
+    }
+
+
+class AssignmentSubmission(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    assignment_id = ReferenceField(Assignment, required=True)
+    student_id = ReferenceField(User, required=True)
+    status = StringField(default="pending", required=True, choices=["pending", "completed"])
+    note = StringField(null=True)
+    completed_at = DateTimeField(null=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'assignment_submissions',
+        'indexes': [
+            'assignment_id',
+            'student_id',
+            ('assignment_id', 'student_id'),
+            'status',
+            'completed_at'
+        ]
+    }
+
+
+class AssignmentAttempt(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    assignment_id = ReferenceField(Assignment, required=True)
+    student_id = ReferenceField(User, required=True)
+    answers_json = StringField(required=True)
+    status = StringField(default="submitted", required=True, choices=["submitted", "graded"])
+    total_score = IntField(default=0, required=True)
+    score_awarded = IntField(default=0, required=True)
+    teacher_note = StringField(null=True)
+    graded_by = ReferenceField(User, null=True)
+    submitted_at = DateTimeField(default=datetime.utcnow)
+    graded_at = DateTimeField(null=True)
+
+    meta = {
+        'collection': 'assignment_attempts',
+        'indexes': [
+            'assignment_id',
+            'student_id',
+            ('assignment_id', 'student_id'),
+            'status',
+            'submitted_at',
+            'graded_at'
+        ]
+    }
+
+
+class StudyPlan(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    student_id = ReferenceField(User, required=True)
+    title = StringField(required=True, max_length=200)
+    description = StringField(null=True)
+    week_start = DateTimeField(null=True)
+    week_end = DateTimeField(null=True)
+    created_by = ReferenceField(User, required=True)
+    is_active = BooleanField(default=True, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'study_plans',
+        'indexes': [
+            'student_id',
+            'created_by',
+            'week_start',
+            'week_end',
+            'is_active',
+            'created_at'
+        ]
+    }
+
+
+class StudyPlanItem(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    plan_id = ReferenceField(StudyPlan, required=True)
+    title = StringField(required=True, max_length=220)
+    lesson_id = ReferenceField(Lesson, null=True)
+    test_id = ReferenceField(Test, null=True)
+    due_at = DateTimeField(null=True)
+    is_done = BooleanField(default=False, required=True)
+    done_at = DateTimeField(null=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'study_plan_items',
+        'indexes': [
+            'plan_id',
+            'lesson_id',
+            'test_id',
+            'due_at',
+            'is_done',
+            'created_at'
         ]
     }
 

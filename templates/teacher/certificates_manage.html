@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة الشهادات</h1>
+    <p class="mb-0">رفع روابط الشهادات وإتاحتها للطلاب.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('teacher.certificates_verification') }}">التحقق من الشهادات</a>
+    <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="mb-3">إضافة/تحديث شهادة يدويًا</h5>
+    <form method="post" class="row g-2 align-items-end">
+      <input type="hidden" name="action" value="issue">
+      <div class="col-12 col-md-4">
+        <label class="form-label small">الطالب</label>
+        <select class="form-select form-select-sm" name="student_id" required>
+          <option value="">اختر طالبًا</option>
+          {% for s in all_students %}
+            <option value="{{ s.id }}">{{ s.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label small">الدرس</label>
+        <select class="form-select form-select-sm" name="lesson_id" required>
+          <option value="">اختر درسًا</option>
+          {% for l in all_lessons %}
+            <option value="{{ l.id }}">{{ l.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-8">
+        <label class="form-label small">رابط Google Drive للشهادة</label>
+        <input class="form-control form-control-sm" type="url" name="certificate_url" placeholder="https://drive.google.com/..." required>
+      </div>
+      <div class="col-12 col-md-4 d-grid">
+        <button class="btn btn-cta btn-sm" type="submit">حفظ الشهادة</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if certificates %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>الطالب</th>
+              <th>الدرس</th>
+              <th>الحالة</th>
+              <th>تاريخ الإصدار</th>
+              <th class="text-end">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in certificates %}
+              {% set student = students_map.get(c.student_id.id) if c.student_id else None %}
+              {% set lesson = lessons_map.get(c.lesson_id.id) if c.lesson_id else None %}
+              <tr>
+                <td>{{ student.full_name if student else '-' }}</td>
+                <td>{{ lesson.title if lesson else '-' }}</td>
+                <td>
+                  <span class="badge {% if c.is_verified %}text-bg-success{% else %}text-bg-warning{% endif %}">{{ 'معتمدة' if c.is_verified else 'غير معتمدة' }}</span>
+                </td>
+                <td>{{ c.issued_at.strftime('%Y-%m-%d') if c.issued_at else '-' }}</td>
+                <td class="text-end d-flex justify-content-end gap-2">
+                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.download_certificate_teacher', certificate_id=c.id) }}" target="_blank" rel="noopener">فتح الرابط</a>
+                  <form method="post" onsubmit="return confirm('حذف الشهادة؟');">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="certificate_id" value="{{ c.id }}">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد شهادات حالياً.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">تسليمات الواجب: {{ assignment.title }}</h1>
+    <p class="mb-0">متابعة حلول الطلاب وتصحيحها.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-info btn-sm" href="{{ url_for('teacher.assignment_questions', assignment_id=assignment.id) }}">عرض الأسئلة</a>
+    <a class="btn btn-light btn-sm" href="{{ url_for('teacher.assignments_manage') }}">العودة للواجبات</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if attempts %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>الطالب</th>
+              <th>الحالة</th>
+              <th>الدرجة</th>
+              <th>وقت التسليم</th>
+              <th class="text-end">إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in attempts %}
+              <tr>
+                <td>{{ a.student_id.full_name if a.student_id else '-' }}</td>
+                <td>
+                  {% if a.status == 'graded' %}
+                    <span class="badge text-bg-success">تم التصحيح</span>
+                  {% else %}
+                    <span class="badge text-bg-warning">بانتظار التصحيح</span>
+                  {% endif %}
+                </td>
+                <td>{{ a.score_awarded or 0 }} / {{ a.total_score or assignment.max_score or 0 }}</td>
+                <td class="text-muted small">{{ a.submitted_at.strftime('%Y-%m-%d %H:%M') if a.submitted_at else '-' }}</td>
+                <td class="text-end">
+                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.grade_assignment_attempt', attempt_id=a.id) }}">فتح التصحيح</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد تسليمات حتى الآن.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -22,10 +22,15 @@
 		<div class="card shadow-sm mb-3">
 			<div class="card-body text-center">
 				{% set pct = (attempt.score / attempt.total * 100) if attempt.total else 0 %}
-				<div class="display-6 fw-bold">{{ attempt.score }} / {{ attempt.total }}</div>
-				<div class="progress my-3" style="height: 18px;">
-					<div class="progress-bar bg-success" role="progressbar" style="width: {{ pct }}%" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">{{ pct|round(0) }}%</div>
-				</div>
+				{% if pending_text_grading %}
+					<div class="display-6 fw-bold">بانتظار التصحيح</div>
+					<div class="alert alert-warning my-3 mb-2">تم إرسال إجاباتك النصية، وسيتم نشر النتيجة النهائية بعد تصحيحها.</div>
+				{% else %}
+					<div class="display-6 fw-bold">{{ attempt.score }} / {{ attempt.total }}</div>
+					<div class="progress my-3" style="height: 18px;">
+						<div class="progress-bar bg-success" role="progressbar" style="width: {{ pct }}%" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">{{ pct|round(0) }}%</div>
+					</div>
+				{% endif %}
 				{% if pct >= 90 %}
 					{% set messages = ["عمل رائع! أنت تتقن هذا.", "درجة ممتازة! استمر في التقدم.", "نتيجة مبهرة! أنت في القمة."] %}
 				{% elif pct >= 75 %}
@@ -35,7 +40,11 @@
 				{% else %}
 					{% set messages = ["استمر! كل محاولة تساعدك على التحسن.", "لا تستسلم—راجع وحاول مرة أخرى.", "التقدم يستغرق وقتاً. أنت قادر!"] %}
 				{% endif %}
-				<p class="mt-2 fw-semibold">{{ messages|random }}</p>
+				{% if pending_text_grading %}
+					<p class="mt-2 fw-semibold">شكراً لمشاركتك. راجع الصفحة لاحقاً بعد اعتماد التصحيح.</p>
+				{% else %}
+					<p class="mt-2 fw-semibold">{{ messages|random }}</p>
+				{% endif %}
 				<span class="chip">النتيجة</span>
 				<div class="d-flex justify-content-center gap-2 mt-2 flex-wrap">
 					<span class="badge text-bg-info">+{{ attempt.xp_earned|default(0) }} XP</span>
@@ -118,6 +127,22 @@
 				{% endif %}
 			</div>
 		</div>
+
+		{% if text_review %}
+		<div class="card shadow-sm mt-3">
+			<div class="card-body">
+				<h5 class="card-title">الإجابات النصية</h5>
+				<div class="list-group list-group-flush">
+					{% for item in text_review %}
+						<div class="list-group-item">
+							<div class="fw-semibold">سؤال: {{ item.question.text }}</div>
+							<div class="small text-muted mt-2" style="white-space: pre-wrap;">إجابتك: {{ item.answer_text }}</div>
+						</div>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+		{% endif %}
 	</div>
 </div>
 {% endblock %}

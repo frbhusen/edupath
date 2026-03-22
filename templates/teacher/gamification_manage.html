@@ -35,7 +35,7 @@
               <tr>
                 <td class="fw-semibold">{{ item.rank }}</td>
                 <td>
-                  <div class="fw-semibold">{{ student.username if student else 'طالب غير معروف' }}</div>
+                  <div class="fw-semibold">{{ student.full_name if student else 'طالب غير معروف' }}</div>
                   <div class="text-muted small">ID: {{ profile.student_id.id }}</div>
                 </td>
                 <td><span class="badge text-bg-primary">{{ profile.xp_total }}</span></td>

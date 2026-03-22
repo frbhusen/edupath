@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">تقارير المنصة</h1>
+    <p class="mb-0">إنشاء تقرير ثم تنزيله PDF للإرسال اليدوي.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">العودة</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label small">الطالب</label>
+        <select class="form-select form-select-sm" name="student_id">
+          <option value="">كل الطلاب</option>
+          {% for st in students %}
+            <option value="{{ st.id }}" {% if selected_student and selected_student.id == st.id %}selected{% endif %}>{{ st.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-8 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary btn-sm">تحديث</button>
+        <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.reports_download_pdf', student_id=selected_student.id if selected_student else '') }}">تنزيل PDF</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">محاولات الاختبارات</div><div class="h4 mb-0">{{ report.regular_attempts }}</div></div></div></div>
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">محاولات مخصصة</div><div class="h4 mb-0">{{ report.custom_attempts }}</div></div></div></div>
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">الدروس المكتملة</div><div class="h4 mb-0">{{ report.lessons_completed }}</div></div></div></div>
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">الواجبات المكتملة</div><div class="h4 mb-0">{{ report.assignments_completed }}</div></div></div></div>
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">متوسط النتائج</div><div class="h4 mb-0">{{ report.avg_score }}%</div></div></div></div>
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">نسبة النجاح</div><div class="h4 mb-0">{{ report.pass_rate }}%</div></div></div></div>
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">متوسط XP</div><div class="h4 mb-0">{{ report.avg_xp }}</div></div></div></div>
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">نسبة إنجاز الواجبات</div><div class="h4 mb-0">{{ report.assignment_completion_rate }}%</div></div></div></div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-6 col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">مواد</div><div class="h5 mb-0">{{ report.subjects_count }}</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">أقسام</div><div class="h5 mb-0">{{ report.sections_count }}</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">دروس</div><div class="h5 mb-0">{{ report.lessons_count }}</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">اختبارات</div><div class="h5 mb-0">{{ report.tests_count }}</div></div></div></div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">أضعف الاختبارات</h5>
+        {% if report.weak_tests %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>الاختبار</th><th>المتوسط</th><th>محاولات</th></tr></thead>
+              <tbody>
+                {% for t in report.weak_tests %}
+                  <tr>
+                    <td>{{ t.title }}</td>
+                    <td><span class="badge {% if t.avg < 50 %}text-bg-danger{% elif t.avg < 75 %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ t.avg }}%</span></td>
+                    <td>{{ t.count }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert alert-light mb-0">لا توجد بيانات كافية.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">أفضل الطلاب (XP)</h5>
+        {% if report.top_students %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>#</th><th>الطالب</th><th>XP</th><th>Level</th></tr></thead>
+              <tbody>
+                {% for s in report.top_students %}
+                  <tr>
+                    <td>{{ s.rank }}</td>
+                    <td>{{ s.name }}</td>
+                    <td>{{ s.xp }}</td>
+                    <td>{{ s.level }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert alert-light mb-0">لا توجد بيانات كافية.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

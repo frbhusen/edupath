@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">أسئلة الواجب: {{ assignment.title }}</h1>
+    <p class="mb-0">عرض أسئلة MCQ والأسئلة الكتابية.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.assignment_submissions', assignment_id=assignment.id) }}">العودة للتسليمات</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="mb-3">أسئلة MCQ</h5>
+    {% if questions %}
+      {% for q in questions %}
+        <div class="border rounded p-3 mb-2">
+          <div class="fw-semibold">{{ loop.index }}. {{ q.text }}</div>
+          <ul class="mt-2 mb-0">
+            {% for c in q.choices %}
+              <li class="{{ 'text-success fw-semibold' if c.is_correct else '' }}">
+                {{ c.text }} {% if c.is_correct %}<span class="badge text-bg-success">صحيح</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-muted">لا توجد أسئلة MCQ.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">الأسئلة الكتابية</h5>
+    {% if written_items %}
+      {% for item in written_items %}
+        <div class="border rounded p-3 mb-2">
+          <div class="fw-semibold">{{ loop.index }}. {{ item.prompt }}</div>
+          <div class="small text-muted">الدرجة القصوى: {{ item.max_score or 5 }}</div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-muted">لا توجد أسئلة كتابية.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة النتائج</h1>
+    <p class="mb-0">عرض نتائج الطلاب بنفس صفحات الطالب مع إمكانية الحذف.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('admin.dashboard') }}">العودة للوحة الأدمن</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-6">
+        <label class="form-label small">اختر الطالب</label>
+        <select class="form-select form-select-sm" name="student_id">
+          <option value="">كل الطلاب</option>
+          {% for st in students %}
+            <option value="{{ st.id }}" {% if selected_student and selected_student.id == st.id %}selected{% endif %}>{{ st.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6 d-flex gap-2">
+        <button class="btn btn-outline-primary btn-sm" type="submit">تطبيق</button>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin.results_manage') }}">مسح</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="mb-3">نتائج الاختبارات العادية</h5>
+    {% if regular_attempts %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>الطالب</th>
+              <th>الاختبار</th>
+              <th>الدرجة</th>
+              <th>التاريخ</th>
+              <th class="text-end">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in regular_attempts %}
+              <tr>
+                <td>{{ a.student_id.full_name if a.student_id else '-' }}</td>
+                <td>{{ a.test_id.title if a.test_id else '-' }}</td>
+                <td>
+                  {% if a._pending_text_grading %}
+                    <span class="badge text-bg-warning">بانتظار التصحيح</span>
+                  {% else %}
+                    <span class="badge text-bg-primary">{{ a.score }}/{{ a.total }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ a.started_at.strftime('%Y-%m-%d %H:%M') if a.started_at else '-' }}</td>
+                <td class="text-end d-flex justify-content-end gap-2">
+                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.test_result', attempt_id=a.id) }}">عرض مثل الطالب</a>
+                  <form method="post" action="{{ url_for('admin.delete_regular_result', attempt_id=a.id) }}" onsubmit="return confirm('حذف هذه النتيجة؟');">
+                    <input type="hidden" name="student_id" value="{{ selected_student.id if selected_student else '' }}">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد نتائج عادية مطابقة للفلتر.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">نتائج الاختبارات المخصصة</h5>
+    {% if custom_attempts %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>الطالب</th>
+              <th>العنوان</th>
+              <th>الدرجة</th>
+              <th>التاريخ</th>
+              <th class="text-end">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in custom_attempts %}
+              <tr>
+                <td>{{ a.student_id.full_name if a.student_id else '-' }}</td>
+                <td>{{ a.label or 'Custom Test' }}</td>
+                <td><span class="badge text-bg-info">{{ a.score }}/{{ a.total }}</span></td>
+                <td>{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '-' }}</td>
+                <td class="text-end d-flex justify-content-end gap-2">
+                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.custom_test_result', attempt_id=a.id) }}">عرض مثل الطالب</a>
+                  <form method="post" action="{{ url_for('admin.delete_custom_result', attempt_id=a.id) }}" onsubmit="return confirm('حذف هذه النتيجة؟');">
+                    <input type="hidden" name="student_id" value="{{ selected_student.id if selected_student else '' }}">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد نتائج مخصصة مطابقة للفلتر.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

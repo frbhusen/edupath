@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">حل واجب: {{ assignment.title }}</h1>
+    <p class="mb-0">أجب عن الأسئلة ثم أرسل الحل للتصحيح.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.assignments') }}">العودة للواجبات</a>
+</div>
+
+<form method="post" class="card shadow-sm">
+  <div class="card-body">
+    {% if questions %}
+      <h5 class="mb-3">أسئلة MCQ</h5>
+      {% for q in questions %}
+        <div class="border rounded p-3 mb-3">
+          <div class="fw-semibold mb-2">{{ loop.index }}. {{ q.text }}</div>
+          {% for choice in q.choices %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="mcq_{{ q.id }}" id="q{{ q.id }}_{{ choice.choice_id }}" value="{{ choice.choice_id }}">
+              <label class="form-check-label" for="q{{ q.id }}_{{ choice.choice_id }}">{{ choice.text }}</label>
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if written_items %}
+      <h5 class="mb-3 mt-4">أسئلة كتابية</h5>
+      {% for item in written_items %}
+        <div class="border rounded p-3 mb-3">
+          <div class="fw-semibold mb-2">{{ loop.index }}. {{ item.prompt }}</div>
+          <div class="text-muted small mb-2">الدرجة القصوى: {{ item.max_score or 5 }}</div>
+          <textarea class="form-control" rows="4" name="text_{{ loop.index0 }}" placeholder="اكتب إجابتك هنا" required></textarea>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if not questions and not written_items %}
+      <div class="alert alert-warning">لا توجد أسئلة في هذا الواجب.</div>
+    {% endif %}
+
+    <div class="d-flex justify-content-end mt-3">
+      <button type="submit" class="btn btn-cta">إرسال الحل</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

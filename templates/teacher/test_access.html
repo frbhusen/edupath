@@ -33,7 +33,7 @@
           {% set active = activations.get(student.id) %}
           {% set codes = codes_by_student.get(student.id, []) %}
           <tr>
-            <td>{{ student.username }}</td>
+            <td>{{ student.full_name }}</td>
             <td class="text-muted small">{{ student.phone }}</td>
             <td>
               {% if active %}

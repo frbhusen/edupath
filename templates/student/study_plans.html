@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">خطتي الدراسية</h1>
+    <p class="mb-0">مهامك الأسبوعية المقترحة من المعلم.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+</div>
+
+{% if plans %}
+  {% for p in plans %}
+    {% set p_items = items_by_plan.get(p.id, []) %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h5 class="mb-1">{{ p.title }}</h5>
+            <div class="text-muted small">{{ p.description or 'بدون وصف' }}</div>
+          </div>
+          <span class="chip">{{ p_items|length }} مهام</span>
+        </div>
+
+        {% if p_items %}
+          <div class="list-group">
+            {% for it in p_items %}
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="fw-semibold">{{ it.title }}</div>
+                  <div class="text-muted small">{{ it.due_at.strftime('%Y-%m-%d %H:%M') if it.due_at else 'بدون موعد' }}</div>
+                </div>
+                <form method="post" action="{{ url_for('student.toggle_study_plan_item', item_id=it.id) }}">
+                  <button class="btn btn-sm {% if it.is_done %}btn-outline-secondary{% else %}btn-cta{% endif %}" type="submit">{{ 'إلغاء الإنجاز' if it.is_done else 'تم الإنجاز (+5 XP)' }}</button>
+                </form>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted small">لا توجد مهام في هذه الخطة.</div>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="text-center display-1">قريبا...</div>
+{% endif %}
+{% endblock %}

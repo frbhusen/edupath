@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">واجباتي</h1>
+    <p class="mb-0">تابع الواجبات وسلّمها لتحصل على XP إضافي.</p>
+  </div>
+</div>
+
+{% if assignments_data %}
+  <div class="row g-3">
+    {% for item in assignments_data %}
+      {% set a = item.assignment %}
+      {% set s = item.submission %}
+      <div class="col-12 col-md-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h5 class="card-title mb-0">{{ a.title }}</h5>
+              {% if item.status == 'completed' %}
+                <span class="badge text-bg-success">مكتمل</span>
+              {% elif item.is_overdue %}
+                <span class="badge text-bg-danger">متأخر</span>
+              {% else %}
+                <span class="badge text-bg-warning">قيد التنفيذ</span>
+              {% endif %}
+            </div>
+            <p class="text-muted small mb-2">{{ a.description or 'بدون وصف.' }}</p>
+            <div class="text-muted small mb-2">الموعد: {{ a.due_at.strftime('%Y-%m-%d %H:%M') if a.due_at else 'بدون موعد' }}</div>
+            {% if a.assignment_mode == 'custom_test' %}
+              <div class="text-muted small mb-2">النوع: اختبار مخصص{% if item.total_score %} ({{ item.total_score }} درجة){% endif %}</div>
+              {% if item.status == 'graded' %}
+                <div class="alert alert-success py-2 px-2 small mb-2">
+                  الدرجة: {{ item.score_awarded }} / {{ item.total_score }}
+                </div>
+              {% elif item.status == 'submitted' %}
+                <div class="alert alert-info py-2 px-2 small mb-2">تم التسليم وبانتظار تصحيح المعلم.</div>
+              {% endif %}
+            {% endif %}
+            <div class="mt-auto">
+              {% if a.assignment_mode == 'custom_test' %}
+                {% if item.raw_status == 'pending' %}
+                  <a class="btn btn-cta btn-sm" href="{{ url_for('student.solve_assignment', assignment_id=a.id) }}">بدء الحل</a>
+                {% elif item.raw_status == 'graded' %}
+                  <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <span class="text-success small">تم تصحيح الواجب.</span>
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.view_assignment_questions', assignment_id=a.id) }}">عرض الأسئلة</a>
+                  </div>
+                {% else %}
+                  <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <span class="text-info small">تم إرسال الحل، بانتظار التصحيح.</span>
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.view_assignment_questions', assignment_id=a.id) }}">عرض الأسئلة</a>
+                  </div>
+                {% endif %}
+              {% elif item.status != 'completed' %}
+                <form method="post" action="{{ url_for('student.complete_assignment', assignment_id=a.id) }}">
+                  <div class="mb-2">
+                    <textarea class="form-control form-control-sm" rows="2" name="note" placeholder="ملاحظة التسليم (اختياري)"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-cta btn-sm">تسليم الواجب (+10 XP)</button>
+                </form>
+              {% else %}
+                <div class="text-success small">تم التسليم {{ s.completed_at.strftime('%Y-%m-%d %H:%M') if s and s.completed_at else '' }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-light">لا توجد واجبات حالياً.</div>
+{% endif %}
+{% endblock %}

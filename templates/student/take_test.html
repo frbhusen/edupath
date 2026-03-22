@@ -5,7 +5,7 @@
     <h1 class="h4 mb-1">{{ test.title }}</h1>
     <p class="mb-0">{{ test.description or 'أجب عن جميع الأسئلة أدناه.' }}</p>
   </div>
-  {% if selected_count %}
+  {% if selected_count is not none %}
     <div class="text-end">
       <div class="small text-muted">الوقت المتبقي</div>
       <div id="test-timer" class="badge text-bg-warning fs-6" data-duration="{{ time_limit_seconds }}">--:--</div>
@@ -14,7 +14,7 @@
   <a class="btn btn-light btn-sm" href="{{ url_for('student.section_detail', section_id=test.section.id) }}">رجوع</a>
 </div>
 
-{% if not selected_count %}
+{% if selected_count is none %}
   <form method="get" class="card shadow-sm">
     <div class="card-body">
       <label class="form-label" for="questionRange">كم عدد الأسئلة التي تريدها؟ (10-50)</label>
@@ -80,6 +80,7 @@
 {% else %}
   <form method="post" id="test-form">
     <input type="hidden" name="question_ids" value="{{ question_ids_str }}" />
+    <input type="hidden" name="text_question_ids" value="{{ text_question_ids_str|default('') }}" />
     <input type="hidden" name="time_expired" id="time-expired" value="0" />
     <input type="hidden" name="count" value="{{ selected_count or 0 }}" />
     <input type="hidden" name="easy" value="{{ easy_count|default(0) }}" />
@@ -94,27 +95,36 @@
       {% set choices = item.choices %}
       <div class="card shadow-sm mb-3">
         <div class="card-body">
-          <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
-          {% if q.question_images %}
-            <div class="d-flex flex-wrap gap-2 mb-2">
-              {% for img in q.question_images %}
-                <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 240px;">
+          {% if item.question_type == 'text' %}
+            {% set tq = item.text_question %}
+            <p class="fw-semibold">س{{ loop.index }} (سؤال نصي). {{ tq.text }}</p>
+            {% if tq.hint %}
+              <div class="small text-muted mb-2">تلميح: {{ tq.hint }}</div>
+            {% endif %}
+            <textarea class="form-control" name="text_question_{{ tq.id }}" rows="4" placeholder="اكتب إجابتك هنا" required></textarea>
+          {% else %}
+            <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
+            {% if q.question_images %}
+              <div class="d-flex flex-wrap gap-2 mb-2">
+                {% for img in q.question_images %}
+                  <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 240px;">
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="list-group">
+              {% for c in choices %}
+                <label class="list-group-item">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.choice_id }}" required>
+                    <span>{{ c.text }}</span>
+                    {% if c.image_url %}
+                      <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;" required>
+                    {% endif %}
+                  </div>
+                </label>
               {% endfor %}
             </div>
           {% endif %}
-          <div class="list-group">
-            {% for c in choices %}
-              <label class="list-group-item">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.choice_id }}" required>
-                  <span>{{ c.text }}</span>
-                  {% if c.image_url %}
-                    <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;" required>
-                  {% endif %}
-                </div>
-              </label>
-            {% endfor %}
-          </div>
         </div>
       </div>
     {% endfor %}

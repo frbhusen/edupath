@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">الأسئلة المثبتة</h1>
+    <p class="mb-0">عرض جميع الأسئلة المثبتة وإجاباتها في مكان واحد.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if questions %}
+      {% for q in questions %}
+        {% set lesson = lessons_by_id.get(q.lesson_id.id) if q.lesson_id else None %}
+        {% set author = users_by_id.get(q.author_id.id) if q.author_id else None %}
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="fw-semibold">{{ q.title }}</div>
+              <div class="small text-muted">
+                الدرس: {{ lesson.title if lesson else '-' }} ·
+                بواسطة: {{ author.full_name if author else 'مستخدم' }} ·
+                {{ q.created_at.strftime('%Y-%m-%d %H:%M') if q.created_at else '-' }}
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <span class="badge text-bg-warning">مثبت</span>
+              <span class="badge {% if q.is_resolved %}text-bg-success{% else %}text-bg-secondary{% endif %}">{{ 'تم الحل' if q.is_resolved else 'مفتوح' }}</span>
+            </div>
+          </div>
+
+          <div class="mb-3" style="white-space: pre-wrap;">{{ q.body }}</div>
+
+          {% if lesson %}
+            <div class="mb-3">
+              <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.lesson_discussion', lesson_id=lesson.id) }}">فتح مناقشة الدرس</a>
+            </div>
+          {% endif %}
+
+          {% set q_answers = answers_by_question.get(q.id, []) %}
+          {% if q_answers %}
+            <div class="list-group list-group-flush">
+              {% for a in q_answers %}
+                {% set ans_author = users_by_id.get(a.author_id.id) if a.author_id else None %}
+                <div class="list-group-item px-0">
+                  <div class="small text-muted mb-1">{{ ans_author.full_name if ans_author else 'مستخدم' }} - {{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '-' }}</div>
+                  <div style="white-space: pre-wrap;">{{ a.body }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="small text-muted">لا توجد ردود بعد.</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد أسئلة مثبتة متاحة حالياً.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

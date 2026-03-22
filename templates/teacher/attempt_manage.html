@@ -3,7 +3,7 @@
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
     <h1 class="h4 mb-1">إدارة المحاولة</h1>
-    <p class="mb-0">{{ student.username }} · {{ test.title }}</p>
+    <p class="mb-0">{{ student.full_name }} · {{ test.title }}</p>
   </div>
   <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.student_results', student_id=student.id) }}">العودة لنتائج الطالب</a>
 </div>
@@ -37,6 +37,48 @@
       </div>
     </div>
   {% endfor %}
+
+  {% if text_questions %}
+    <div class="mt-4 mb-2">
+      <h5 class="mb-0">الأسئلة النصية (تصحيح يدوي)</h5>
+    </div>
+    {% for tq in text_questions %}
+      {% set ta = text_answers.get(tq.id) if text_answers else None %}
+      <div class="card mb-2">
+        <div class="card-body">
+          <div class="fw-semibold mb-2">T{{ loop.index }}. {{ tq.text }}</div>
+          {% if tq.hint %}
+            <div class="text-muted small mb-2">تلميح: {{ tq.hint }}</div>
+          {% endif %}
+          <div class="mb-2" style="white-space: pre-wrap;">{{ ta.answer_text if ta else 'لا توجد إجابة من الطالب.' }}</div>
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+              <label class="form-label small">الدرجة (من {{ tq.max_score|default(5) }})</label>
+              <input
+                class="form-control form-control-sm"
+                type="number"
+                min="0"
+                max="{{ tq.max_score|default(5) }}"
+                name="text_score_{{ tq.id }}"
+                value="{{ ta.score_awarded if ta and ta.score_awarded is not none else '' }}"
+                {% if not ta %}disabled{% endif %}
+              />
+            </div>
+            <div class="col-12 col-md-8">
+              {% if ta and ta.score_awarded is none %}
+                <span class="badge text-bg-warning">بانتظار التصحيح</span>
+              {% elif ta %}
+                <span class="badge text-bg-success">تم التصحيح</span>
+              {% else %}
+                <span class="badge text-bg-secondary">بدون إجابة</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% endif %}
+
   <button type="submit" class="btn btn-cta">حفظ التغييرات</button>
 </form>
 {% endblock %}

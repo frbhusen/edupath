@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">Discussion / Q&A</h1>
+    <p class="mb-0">مناقشات وأسئلة درس: {{ lesson.title }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('student.pinned_discussions') }}">الأسئلة المثبتة</a>
+    <a class="btn btn-light btn-sm" href="{{ url_for('student.lesson_detail', lesson_id=lesson.id) }}">العودة للدرس</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="mb-3">اسأل سؤالًا جديدًا</h5>
+    <form method="post" class="row g-2">
+      <input type="hidden" name="action" value="ask_question">
+      <div class="col-12 col-md-4">
+        <input class="form-control" name="title" placeholder="عنوان السؤال" required>
+      </div>
+      <div class="col-12 col-md-8">
+        <textarea class="form-control" name="body" rows="2" placeholder="اكتب سؤالك بالتفصيل" required></textarea>
+      </div>
+      <div class="col-12"><button type="submit" class="btn btn-cta btn-sm">نشر السؤال</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">الأسئلة والإجابات</h5>
+    {% if questions %}
+      {% for q in questions %}
+        {% set author = users_by_id.get(q.author_id.id) if q.author_id else None %}
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="fw-semibold">{{ q.title }}</div>
+              <div class="small text-muted">بواسطة {{ author.full_name if author else 'مستخدم' }} - {{ q.created_at.strftime('%Y-%m-%d %H:%M') if q.created_at else '-' }}</div>
+            </div>
+            <div class="d-flex gap-2">
+              {% if q.is_pinned %}
+                <span class="badge text-bg-warning">مثبت</span>
+              {% endif %}
+              <span class="badge {% if q.is_resolved %}text-bg-success{% else %}text-bg-warning{% endif %}">{{ 'تم الحل' if q.is_resolved else 'مفتوح' }}</span>
+            </div>
+          </div>
+          <div class="mb-3" style="white-space: pre-wrap;">{{ q.body }}</div>
+
+          <form method="post" class="mb-3">
+            <input type="hidden" name="action" value="add_answer">
+            <input type="hidden" name="question_id" value="{{ q.id }}">
+            <div class="input-group">
+              <input class="form-control" name="body" placeholder="أضف إجابة أو تعليق" required>
+              <button class="btn btn-outline-primary" type="submit">إرسال</button>
+            </div>
+          </form>
+
+          <div class="mb-2 d-flex justify-content-end">
+            <form method="post">
+              <input type="hidden" name="action" value="toggle_resolved">
+              <input type="hidden" name="question_id" value="{{ q.id }}">
+              <button class="btn btn-outline-secondary btn-sm" type="submit">{{ 'إعادة فتح' if q.is_resolved else 'وضع كمحلول' }}</button>
+            </form>
+          </div>
+
+          {% set answers = answers_by_question.get(q.id, []) %}
+          {% if answers %}
+            <div class="list-group list-group-flush">
+              {% for a in answers %}
+                {% set ans_author = users_by_id.get(a.author_id.id) if a.author_id else None %}
+                <div class="list-group-item px-0">
+                  <div class="small text-muted mb-1">{{ ans_author.full_name if ans_author else 'مستخدم' }} - {{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '-' }}</div>
+                  <div style="white-space: pre-wrap;">{{ a.body }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="small text-muted">لا توجد إجابات بعد.</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد أسئلة حتى الآن.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

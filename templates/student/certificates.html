@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">شهاداتي</h1>
+    <p class="mb-0">الشهادات التي تم رفعها من المعلم عبر رابط خارجي.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if certificates %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>الطالب</th>
+              <th>الدرس المكتمل</th>
+              <th>حالة التحقق</th>
+              <th>تاريخ الإصدار</th>
+              <th class="text-end">الإجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in certificates %}
+              {% set lesson = lessons_by_id.get(c.lesson_id.id) if c.lesson_id else None %}
+              <tr>
+                <td>{{ current_user.first_name }} {{ current_user.last_name }}</td>
+                <td>{{ lesson.title if lesson else '-' }}</td>
+                <td>
+                  <span class="badge {% if c.is_verified %}text-bg-success{% else %}text-bg-warning{% endif %}">{{ 'معتمدة' if c.is_verified else 'قيد المراجعة' }}</span>
+                </td>
+                <td>{{ c.issued_at.strftime('%Y-%m-%d') if c.issued_at else '-' }}</td>
+                <td class="text-end">
+                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.download_certificate', certificate_id=c.id) }}">تحميل الشهادة</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد شهادات بعد. سيقوم المعلم بإضافة رابط الشهادة بعد المراجعة.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

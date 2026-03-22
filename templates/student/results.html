@@ -5,7 +5,10 @@
     <h1 class="h4 mb-1">النتائج</h1>
     <p class="mb-0">درجاتك ودرجات الطلاب الآخرين.</p>
   </div>
-  <a class="btn btn-primary btn-sm px-3" href="{{ url_for('student.subjects') }}">← العودة للمواد</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-warning btn-sm px-3" href="{{ url_for('student.frequently_wrong') }}">الأخطاء المتكررة</a>
+    <a class="btn btn-primary btn-sm px-3" href="{{ url_for('student.subjects') }}">← العودة للمواد</a>
+  </div>
 </div>
 
 <h5 class="mb-2">نتائجك</h5>
@@ -30,11 +33,19 @@
                   <span class="badge text-bg-warning">إعادة</span>
                 {% endif %}
               </div>
-              <span class="badge text-bg-primary">{{ attempt.score }}/{{ attempt.total }}</span>
+              {% if attempt._pending_text_grading %}
+                <span class="badge text-bg-warning">بانتظار التصحيح</span>
+              {% else %}
+                <span class="badge text-bg-primary">{{ attempt.score }}/{{ attempt.total }}</span>
+              {% endif %}
             </div>
             <div class="text-muted small mb-3">تم في {{ attempt.started_at.strftime('%Y-%m-%d %H:%M') if attempt.started_at else 'تاريخ غير معروف' }}</div>
             <div class="mt-auto d-flex justify-content-between align-items-center">
-              <span class="chip">{{ pct|round(0) }}% صحيح</span>
+              {% if attempt._pending_text_grading %}
+                <span class="chip">سيتم إعلان النتيجة بعد التصحيح</span>
+              {% else %}
+                <span class="chip">{{ pct|round(0) }}% صحيح</span>
+              {% endif %}
               <a class="btn btn-cta btn-sm" href="{{ url_for('student.test_result', attempt_id=attempt.id) }}">عرض الإجابات</a>
             </div>
           </div>
@@ -95,13 +106,21 @@
                     {% endif %}
                   </div>
                   <h5 class="card-title mb-1">{{ attempt.test.title if attempt.test else 'اختبار مخصص' }}</h5>
-                  <div class="text-muted small">الطالب: {{ attempt.student.first_name or attempt.student.username }}</div>
+                  <div class="text-muted small">الطالب: {{ attempt.student.full_name }}</div>
                 </div>
-                <span class="badge text-bg-primary">{{ attempt.score }}/{{ attempt.total }}</span>
+                {% if attempt._pending_text_grading %}
+                  <span class="badge text-bg-warning">بانتظار التصحيح</span>
+                {% else %}
+                  <span class="badge text-bg-primary">{{ attempt.score }}/{{ attempt.total }}</span>
+                {% endif %}
               </div>
               <div class="text-muted small mb-3">تم في {{ attempt.started_at.strftime('%Y-%m-%d %H:%M') if attempt.started_at else 'تاريخ غير معروف' }}</div>
               <div class="mt-auto d-flex justify-content-between align-items-center">
-                <span class="chip">{{ pct|round(0) }}% صحيح</span>
+                {% if attempt._pending_text_grading %}
+                  <span class="chip">سيتم إعلان النتيجة بعد التصحيح</span>
+                {% else %}
+                  <span class="chip">{{ pct|round(0) }}% صحيح</span>
+                {% endif %}
                 <span class="text-muted small">الإجابات مخفية</span>
               </div>
             </div>

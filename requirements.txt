@@ -6,3 +6,6 @@ email_validator==2.2.0
 pymongo==4.6.0
 gunicorn
 Flask-Caching==2.1.0
+fpdf2==2.8.2
+arabic-reshaper==3.0.0
+python-bidi==0.4.2

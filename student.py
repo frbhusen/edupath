@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from bson import ObjectId
 from mongoengine.errors import DoesNotExist
 
-from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion
+from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, AttemptTextAnswer, TestTextQuestion, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate
 from .forms import ActivationForm, LessonActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
 from .extensions import cache
@@ -162,6 +162,54 @@ def _get_or_create_gamification_profile(student_id):
     return profile
 
 
+def _update_streak(profile):
+    now = datetime.utcnow()
+    today = now.date()
+    last_activity = getattr(profile, "last_activity_date", None)
+
+    if last_activity:
+        last_date = last_activity.date()
+        if last_date == today:
+            return
+        if (today - last_date).days == 1:
+            profile.current_streak = int(profile.current_streak or 0) + 1
+        else:
+            profile.current_streak = 1
+    else:
+        profile.current_streak = 1
+
+    profile.best_streak = max(int(profile.best_streak or 0), int(profile.current_streak or 0))
+    profile.last_activity_date = now
+
+
+def _update_badges(profile):
+    badges = set(getattr(profile, "badges", []) or [])
+
+    xp_total = int(profile.xp_total or 0)
+    best_streak = int(profile.best_streak or 0)
+
+    if xp_total >= 1:
+        badges.add("xp_starter")
+    if xp_total >= 100:
+        badges.add("xp_100")
+    if xp_total >= 500:
+        badges.add("xp_500")
+    if best_streak >= 3:
+        badges.add("streak_3")
+    if best_streak >= 7:
+        badges.add("streak_7")
+
+    lesson_count = LessonCompletion.objects(student_id=profile.student_id.id).count()
+    if lesson_count >= 5:
+        badges.add("lesson_5")
+
+    test_count = Attempt.objects(student_id=profile.student_id.id).count() + CustomTestAttempt.objects(student_id=profile.student_id.id, status="submitted").count()
+    if test_count >= 5:
+        badges.add("test_5")
+
+    profile.badges = sorted(list(badges))
+
+
 def _award_xp_for_attempt(student_id, event_type: str, source_id: str, score: int, total: int, is_retake: bool = False):
     existing_event = XPEvent.objects(
         student_id=student_id,
@@ -196,6 +244,8 @@ def _award_xp_for_attempt(student_id, event_type: str, source_id: str, score: in
 
     profile.xp_total = (profile.xp_total or 0) + earned_xp
     profile.level = _calculate_level(profile.xp_total)
+    _update_streak(profile)
+    _update_badges(profile)
     profile.updated_at = datetime.utcnow()
     profile.save()
     return earned_xp, profile
@@ -221,6 +271,8 @@ def _award_flat_xp_once(student_id, event_type: str, source_id: str, amount: int
 
     profile.xp_total = (profile.xp_total or 0) + earned_xp
     profile.level = _calculate_level(profile.xp_total)
+    _update_streak(profile)
+    _update_badges(profile)
     profile.updated_at = datetime.utcnow()
     profile.save()
     return earned_xp, profile
@@ -235,8 +287,27 @@ def _avatar_text_for_user(user):
     return (username[:2] or "U").upper()
 
 
-def _serialize_leaderboard_entry(profile, user, rank, xp_override=None, student_id_override=None):
-    username = getattr(user, "username", "مستخدم") if user else "مستخدم"
+def _certificate_counts_for_students(student_ids):
+    if not student_ids:
+        return {}
+
+    pipeline = [
+        {"$match": {"student_id": {"$in": list(student_ids)}, "is_verified": True}},
+        {"$group": {"_id": "$student_id", "count": {"$sum": 1}}},
+    ]
+    rows = list(Certificate._get_collection().aggregate(pipeline))
+    return {row.get("_id"): int(row.get("count", 0) or 0) for row in rows}
+
+
+def _certificate_count_for_student(student_id):
+    if not student_id:
+        return 0
+    return int(Certificate.objects(student_id=student_id, is_verified=True).count())
+
+
+def _serialize_leaderboard_entry(profile, user, rank, xp_override=None, student_id_override=None, certificates_count=0):
+    display_name = getattr(user, "full_name", None) if user else None
+    username = (display_name or getattr(user, "username", "مستخدم")) if user else "مستخدم"
     student_obj_id = None
     if profile and getattr(profile, "student_id", None):
         student_obj_id = profile.student_id.id
@@ -254,6 +325,7 @@ def _serialize_leaderboard_entry(profile, user, rank, xp_override=None, student_
         "avatar": _avatar_text_for_user(user) if user else "U",
         "is_top_3": rank <= 3,
         "student_id": str(student_obj_id) if student_obj_id else None,
+        "certificates_count": int(certificates_count or 0),
     }
 
 
@@ -326,14 +398,17 @@ def _leaderboard_payload_for_user(student_id, scope, page, per_page):
     board = _build_leaderboard_page(page=page, per_page=per_page, scope=scope)
     current_rank = None
     current_xp = 0
+    current_certificates_count = 0
     if student_id is not None:
         current_rank = _calculate_student_rank(student_id, scope=scope)
         current_xp = _student_scope_xp(student_id=student_id, scope=scope)
+        current_certificates_count = _certificate_count_for_student(student_id)
     return {
         "ok": True,
         "leaderboard": board,
         "current_rank": current_rank,
         "current_xp": current_xp,
+        "current_certificates_count": current_certificates_count,
     }
 
 
@@ -341,7 +416,12 @@ def _leaderboard_payload_signature(payload):
     board = payload.get("leaderboard", {})
     entries = board.get("entries", [])
     signature_rows = tuple(
-        (e.get("student_id"), int(e.get("rank", 0)), int(e.get("xp", 0)))
+        (
+            e.get("student_id"),
+            int(e.get("rank", 0)),
+            int(e.get("xp", 0)),
+            int(e.get("certificates_count", 0) or 0),
+        )
         for e in entries
     )
     return (
@@ -351,6 +431,7 @@ def _leaderboard_payload_signature(payload):
         tuple(signature_rows),
         payload.get("current_rank"),
         int(payload.get("current_xp", 0) or 0),
+        int(payload.get("current_certificates_count", 0) or 0),
     )
 
 
@@ -381,11 +462,20 @@ def _build_leaderboard_page(page: int, per_page: int, scope: str = "all"):
         student_ids = [p.student_id.id for p in profiles if p.student_id]
         users = User.objects(id__in=student_ids).only("id", "username", "first_name", "last_name").all() if student_ids else []
         users_by_id = {u.id: u for u in users}
+        cert_counts = _certificate_counts_for_students(student_ids)
 
         entries = []
         for i, profile in enumerate(profiles):
             user = users_by_id.get(profile.student_id.id) if profile.student_id else None
-            entries.append(_serialize_leaderboard_entry(profile, user, start_rank + i))
+            sid = profile.student_id.id if profile.student_id else None
+            entries.append(
+                _serialize_leaderboard_entry(
+                    profile,
+                    user,
+                    start_rank + i,
+                    certificates_count=cert_counts.get(sid, 0),
+                )
+            )
     else:
         rows, total_users = _aggregate_scope_rankings(scope=scope, page=page, per_page=per_page)
         total_pages = max(1, math.ceil(total_users / per_page)) if total_users else 1
@@ -399,6 +489,7 @@ def _build_leaderboard_page(page: int, per_page: int, scope: str = "all"):
         users_by_id = {u.id: u for u in users}
         profiles = StudentGamification.objects(student_id__in=student_ids).only("student_id", "level", "badges").all() if student_ids else []
         profiles_by_student_id = {p.student_id.id: p for p in profiles if p.student_id}
+        cert_counts = _certificate_counts_for_students(student_ids)
 
         entries = []
         for i, row in enumerate(rows):
@@ -413,6 +504,7 @@ def _build_leaderboard_page(page: int, per_page: int, scope: str = "all"):
                     rank=start_rank + i,
                     xp_override=xp_value,
                     student_id_override=sid,
+                    certificates_count=cert_counts.get(sid, 0),
                 )
             )
 
@@ -828,6 +920,10 @@ def lesson_detail(lesson_id):
     else:
         tests_data = [{"test": t, "is_open": True} for t in tests]
 
+    certificate = None
+    if current_user.role == "student":
+        certificate = Certificate.objects(student_id=current_user.id, lesson_id=lesson.id).first()
+
     return render_template(
         "student/lesson_detail.html",
         lesson=lesson,
@@ -836,7 +932,207 @@ def lesson_detail(lesson_id):
         tests_data=tests_data,
         is_completed=is_completed,
         lesson_completion_xp=lesson_completion_xp,
+        certificate=certificate,
     )
+
+
+@student_bp.route("/lessons/<lesson_id>/discussion", methods=["GET", "POST"])
+@login_required
+def lesson_discussion(lesson_id):
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        return "404", 404
+
+    if current_user.role == "student":
+        access = AccessContext(lesson.section, current_user.id)
+        if not access.lesson_open(lesson):
+            flash("قم بتفعيل الدرس للوصول إلى المناقشة.", "warning")
+            return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
+
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+
+        if action == "ask_question":
+            title = (request.form.get("title") or "").strip()
+            body = (request.form.get("body") or "").strip()
+            if not title or not body:
+                flash("عنوان السؤال ومحتواه مطلوبان.", "error")
+                return redirect(url_for("student.lesson_discussion", lesson_id=lesson.id))
+            DiscussionQuestion(
+                lesson_id=lesson.id,
+                author_id=current_user.id,
+                title=title,
+                body=body,
+                is_resolved=False,
+            ).save()
+            flash("تم إضافة السؤال بنجاح.", "success")
+            return redirect(url_for("student.lesson_discussion", lesson_id=lesson.id))
+
+        if action == "add_answer":
+            question_id = (request.form.get("question_id") or "").strip()
+            body = (request.form.get("body") or "").strip()
+            question = DiscussionQuestion.objects(id=question_id, lesson_id=lesson.id).first() if ObjectId.is_valid(question_id) else None
+            if not question or not body:
+                flash("تعذر إضافة الرد.", "error")
+                return redirect(url_for("student.lesson_discussion", lesson_id=lesson.id))
+
+            DiscussionAnswer(
+                question_id=question.id,
+                author_id=current_user.id,
+                body=body,
+            ).save()
+            flash("تمت إضافة الرد.", "success")
+            return redirect(url_for("student.lesson_discussion", lesson_id=lesson.id))
+
+        if action == "toggle_resolved":
+            question_id = (request.form.get("question_id") or "").strip()
+            question = DiscussionQuestion.objects(id=question_id, lesson_id=lesson.id).first() if ObjectId.is_valid(question_id) else None
+            if not question:
+                flash("السؤال غير موجود.", "error")
+                return redirect(url_for("student.lesson_discussion", lesson_id=lesson.id))
+
+            is_owner = str(question.author_id.id) == str(current_user.id) if question.author_id else False
+            is_staff = (current_user.role or "").lower() in {"teacher", "admin"}
+            if not (is_owner or is_staff):
+                flash("غير مسموح لك بتغيير حالة السؤال.", "error")
+                return redirect(url_for("student.lesson_discussion", lesson_id=lesson.id))
+
+            question.is_resolved = not bool(question.is_resolved)
+            question.save()
+            flash("تم تحديث حالة السؤال.", "success")
+            return redirect(url_for("student.lesson_discussion", lesson_id=lesson.id))
+
+    questions = list(DiscussionQuestion.objects(lesson_id=lesson.id).order_by("-is_pinned", "is_resolved", "-created_at").all())
+    answers = list(DiscussionAnswer.objects(question_id__in=[q.id for q in questions]).order_by("created_at").all()) if questions else []
+
+    answers_by_question = {}
+    author_ids = set()
+    for q in questions:
+        if q.author_id:
+            author_ids.add(q.author_id.id)
+    for a in answers:
+        qid = a.question_id.id if a.question_id else None
+        if qid is None:
+            continue
+        answers_by_question.setdefault(qid, []).append(a)
+        if a.author_id:
+            author_ids.add(a.author_id.id)
+
+    users_by_id = {u.id: u for u in User.objects(id__in=list(author_ids)).all()} if author_ids else {}
+
+    return render_template(
+        "student/lesson_discussion.html",
+        lesson=lesson,
+        section=lesson.section,
+        questions=questions,
+        answers_by_question=answers_by_question,
+        users_by_id=users_by_id,
+    )
+
+
+@student_bp.route("/discussions/pinned", methods=["GET"])
+@login_required
+def pinned_discussions():
+    all_pinned = list(DiscussionQuestion.objects(is_pinned=True).order_by("-created_at").all())
+
+    visible_questions = []
+    access_cache = {}
+    for question in all_pinned:
+        lesson = question.lesson_id
+        if not lesson:
+            continue
+
+        if (current_user.role or "").lower() in {"teacher", "admin"}:
+            visible_questions.append(question)
+            continue
+
+        section = lesson.section
+        cache_key = str(section.id) if section else ""
+        if cache_key not in access_cache and section:
+            access_cache[cache_key] = AccessContext(section, current_user.id)
+        context = access_cache.get(cache_key)
+        if context and context.lesson_open(lesson):
+            visible_questions.append(question)
+
+    answers = (
+        list(
+            DiscussionAnswer.objects(
+                question_id__in=[q.id for q in visible_questions]
+            )
+            .order_by("created_at")
+            .all()
+        )
+        if visible_questions
+        else []
+    )
+
+    answers_by_question = {}
+    lesson_ids = set()
+    user_ids = set()
+
+    for question in visible_questions:
+        if question.lesson_id:
+            lesson_ids.add(question.lesson_id.id)
+        if question.author_id:
+            user_ids.add(question.author_id.id)
+
+    for answer in answers:
+        qid = answer.question_id.id if answer.question_id else None
+        if qid is None:
+            continue
+        answers_by_question.setdefault(qid, []).append(answer)
+        if answer.author_id:
+            user_ids.add(answer.author_id.id)
+
+    lessons = list(Lesson.objects(id__in=list(lesson_ids)).all()) if lesson_ids else []
+    lessons_by_id = {lesson.id: lesson for lesson in lessons}
+    users_by_id = {user.id: user for user in User.objects(id__in=list(user_ids)).all()} if user_ids else {}
+
+    return render_template(
+        "student/pinned_discussions.html",
+        questions=visible_questions,
+        answers_by_question=answers_by_question,
+        lessons_by_id=lessons_by_id,
+        users_by_id=users_by_id,
+    )
+
+
+@student_bp.route("/certificates", methods=["GET"])
+@login_required
+def certificates():
+    if current_user.role != "student":
+        flash("هذه الصفحة للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    certificates = list(Certificate.objects(student_id=current_user.id).order_by("-issued_at").all())
+    lesson_ids = [c.lesson_id.id for c in certificates if c.lesson_id]
+    lessons = Lesson.objects(id__in=lesson_ids).all() if lesson_ids else []
+    lessons_by_id = {l.id: l for l in lessons}
+
+    return render_template(
+        "student/certificates.html",
+        certificates=certificates,
+        lessons_by_id=lessons_by_id,
+    )
+
+
+@student_bp.route("/certificates/<certificate_id>/download", methods=["GET"])
+@login_required
+def download_certificate(certificate_id):
+    if current_user.role != "student":
+        flash("هذه الصفحة للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    cert = Certificate.objects(id=certificate_id, student_id=current_user.id).first()
+    if not cert:
+        flash("الشهادة غير موجودة.", "error")
+        return redirect(url_for("student.certificates"))
+
+    cert_url = (getattr(cert, "certificate_url", "") or "").strip()
+    if not cert_url:
+        flash("لم يتم رفع رابط الشهادة بعد. تواصل مع المعلم.", "warning")
+        return redirect(url_for("student.certificates"))
+    return redirect(cert_url)
 
 
 @student_bp.route("/lessons/<lesson_id>/complete", methods=["POST"])
@@ -893,10 +1189,12 @@ def leaderboard():
     current_rank = None
     current_profile = None
     current_scope_xp = 0
+    current_certificates_count = 0
     if current_user.role == "student":
         current_rank = _calculate_student_rank(current_user.id, scope=scope)
         current_profile = StudentGamification.objects(student_id=current_user.id).first()
         current_scope_xp = _student_scope_xp(student_id=current_user.id, scope=scope)
+        current_certificates_count = _certificate_count_for_student(current_user.id)
 
     return render_template(
         "student/leaderboard.html",
@@ -905,6 +1203,27 @@ def leaderboard():
         current_rank=current_rank,
         current_profile=current_profile,
         current_scope_xp=current_scope_xp,
+        current_certificates_count=current_certificates_count,
+    )
+
+
+@student_bp.route("/leaderboard/students/<student_id>/certificates", methods=["GET"])
+@login_required
+def leaderboard_student_certificates(student_id):
+    student = User.objects(id=student_id, role="student").first() if ObjectId.is_valid(student_id) else None
+    if not student:
+        return "404", 404
+
+    certificates = list(Certificate.objects(student_id=student.id, is_verified=True).order_by("-issued_at").all())
+    lesson_ids = [c.lesson_id.id for c in certificates if c.lesson_id]
+    lessons = list(Lesson.objects(id__in=lesson_ids).all()) if lesson_ids else []
+    lessons_by_id = {l.id: l for l in lessons}
+
+    return render_template(
+        "student/leaderboard_student_certificates.html",
+        student=student,
+        certificates=certificates,
+        lessons_by_id=lessons_by_id,
     )
 
 
@@ -964,6 +1283,7 @@ def take_test(test_id):
                 return redirect(url_for("student.activate_section", section_id=test.section_id))
 
     total_questions_available = len(test.questions)
+    text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
     min_select = 10 if total_questions_available >= 10 else total_questions_available
     max_select = min(50, total_questions_available)
 
@@ -979,6 +1299,9 @@ def take_test(test_id):
     retake_source_id = request.values.get("retake_source_id")
     retake_mode = request.values.get("retake_mode")
 
+    if selected_count is None and total_questions_available == 0 and text_questions:
+        selected_count = 0
+
     if selected_count is None and preset_question_ids:
         selected_count = len(preset_question_ids)
     if selected_count:
@@ -989,6 +1312,7 @@ def take_test(test_id):
     if request.method == "POST":
         # Evaluate answers
         question_ids_raw = request.form.get("question_ids", "")
+        text_question_ids_raw = request.form.get("text_question_ids", "")
         if question_ids_raw:
             question_ids = [qid.strip() for qid in question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
             questions = Question.objects(id__in=question_ids).all()
@@ -996,6 +1320,12 @@ def take_test(test_id):
             ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
         else:
             ordered_questions = list(test.questions)
+
+        ordered_text_questions = list(text_questions)
+        if text_question_ids_raw:
+            text_question_ids = [qid.strip() for qid in text_question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
+            text_q_map = {str(tq.id): tq for tq in TestTextQuestion.objects(id__in=text_question_ids, test_id=test.id).all()}
+            ordered_text_questions = [text_q_map[qid] for qid in text_question_ids if qid in text_q_map]
 
         settings_payload = {
             "count": _to_int(request.form.get("count"), len(ordered_questions)),
@@ -1010,7 +1340,8 @@ def take_test(test_id):
             is_retake = bool(source)
 
         question_order = [str(q.id) for q in ordered_questions]
-        total = len(ordered_questions)
+        text_total = sum(max(1, int(getattr(tq, "max_score", 5) or 5)) for tq in ordered_text_questions)
+        total = len(ordered_questions) + text_total
         score = 0
         attempt = Attempt(
             test_id=test.id,
@@ -1044,6 +1375,17 @@ def take_test(test_id):
                     is_correct=is_correct,
                 )
                 ans.save()
+
+        for tq in ordered_text_questions:
+            text_answer = (request.form.get(f"text_question_{tq.id}") or "").strip()
+            if text_answer:
+                AttemptTextAnswer(
+                    attempt_id=attempt.id,
+                    text_question_id=tq.id,
+                    answer_text=text_answer,
+                    max_score=max(1, int(getattr(tq, "max_score", 5) or 5)),
+                    score_awarded=None,
+                ).save()
         attempt.score = score
         earned_xp, _ = _award_xp_for_attempt(
             student_id=current_user.id,
@@ -1061,6 +1403,7 @@ def take_test(test_id):
     ordered_questions = []
     question_ids_str = ""
     time_limit_seconds = None
+    text_question_ids_str = ",".join(str(tq.id) for tq in text_questions)
     if selected_count:
         questions = list(test.questions)
         if preset_question_ids:
@@ -1102,8 +1445,14 @@ def take_test(test_id):
         for q in questions:
             choices = list(q.choices)
             random.shuffle(choices)
-            ordered_questions.append({"question": q, "choices": choices})
+            ordered_questions.append({"question": q, "choices": choices, "question_type": "mcq"})
+        for tq in text_questions:
+            ordered_questions.append({"text_question": tq, "choices": [], "question_type": "text"})
         time_limit_seconds = (len(question_ids) * 75) + 15
+    elif selected_count is not None and total_questions_available == 0 and text_questions:
+        for tq in text_questions:
+            ordered_questions.append({"text_question": tq, "choices": [], "question_type": "text"})
+        time_limit_seconds = (len(text_questions) * 75) + 15
 
     # Available counts per difficulty for UI
     def _norm_level(q):
@@ -1129,6 +1478,7 @@ def take_test(test_id):
         hard_count=hard_count,
         ordered_questions=ordered_questions,
         question_ids_str=question_ids_str,
+        text_question_ids_str=text_question_ids_str,
         time_limit_seconds=time_limit_seconds,
         retake_source_id=retake_source_id,
         retake_mode=retake_mode,
@@ -1222,6 +1572,323 @@ def activate_lesson(lesson_id):
     return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
 
 
+@student_bp.route("/assignments")
+@login_required
+def assignments():
+    if current_user.role != "student":
+        flash("هذه الصفحة للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    active_assignments = list(Assignment.objects(is_active=True).order_by("due_at", "-created_at").all())
+    relevant_assignments = []
+    for assignment in active_assignments:
+        target = getattr(assignment, "target_student_id", None)
+        if target and str(target.id) != str(current_user.id):
+            continue
+        relevant_assignments.append(assignment)
+
+    submissions = AssignmentSubmission.objects(
+        assignment_id__in=[a.id for a in relevant_assignments],
+        student_id=current_user.id,
+    ).all() if relevant_assignments else []
+    attempts = AssignmentAttempt.objects(
+        assignment_id__in=[a.id for a in relevant_assignments],
+        student_id=current_user.id,
+    ).all() if relevant_assignments else []
+    submissions_by_assignment = {s.assignment_id.id: s for s in submissions if s.assignment_id}
+    attempts_by_assignment = {a.assignment_id.id: a for a in attempts if a.assignment_id}
+
+    assignments_data = []
+    now = datetime.utcnow()
+    for assignment in relevant_assignments:
+        if assignment.assignment_mode == "custom_test":
+            attempt = attempts_by_assignment.get(assignment.id)
+            submission = None
+            raw_status = attempt.status if attempt else "pending"
+            status = "completed" if raw_status == "graded" else raw_status
+            score_awarded = int(attempt.score_awarded or 0) if attempt else 0
+            total_score = int(attempt.total_score or int(assignment.max_score or 0)) if attempt else int(assignment.max_score or 0)
+        else:
+            submission = submissions_by_assignment.get(assignment.id)
+            attempt = None
+            raw_status = submission.status if submission else "pending"
+            status = submission.status if submission else "pending"
+            score_awarded = None
+            total_score = None
+        is_overdue = bool(assignment.due_at and assignment.due_at < now and status != "completed")
+        assignments_data.append(
+            {
+                "assignment": assignment,
+                "submission": submission,
+                "attempt": attempt,
+                "status": status,
+                "raw_status": raw_status,
+                "is_overdue": is_overdue,
+                "score_awarded": score_awarded,
+                "total_score": total_score,
+            }
+        )
+
+    return render_template("student/assignments.html", assignments_data=assignments_data)
+
+
+@student_bp.route("/assignments/<assignment_id>/complete", methods=["POST"])
+@login_required
+def complete_assignment(assignment_id):
+    if current_user.role != "student":
+        flash("هذه الخاصية للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    assignment = Assignment.objects(id=assignment_id, is_active=True).first()
+    if not assignment:
+        flash("الواجب غير موجود.", "error")
+        return redirect(url_for("student.assignments"))
+
+    if assignment.target_student_id and str(assignment.target_student_id.id) != str(current_user.id):
+        flash("هذا الواجب غير مخصص لك.", "error")
+        return redirect(url_for("student.assignments"))
+
+    note = (request.form.get("note") or "").strip() or None
+    submission = AssignmentSubmission.objects(
+        assignment_id=assignment.id,
+        student_id=current_user.id,
+    ).first()
+    if not submission:
+        submission = AssignmentSubmission(
+            assignment_id=assignment.id,
+            student_id=current_user.id,
+            status="completed",
+            note=note,
+            completed_at=datetime.utcnow(),
+        )
+    else:
+        submission.status = "completed"
+        submission.note = note
+        submission.completed_at = datetime.utcnow()
+    submission.save()
+
+    _award_flat_xp_once(
+        student_id=current_user.id,
+        event_type="assignment_complete",
+        source_id=str(assignment.id),
+        amount=10,
+    )
+    flash("تم تسليم الواجب بنجاح.", "success")
+    return redirect(url_for("student.assignments"))
+
+
+@student_bp.route("/assignments/<assignment_id>/solve", methods=["GET", "POST"])
+@login_required
+def solve_assignment(assignment_id):
+    if current_user.role != "student":
+        flash("هذه الصفحة للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    assignment = Assignment.objects(id=assignment_id, is_active=True, assignment_mode="custom_test").first()
+    if not assignment:
+        flash("الواجب غير موجود.", "error")
+        return redirect(url_for("student.assignments"))
+
+    if assignment.target_student_id and str(assignment.target_student_id.id) != str(current_user.id):
+        flash("هذا الواجب غير مخصص لك.", "error")
+        return redirect(url_for("student.assignments"))
+
+    existing_attempt = AssignmentAttempt.objects(assignment_id=assignment.id, student_id=current_user.id).first()
+    if existing_attempt and existing_attempt.status in {"submitted", "graded"}:
+        flash("تم إرسال هذا الواجب مسبقاً.", "info")
+        return redirect(url_for("student.assignments"))
+
+    question_ids = []
+    if assignment.selected_question_ids_json:
+        try:
+            question_ids = [qid for qid in json.loads(assignment.selected_question_ids_json) if ObjectId.is_valid(qid)]
+        except Exception:
+            question_ids = []
+
+    questions = Question.objects(id__in=question_ids).all() if question_ids else []
+    questions_by_id = {str(q.id): q for q in questions}
+    ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
+
+    written_items = []
+    if assignment.written_questions_json:
+        try:
+            payload = json.loads(assignment.written_questions_json)
+            if isinstance(payload, list):
+                written_items = payload
+        except Exception:
+            written_items = []
+
+    if request.method == "POST":
+        answers = []
+        total_score = 0
+
+        for q in ordered_questions:
+            selected_choice_id = request.form.get(f"mcq_{q.id}")
+            answers.append(
+                {
+                    "type": "mcq",
+                    "question_id": str(q.id),
+                    "selected_choice_id": selected_choice_id,
+                    "max_score": 1,
+                    "score_awarded": 0,
+                }
+            )
+            total_score += 1
+
+        for idx, item in enumerate(written_items):
+            text_answer = (request.form.get(f"text_{idx}") or "").strip()
+            max_score = max(1, int(item.get("max_score", 5) or 5))
+            answers.append(
+                {
+                    "type": "text",
+                    "prompt": item.get("prompt", ""),
+                    "text_answer": text_answer,
+                    "max_score": max_score,
+                    "score_awarded": 0,
+                }
+            )
+            total_score += max_score
+
+        attempt = AssignmentAttempt(
+            assignment_id=assignment.id,
+            student_id=current_user.id,
+            answers_json=json.dumps(answers, ensure_ascii=False),
+            status="submitted",
+            total_score=total_score,
+            score_awarded=0,
+            submitted_at=datetime.utcnow(),
+        )
+        attempt.save()
+        flash("تم إرسال الحل بنجاح. بانتظار التصحيح من المعلم.", "success")
+        return redirect(url_for("student.assignments"))
+
+    return render_template(
+        "student/assignment_solve.html",
+        assignment=assignment,
+        questions=ordered_questions,
+        written_items=written_items,
+    )
+
+
+@student_bp.route("/assignments/<assignment_id>/view", methods=["GET"])
+@login_required
+def view_assignment_questions(assignment_id):
+    if current_user.role != "student":
+        flash("هذه الصفحة للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    assignment = Assignment.objects(id=assignment_id, assignment_mode="custom_test").first()
+    if not assignment:
+        flash("الواجب غير موجود.", "error")
+        return redirect(url_for("student.assignments"))
+
+    if assignment.target_student_id and str(assignment.target_student_id.id) != str(current_user.id):
+        flash("هذا الواجب غير مخصص لك.", "error")
+        return redirect(url_for("student.assignments"))
+
+    question_ids = []
+    if assignment.selected_question_ids_json:
+        try:
+            question_ids = [qid for qid in json.loads(assignment.selected_question_ids_json) if ObjectId.is_valid(qid)]
+        except Exception:
+            question_ids = []
+
+    questions = Question.objects(id__in=question_ids).all() if question_ids else []
+    questions_by_id = {str(q.id): q for q in questions}
+    ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
+
+    written_items = []
+    if assignment.written_questions_json:
+        try:
+            payload = json.loads(assignment.written_questions_json)
+            if isinstance(payload, list):
+                written_items = payload
+        except Exception:
+            written_items = []
+
+    attempt = AssignmentAttempt.objects(assignment_id=assignment.id, student_id=current_user.id).first()
+    mcq_answers = {}
+    text_answers = []
+    teacher_note = None
+    if attempt:
+        teacher_note = attempt.teacher_note
+        try:
+            answers = json.loads(attempt.answers_json or "[]")
+            if isinstance(answers, list):
+                for ans in answers:
+                    if ans.get("type") == "mcq":
+                        mcq_answers[str(ans.get("question_id") or "")] = ans
+                    elif ans.get("type") == "text":
+                        text_answers.append(ans)
+        except Exception:
+            pass
+
+    return render_template(
+        "student/assignment_view.html",
+        assignment=assignment,
+        questions=ordered_questions,
+        written_items=written_items,
+        attempt=attempt,
+        mcq_answers=mcq_answers,
+        text_answers=text_answers,
+        teacher_note=teacher_note,
+    )
+
+
+@student_bp.route("/study-plans")
+@login_required
+def study_plans():
+    if current_user.role != "student":
+        flash("هذه الصفحة للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    plans = list(StudyPlan.objects(student_id=current_user.id, is_active=True).order_by("-created_at").all())
+    items = StudyPlanItem.objects(plan_id__in=[p.id for p in plans]).order_by("due_at", "created_at").all() if plans else []
+    items_by_plan = {}
+    for item in items:
+        pid = item.plan_id.id if item.plan_id else None
+        if not pid:
+            continue
+        items_by_plan.setdefault(pid, []).append(item)
+
+    return render_template("student/study_plans.html", plans=plans, items_by_plan=items_by_plan)
+
+
+@student_bp.route("/study-plans/items/<item_id>/toggle", methods=["POST"])
+@login_required
+def toggle_study_plan_item(item_id):
+    if current_user.role != "student":
+        flash("هذه الخاصية للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    item = StudyPlanItem.objects(id=item_id).first()
+    if not item or not item.plan_id:
+        flash("المهمة غير موجودة.", "error")
+        return redirect(url_for("student.study_plans"))
+
+    plan = item.plan_id
+    if not plan.student_id or str(plan.student_id.id) != str(current_user.id):
+        flash("غير مصرح لك بهذا الإجراء.", "error")
+        return redirect(url_for("student.study_plans"))
+
+    item.is_done = not item.is_done
+    item.done_at = datetime.utcnow() if item.is_done else None
+    item.save()
+
+    if item.is_done:
+        _award_flat_xp_once(
+            student_id=current_user.id,
+            event_type="study_plan_item_complete",
+            source_id=str(item.id),
+            amount=5,
+        )
+        flash("تم إنجاز المهمة (+5 XP).", "success")
+    else:
+        flash("تم إعادة المهمة إلى غير منجزة.", "info")
+
+    return redirect(url_for("student.study_plans"))
+
+
 @student_bp.route("/results")
 @login_required
 def results():
@@ -1256,6 +1923,21 @@ def results():
         .order_by("-started_at")
         .all()
     )
+
+    all_attempts = own_attempts + other_attempts
+    attempt_ids = [a.id for a in all_attempts if a.id]
+    text_answers = list(AttemptTextAnswer.objects(attempt_id__in=attempt_ids).all()) if attempt_ids else []
+    text_by_attempt = {}
+    for ta in text_answers:
+        if not ta.attempt_id:
+            continue
+        aid = ta.attempt_id.id
+        text_by_attempt.setdefault(aid, []).append(ta)
+
+    for attempt in all_attempts:
+        tas = text_by_attempt.get(attempt.id, [])
+        pending = bool(tas) and any(getattr(ta, "score_awarded", None) is None for ta in tas)
+        attempt._pending_text_grading = pending
     return render_template(
         "student/results.html",
         own_attempts=own_attempts,
@@ -1263,13 +1945,132 @@ def results():
         other_attempts=other_attempts,
     )
 
+
+def _frequently_wrong_question_counts(student_id):
+    counts = {}
+    if not student_id:
+        return counts
+
+    regular_attempt_ids = [a.id for a in Attempt.objects(student_id=student_id).only("id").all()]
+    if regular_attempt_ids:
+        rows = list(
+            AttemptAnswer._get_collection().aggregate(
+                [
+                    {"$match": {"attempt_id": {"$in": regular_attempt_ids}, "is_correct": False}},
+                    {"$group": {"_id": "$question_id", "count": {"$sum": 1}}},
+                ]
+            )
+        )
+        for row in rows:
+            qid = row.get("_id")
+            if qid:
+                counts[qid] = counts.get(qid, 0) + int(row.get("count", 0) or 0)
+
+    custom_attempt_ids = [
+        a.id
+        for a in CustomTestAttempt.objects(student_id=student_id, status="submitted").only("id").all()
+    ]
+    if custom_attempt_ids:
+        rows = list(
+            CustomTestAnswer._get_collection().aggregate(
+                [
+                    {"$match": {"attempt_id": {"$in": custom_attempt_ids}, "is_correct": False}},
+                    {"$group": {"_id": "$question_id", "count": {"$sum": 1}}},
+                ]
+            )
+        )
+        for row in rows:
+            qid = row.get("_id")
+            if qid:
+                counts[qid] = counts.get(qid, 0) + int(row.get("count", 0) or 0)
+
+    return counts
+
+
+@student_bp.route("/frequently-wrong", methods=["GET"])
+@login_required
+def frequently_wrong():
+    if current_user.role != "student":
+        flash("هذه الصفحة للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    freq_map = _frequently_wrong_question_counts(current_user.id)
+    question_ids = list(freq_map.keys())
+    questions = list(Question.objects(id__in=question_ids).all()) if question_ids else []
+    questions_by_id = {q.id: q for q in questions}
+
+    rows = []
+    for qid, freq in freq_map.items():
+        q = questions_by_id.get(qid)
+        if not q:
+            continue
+        rows.append(
+            {
+                "question": q,
+                "frequency": int(freq or 0),
+                "test": q.test_id,
+            }
+        )
+
+    rows.sort(key=lambda r: r["frequency"], reverse=True)
+    total_wrong = sum(r["frequency"] for r in rows)
+
+    return render_template(
+        "student/frequently_wrong.html",
+        rows=rows,
+        total_wrong=total_wrong,
+    )
+
+
+@student_bp.route("/frequently-wrong/start", methods=["POST"])
+@login_required
+def frequently_wrong_start_test():
+    if current_user.role != "student":
+        flash("هذه الصفحة للطلاب فقط.", "warning")
+        return redirect(url_for("index"))
+
+    selected_ids = [qid for qid in request.form.getlist("question_ids") if ObjectId.is_valid(qid)]
+    if not selected_ids:
+        flash("اختر سؤالاً واحداً على الأقل لبدء الاختبار.", "error")
+        return redirect(url_for("student.frequently_wrong"))
+
+    questions = list(Question.objects(id__in=selected_ids).all())
+    if not questions:
+        flash("تعذر تجهيز الاختبار من الأسئلة المختارة.", "error")
+        return redirect(url_for("student.frequently_wrong"))
+
+    random.shuffle(questions)
+    question_order = [str(q.id) for q in questions]
+    answer_order = {}
+    for q in questions:
+        choices = list(q.choices)
+        random.shuffle(choices)
+        answer_order[str(q.id)] = [str(c.choice_id) for c in choices]
+
+    selections_payload = {
+        "mode": "frequently_wrong",
+        "question_count": len(question_order),
+    }
+
+    attempt = CustomTestAttempt(
+        student_id=current_user.id,
+        label="Frequently Wrong Review",
+        total=len(question_order),
+        selections_json=json.dumps(selections_payload),
+        question_order_json=json.dumps(question_order),
+        answer_order_json=json.dumps(answer_order),
+    )
+    attempt.save()
+
+    return redirect(url_for("student.custom_test_take", attempt_id=attempt.id))
+
 @student_bp.route("/results/<attempt_id>")
 @login_required
 def test_result(attempt_id):
     attempt = Attempt.objects(id=attempt_id).first()
     if not attempt:
         return "404", 404
-    if str(attempt.student_id.id) != str(current_user.id) and current_user.role != "teacher":
+    if str(attempt.student_id.id) != str(current_user.id) and current_user.role not in {"teacher", "admin"}:
         flash("غير مسموح", "error")
         return redirect(url_for("student.subjects"))
     
@@ -1298,8 +2099,36 @@ def test_result(attempt_id):
             "is_correct": ans.is_correct,
         })
 
+    text_answers = list(AttemptTextAnswer.objects(attempt_id=attempt.id).all())
+    text_question_ids = [ta.text_question_id.id for ta in text_answers if ta.text_question_id]
+    text_questions_map = {
+        str(tq.id): tq for tq in TestTextQuestion.objects(id__in=text_question_ids).all()
+    } if text_question_ids else {}
+    text_review = []
+    for ta in text_answers:
+        if not ta.text_question_id:
+            continue
+        tq = text_questions_map.get(str(ta.text_question_id.id))
+        if not tq:
+            continue
+        text_review.append(
+            {
+                "question": tq,
+                "answer_text": ta.answer_text,
+            }
+        )
+
+    pending_text_grading = bool(text_answers) and any(getattr(ta, "score_awarded", None) is None for ta in text_answers)
+
     gamification = StudentGamification.objects(student_id=attempt.student_id.id).first()
-    return render_template("student/test_result.html", attempt=attempt, review=review, gamification=gamification)
+    return render_template(
+        "student/test_result.html",
+        attempt=attempt,
+        review=review,
+        text_review=text_review,
+        gamification=gamification,
+        pending_text_grading=pending_text_grading,
+    )
 
 
 @student_bp.route("/results/<attempt_id>/retake/same", methods=["POST"])

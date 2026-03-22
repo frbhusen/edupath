@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة المناقشات</h1>
+    <p class="mb-0">متابعة أسئلة الطلاب والردود وحالات الحل.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('student.pinned_discussions') }}">الأسئلة المثبتة</a>
+    <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-6">
+        <label class="form-label small">فلتر حسب الدرس</label>
+        <select class="form-select form-select-sm" name="lesson_id">
+          <option value="">كل الدروس</option>
+          {% for l in all_lessons %}
+            <option value="{{ l.id }}" {% if selected_lesson_id and selected_lesson_id == l.id|string %}selected{% endif %}>{{ l.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6 d-flex gap-2">
+        <button class="btn btn-outline-primary btn-sm" type="submit">تطبيق</button>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.discussions_manage') }}">مسح</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if questions %}
+      {% for q in questions %}
+        {% set lesson = lessons_by_id.get(q.lesson_id.id) if q.lesson_id else None %}
+        {% set author = users_by_id.get(q.author_id.id) if q.author_id else None %}
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="fw-semibold">{{ q.title }}</div>
+              <div class="small text-muted">
+                الدرس: {{ lesson.title if lesson else '-' }} ·
+                بواسطة: {{ author.full_name if author else 'مستخدم' }} ·
+                {{ q.created_at.strftime('%Y-%m-%d %H:%M') if q.created_at else '-' }}
+              </div>
+            </div>
+            <span class="badge {% if q.is_resolved %}text-bg-success{% else %}text-bg-warning{% endif %}">{{ 'تم الحل' if q.is_resolved else 'مفتوح' }}</span>
+          </div>
+
+          <div class="mb-3" style="white-space: pre-wrap;">{{ q.body }}</div>
+
+          <div class="d-flex gap-2 mb-3">
+            <form method="post">
+              <input type="hidden" name="action" value="toggle_pin">
+              <input type="hidden" name="question_id" value="{{ q.id }}">
+              <button class="btn btn-outline-warning btn-sm" type="submit">{{ 'إلغاء التثبيت' if q.is_pinned else 'تثبيت' }}</button>
+            </form>
+            <form method="post">
+              <input type="hidden" name="action" value="toggle_resolved">
+              <input type="hidden" name="question_id" value="{{ q.id }}">
+              <button class="btn btn-outline-primary btn-sm" type="submit">{{ 'إعادة فتح' if q.is_resolved else 'وضع كمحلول' }}</button>
+            </form>
+            <form method="post" onsubmit="return confirm('حذف السؤال وكل ردوده؟');">
+              <input type="hidden" name="action" value="delete_question">
+              <input type="hidden" name="question_id" value="{{ q.id }}">
+              <button class="btn btn-outline-danger btn-sm" type="submit">حذف السؤال</button>
+            </form>
+          </div>
+
+          <form method="post" class="mb-3">
+            <input type="hidden" name="action" value="add_answer">
+            <input type="hidden" name="question_id" value="{{ q.id }}">
+            <div class="input-group">
+              <input class="form-control" name="body" placeholder="رد المعلم على السؤال" required>
+              <button class="btn btn-outline-success" type="submit">إرسال الرد</button>
+            </div>
+          </form>
+
+          {% set q_answers = answers_by_question.get(q.id, []) %}
+          {% if q_answers %}
+            <div class="list-group list-group-flush">
+              {% for a in q_answers %}
+                {% set ans_author = users_by_id.get(a.author_id.id) if a.author_id else None %}
+                <div class="list-group-item px-0 d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="small text-muted mb-1">{{ ans_author.full_name if ans_author else 'مستخدم' }} - {{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '-' }}</div>
+                    <div style="white-space: pre-wrap;">{{ a.body }}</div>
+                  </div>
+                  <form method="post" onsubmit="return confirm('حذف هذا الرد؟');">
+                    <input type="hidden" name="action" value="delete_answer">
+                    <input type="hidden" name="answer_id" value="{{ a.id }}">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                  </form>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="small text-muted">لا توجد ردود بعد.</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد مناقشات حالياً.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
