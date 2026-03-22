@@ -26,6 +26,9 @@
                   {% endif %}
                 </div>
                 <h5 class="card-title mb-1">{{ attempt.test.title if attempt.test else 'اختبار غير متوفر' }}</h5>
+                {% if attempt.is_retake %}
+                  <span class="badge text-bg-warning">إعادة</span>
+                {% endif %}
               </div>
               <span class="badge text-bg-primary">{{ attempt.score }}/{{ attempt.total }}</span>
             </div>
@@ -55,6 +58,9 @@
               <div>
                 <div class="text-muted small">اختبار مخصص</div>
                 <h5 class="card-title mb-1">{{ attempt.label or 'Custom Test' }}</h5>
+                {% if attempt.is_retake %}
+                  <span class="badge text-bg-warning">إعادة</span>
+                {% endif %}
               </div>
               <span class="badge text-bg-info">{{ attempt.score }}/{{ attempt.total }}</span>
             </div>

@@ -111,6 +111,41 @@ class AccessContext:
         return self.section_open
 
 
+def _to_int(value, default=0):
+    try:
+        if value is None or value == "":
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _load_attempt_settings(attempt):
+    raw = getattr(attempt, "selection_settings_json", None)
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def _extract_attempt_question_ids(attempt):
+    raw = getattr(attempt, "question_order_json", None)
+    if raw:
+        try:
+            qids = json.loads(raw)
+            if isinstance(qids, list):
+                return [str(qid) for qid in qids if ObjectId.is_valid(str(qid))]
+        except Exception:
+            pass
+
+    # Fallback for old attempts created before question order was persisted.
+    ordered_answers = AttemptAnswer.objects(attempt_id=attempt.id).order_by("id").all()
+    return [str(ans.question_id.id) for ans in ordered_answers if ans.question_id]
+
+
 def get_unlocked_lessons(student_id: int):
     """Collect all lessons the student can access across all sections.
     Optimized to avoid N+1 queries by bulk loading data.
@@ -465,20 +500,21 @@ def take_test(test_id):
     total_questions_available = len(test.questions)
     min_select = 10 if total_questions_available >= 10 else total_questions_available
     max_select = min(50, total_questions_available)
-    selected_count = request.args.get("count")
-    easy_count = request.args.get("easy")
-    medium_count = request.args.get("medium")
-    hard_count = request.args.get("hard")
-    try:
-        selected_count = int(selected_count) if selected_count else None
-    except ValueError:
-        selected_count = None
-    try:
-        easy_count = int(easy_count) if easy_count else 0
-        medium_count = int(medium_count) if medium_count else 0
-        hard_count = int(hard_count) if hard_count else 0
-    except ValueError:
-        easy_count = medium_count = hard_count = 0
+
+    selected_count = _to_int(request.values.get("count"), None)
+    easy_count = _to_int(request.values.get("easy"), 0)
+    medium_count = _to_int(request.values.get("medium"), 0)
+    hard_count = _to_int(request.values.get("hard"), 0)
+    preset_question_ids_raw = request.values.get("question_ids", "") or ""
+    preset_question_ids = [
+        qid.strip() for qid in preset_question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())
+    ]
+
+    retake_source_id = request.values.get("retake_source_id")
+    retake_mode = request.values.get("retake_mode")
+
+    if selected_count is None and preset_question_ids:
+        selected_count = len(preset_question_ids)
     if selected_count:
         lower_bound = 10 if total_questions_available >= 10 else 1
         selected_count = max(lower_bound, min(selected_count, max_select))
@@ -494,9 +530,31 @@ def take_test(test_id):
             ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
         else:
             ordered_questions = list(test.questions)
+
+        settings_payload = {
+            "count": _to_int(request.form.get("count"), len(ordered_questions)),
+            "easy": _to_int(request.form.get("easy"), 0),
+            "medium": _to_int(request.form.get("medium"), 0),
+            "hard": _to_int(request.form.get("hard"), 0),
+        }
+
+        is_retake = False
+        if retake_source_id and ObjectId.is_valid(str(retake_source_id)):
+            source = Attempt.objects(id=retake_source_id, student_id=current_user.id).first()
+            is_retake = bool(source)
+
+        question_order = [str(q.id) for q in ordered_questions]
         total = len(ordered_questions)
         score = 0
-        attempt = Attempt(test_id=test.id, student_id=current_user.id, score=0, total=total)
+        attempt = Attempt(
+            test_id=test.id,
+            student_id=current_user.id,
+            score=0,
+            total=total,
+            question_order_json=json.dumps(question_order),
+            selection_settings_json=json.dumps(settings_payload),
+            is_retake=is_retake,
+        )
         attempt.save()
         for q in ordered_questions:
             selected_choice_id = request.form.get(f"question_{q.id}")
@@ -530,7 +588,11 @@ def take_test(test_id):
     time_limit_seconds = None
     if selected_count:
         questions = list(test.questions)
-        if selected_by_level:
+        if preset_question_ids:
+            questions_by_id = {str(q.id): q for q in Question.objects(id__in=preset_question_ids).all()}
+            questions = [questions_by_id[qid] for qid in preset_question_ids if qid in questions_by_id]
+            selected_count = len(questions)
+        elif selected_by_level:
             level_map = {"easy": [], "medium": [], "hard": []}
             for q in questions:
                 level = (getattr(q, "difficulty", "medium") or "medium").lower()
@@ -558,7 +620,8 @@ def take_test(test_id):
             if selected_count < len(questions):
                 questions = random.sample(questions, selected_count)
 
-        random.shuffle(questions)
+        if not preset_question_ids:
+            random.shuffle(questions)
         question_ids = [q.id for q in questions]
         question_ids_str = ",".join(str(qid) for qid in question_ids)
         for q in questions:
@@ -586,9 +649,14 @@ def take_test(test_id):
         available_easy=available_easy,
         available_medium=available_medium,
         available_hard=available_hard,
+        easy_count=easy_count,
+        medium_count=medium_count,
+        hard_count=hard_count,
         ordered_questions=ordered_questions,
         question_ids_str=question_ids_str,
         time_limit_seconds=time_limit_seconds,
+        retake_source_id=retake_source_id,
+        retake_mode=retake_mode,
     )
 
 
@@ -756,6 +824,62 @@ def test_result(attempt_id):
         })
 
     return render_template("student/test_result.html", attempt=attempt, review=review)
+
+
+@student_bp.route("/results/<attempt_id>/retake/same", methods=["POST"])
+@login_required
+def retake_test_same_questions(attempt_id):
+    attempt = Attempt.objects(id=attempt_id).first()
+    if not attempt:
+        return "404", 404
+    if str(attempt.student_id.id) != str(current_user.id):
+        flash("غير مسموح", "error")
+        return redirect(url_for("student.results"))
+
+    question_ids = _extract_attempt_question_ids(attempt)
+    if not question_ids:
+        flash("تعذر تجهيز إعادة الاختبار بنفس الأسئلة.", "error")
+        return redirect(url_for("student.test_result", attempt_id=attempt.id))
+
+    settings = _load_attempt_settings(attempt)
+    return redirect(
+        url_for(
+            "student.take_test",
+            test_id=attempt.test_id.id,
+            count=settings.get("count", len(question_ids)),
+            easy=settings.get("easy", 0),
+            medium=settings.get("medium", 0),
+            hard=settings.get("hard", 0),
+            question_ids=",".join(question_ids),
+            retake_source_id=str(attempt.id),
+            retake_mode="same",
+        )
+    )
+
+
+@student_bp.route("/results/<attempt_id>/retake/new", methods=["POST"])
+@login_required
+def retake_test_new_questions(attempt_id):
+    attempt = Attempt.objects(id=attempt_id).first()
+    if not attempt:
+        return "404", 404
+    if str(attempt.student_id.id) != str(current_user.id):
+        flash("غير مسموح", "error")
+        return redirect(url_for("student.results"))
+
+    settings = _load_attempt_settings(attempt)
+    return redirect(
+        url_for(
+            "student.take_test",
+            test_id=attempt.test_id.id,
+            count=settings.get("count", attempt.total),
+            easy=settings.get("easy", 0),
+            medium=settings.get("medium", 0),
+            hard=settings.get("hard", 0),
+            retake_source_id=str(attempt.id),
+            retake_mode="new",
+        )
+    )
 
 
 @student_bp.route("/custom-tests/new", methods=["GET", "POST"])
@@ -1106,6 +1230,115 @@ def custom_test_result(attempt_id):
         })
 
     return render_template("student/custom_test_result.html", attempt=attempt, review=review)
+
+
+@student_bp.route("/custom-tests/<attempt_id>/retake/same", methods=["POST"])
+@login_required
+def custom_test_retake_same(attempt_id):
+    source = CustomTestAttempt.objects(id=attempt_id).first()
+    if not source:
+        return "404", 404
+    if str(source.student_id.id) != str(current_user.id):
+        flash("غير مسموح.", "error")
+        return redirect(url_for("student.results"))
+
+    attempt = CustomTestAttempt(
+        student_id=current_user.id,
+        label=source.label,
+        total=source.total,
+        score=0,
+        status="active",
+        selections_json=source.selections_json,
+        question_order_json=source.question_order_json,
+        answer_order_json=source.answer_order_json,
+        is_retake=True,
+    )
+    attempt.save()
+    return redirect(url_for("student.custom_test_take", attempt_id=attempt.id))
+
+
+@student_bp.route("/custom-tests/<attempt_id>/retake/new", methods=["POST"])
+@login_required
+def custom_test_retake_new(attempt_id):
+    source = CustomTestAttempt.objects(id=attempt_id).first()
+    if not source:
+        return "404", 404
+    if str(source.student_id.id) != str(current_user.id):
+        flash("غير مسموح.", "error")
+        return redirect(url_for("student.results"))
+
+    try:
+        selections_payload = json.loads(source.selections_json)
+    except Exception:
+        selections_payload = {}
+    selections = selections_payload.get("lessons", []) if isinstance(selections_payload, dict) else []
+
+    selected_questions = []
+    for sel in selections:
+        lesson_id = sel.get("lesson_id")
+        count = _to_int(sel.get("count"), 0)
+        if not lesson_id or count <= 0:
+            continue
+
+        tests = Test.objects(lesson_id=lesson_id).all()
+        test_ids = [t.id for t in tests]
+        all_lesson_questions = list(Question.objects(test_id__in=test_ids)) if test_ids else []
+
+        if "difficulty" in sel and isinstance(sel["difficulty"], dict):
+            diff_spec = sel["difficulty"]
+            level_map = {"easy": [], "medium": [], "hard": []}
+            for q in all_lesson_questions:
+                diff = (getattr(q, "difficulty", "medium") or "medium").lower()
+                if diff not in level_map:
+                    diff = "medium"
+                level_map[diff].append(q)
+
+            picked = []
+            easy_need = _to_int(diff_spec.get("easy"), 0)
+            medium_need = _to_int(diff_spec.get("medium"), 0)
+            hard_need = _to_int(diff_spec.get("hard"), 0)
+
+            if easy_need > len(level_map["easy"]) or medium_need > len(level_map["medium"]) or hard_need > len(level_map["hard"]):
+                flash("لا توجد أسئلة كافية لإعادة الاختبار بنفس الإعدادات.", "error")
+                return redirect(url_for("student.custom_test_result", attempt_id=source.id))
+
+            if easy_need:
+                picked.extend(random.sample(level_map["easy"], easy_need))
+            if medium_need:
+                picked.extend(random.sample(level_map["medium"], medium_need))
+            if hard_need:
+                picked.extend(random.sample(level_map["hard"], hard_need))
+            selected_questions.extend(picked)
+        else:
+            if len(all_lesson_questions) < count:
+                flash("لا توجد أسئلة كافية لإعادة الاختبار بنفس الإعدادات.", "error")
+                return redirect(url_for("student.custom_test_result", attempt_id=source.id))
+            selected_questions.extend(random.sample(all_lesson_questions, count))
+
+    # Keep unique questions and randomize like original custom test generation.
+    selected_questions = list({q.id: q for q in selected_questions}.values())
+    random.shuffle(selected_questions)
+    question_order = [str(q.id) for q in selected_questions]
+
+    answer_order = {}
+    for q in selected_questions:
+        choices = list(q.choices)
+        random.shuffle(choices)
+        answer_order[str(q.id)] = [str(c.choice_id) for c in choices]
+
+    attempt = CustomTestAttempt(
+        student_id=current_user.id,
+        label=source.label,
+        total=len(question_order),
+        score=0,
+        status="active",
+        selections_json=source.selections_json,
+        question_order_json=json.dumps(question_order),
+        answer_order_json=json.dumps(answer_order),
+        is_retake=True,
+    )
+    attempt.save()
+    return redirect(url_for("student.custom_test_take", attempt_id=attempt.id))
 
 
 @student_bp.route("/flashcards/resource/<resource_id>")

@@ -207,6 +207,9 @@ class Attempt(Document):
     started_at = DateTimeField(default=datetime.utcnow)
     submitted_at = DateTimeField(default=datetime.utcnow)
     answers = ListField(default=list)  # List of {question_id, choice_id, is_correct}
+    question_order_json = StringField(null=True)
+    selection_settings_json = StringField(null=True)
+    is_retake = BooleanField(default=False)
     
     meta = {
         'collection': 'attempts',
@@ -265,6 +268,7 @@ class CustomTestAttempt(Document):
     selections_json = StringField(required=True)  # JSON string of selected questions
     question_order_json = StringField(required=True)  # JSON string of question order
     answer_order_json = StringField(required=True)  # JSON string of answer order
+    is_retake = BooleanField(default=False)
     
     meta = {
         'collection': 'custom_test_attempts',

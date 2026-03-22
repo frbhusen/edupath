@@ -81,6 +81,14 @@
   <form method="post" id="test-form">
     <input type="hidden" name="question_ids" value="{{ question_ids_str }}" />
     <input type="hidden" name="time_expired" id="time-expired" value="0" />
+    <input type="hidden" name="count" value="{{ selected_count or 0 }}" />
+    <input type="hidden" name="easy" value="{{ easy_count|default(0) }}" />
+    <input type="hidden" name="medium" value="{{ medium_count|default(0) }}" />
+    <input type="hidden" name="hard" value="{{ hard_count|default(0) }}" />
+    {% if retake_source_id %}
+      <input type="hidden" name="retake_source_id" value="{{ retake_source_id }}" />
+      <input type="hidden" name="retake_mode" value="{{ retake_mode or '' }}" />
+    {% endif %}
     {% for item in ordered_questions %}
       {% set q = item.question %}
       {% set choices = item.choices %}
