@@ -1,0 +1,415 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+	@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+
+	.faq-shell {
+		--faq-bg-1: #f5efe5;
+		--faq-bg-2: #cfe2dc;
+		--faq-ink: #102a2b;
+		--faq-muted: #50696a;
+		--faq-accent: #0f766e;
+		--faq-accent-soft: #d7f0ec;
+		--faq-card: #ffffff;
+		font-family: 'Tajawal', sans-serif;
+		color: var(--faq-ink);
+		border-radius: 1.5rem;
+		background:
+			radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0) 35%),
+			linear-gradient(135deg, var(--faq-bg-1), var(--faq-bg-2));
+		padding: 2rem;
+		box-shadow: 0 14px 40px rgba(16, 42, 43, 0.08);
+	}
+
+	.faq-headline {
+		font-weight: 800;
+		letter-spacing: 0.2px;
+	}
+
+	.faq-subtitle {
+		color: var(--faq-muted);
+		max-width: 720px;
+		margin: 0 auto;
+		font-size: 1.04rem;
+	}
+
+	.faq-search {
+		max-width: 560px;
+		margin: 1.5rem auto 0;
+		position: relative;
+	}
+
+	.faq-search .form-control {
+		border-radius: 999px;
+		border: 1px solid rgba(15, 118, 110, 0.24);
+		padding: 0.8rem 1rem 0.8rem 2.8rem;
+		background: rgba(255, 255, 255, 0.92);
+	}
+
+	.faq-search i {
+		position: absolute;
+		left: 1rem;
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--faq-accent);
+	}
+
+	.faq-stats {
+		display: flex;
+		justify-content: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+		margin-top: 1rem;
+	}
+
+	.faq-controls {
+		display: flex;
+		justify-content: center;
+		gap: 0.55rem;
+		flex-wrap: wrap;
+		margin-top: 1rem;
+	}
+
+	.faq-control-btn {
+		border: 1px solid rgba(15, 118, 110, 0.35);
+		background: rgba(255, 255, 255, 0.9);
+		color: var(--faq-accent);
+		border-radius: 999px;
+		padding: 0.38rem 0.9rem;
+		font-weight: 700;
+		font-size: 0.86rem;
+		transition: all 0.2s ease;
+	}
+
+	.faq-control-btn:hover {
+		background: var(--faq-accent-soft);
+		transform: translateY(-1px);
+	}
+
+	.faq-chip {
+		border: 1px solid rgba(15, 118, 110, 0.28);
+		background: rgba(255, 255, 255, 0.85);
+		border-radius: 999px;
+		padding: 0.34rem 0.75rem;
+		font-size: 0.86rem;
+		color: var(--faq-accent);
+		font-weight: 700;
+	}
+
+	.faq-grid {
+		margin-top: 1.7rem;
+	}
+
+	.faq-item {
+		border: 0;
+		background: var(--faq-card);
+		border-radius: 1rem !important;
+		overflow: hidden;
+		box-shadow: 0 10px 24px rgba(16, 42, 43, 0.06);
+		margin-bottom: 0.9rem;
+		opacity: 0;
+		transform: translateY(8px);
+		animation: faqRise 0.45s ease forwards;
+	}
+
+	.faq-item:nth-child(2) { animation-delay: 0.04s; }
+	.faq-item:nth-child(3) { animation-delay: 0.08s; }
+	.faq-item:nth-child(4) { animation-delay: 0.12s; }
+	.faq-item:nth-child(5) { animation-delay: 0.16s; }
+	.faq-item:nth-child(6) { animation-delay: 0.20s; }
+	.faq-item:nth-child(7) { animation-delay: 0.24s; }
+	.faq-item:nth-child(8) { animation-delay: 0.28s; }
+	.faq-item:nth-child(9) { animation-delay: 0.32s; }
+	.faq-item:nth-child(10) { animation-delay: 0.36s; }
+
+	.faq-button {
+		background: transparent;
+		color: var(--faq-ink);
+		font-weight: 700;
+		line-height: 1.5;
+		padding: 1rem 1.1rem;
+		box-shadow: none !important;
+		cursor: pointer;
+	}
+
+	.faq-button:not(.collapsed) {
+		color: var(--faq-accent);
+		background: var(--faq-accent-soft);
+	}
+
+	.faq-answer {
+		color: var(--faq-muted);
+		font-size: 0.98rem;
+		line-height: 1.85;
+		margin: 0;
+		white-space: pre-line;
+	}
+
+	.faq-empty {
+		display: none;
+		text-align: center;
+		margin-top: 1.4rem;
+		padding: 1.1rem;
+		border-radius: 0.9rem;
+		border: 1px dashed rgba(15, 118, 110, 0.35);
+		background: rgba(255, 255, 255, 0.6);
+		color: var(--faq-muted);
+		font-weight: 600;
+	}
+
+	@keyframes faqRise {
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	@media (max-width: 768px) {
+		.faq-shell {
+			padding: 1.2rem;
+			border-radius: 1rem;
+		}
+
+		.faq-button {
+			font-size: 0.95rem;
+			padding: 0.82rem 0.9rem;
+		}
+	}
+</style>
+
+<div class="faq-shell">
+	<div class="text-center">
+		<h1 class="faq-headline mb-2">الأسئلة الشائعة</h1>
+		<p class="faq-subtitle">كل ما تحتاج معرفته حول استخدام المنصة: التفعيل، الاختبارات، النتائج، وإعادة المحاولات.</p>
+	</div>
+
+	<div class="faq-search">
+		<i class="bi bi-search"></i>
+		<input id="faqSearchInput" type="text" class="form-control" placeholder="ابحث في الأسئلة... مثال: إعادة الاختبار" aria-label="بحث في الأسئلة الشائعة">
+	</div>
+
+	<div class="faq-stats">
+		<span class="faq-chip">طلاب</span>
+		<span class="faq-chip">معلمون</span>
+		<span class="faq-chip">اختبارات مخصصة</span>
+		<span class="faq-chip">أكواد التفعيل</span>
+	</div>
+
+	<div class="faq-controls">
+		<button id="faqExpandAll" type="button" class="faq-control-btn">فتح الكل</button>
+		<button id="faqCollapseAll" type="button" class="faq-control-btn">إغلاق الكل</button>
+	</div>
+
+	<div class="accordion faq-grid" id="faqAccordion">
+		<div class="accordion-item faq-item" data-faq="ما هي منصة الدراسة teacher student مواد اختبارات">
+			<h2 class="accordion-header" id="faq-h1">
+				<button class="accordion-button faq-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c1" aria-expanded="true" aria-controls="faq-c1">ما هي منصة EduPath؟</button>
+			</h2>
+			<div id="faq-c1" class="accordion-collapse collapse show" aria-labelledby="faq-h1" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">منصة تعليمية تتيح للطالب المواد المختلفة والقيام باختبارات مؤتمتة بشكل تلقائي. المنصة مخدمة بأحدث تقنيات الذكاء الاصطناعي لتوفير أفضل الشروحات والملخصات والاختبارات</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="accordion-item faq-item" data-faq="تفعيل مادة قسم درس code">
+			<h2 class="accordion-header" id="faq-h2">
+				<button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c2" aria-expanded="false" aria-controls="faq-c2">ما الفرق بين تفعيل المادة وتفعيل القسم وتفعيل الدرس؟</button>
+			</h2>
+			<div id="faq-c2" class="accordion-collapse collapse" aria-labelledby="faq-h2" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">تفعيل المادة: يفتح كل المحتوى داخل المادة.
+تفعيل القسم: يفتح محتوى ذلك القسم.
+تفعيل الدرس: يفتح هذا الدرس فقط واختباراته المرتبطة به.</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="accordion-item faq-item" data-faq="كود التفعيل لا يعمل used invalid">
+			<h2 class="accordion-header" id="faq-h3">
+				<button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c3" aria-expanded="false" aria-controls="faq-c3">أدخلت كود التفعيل ولم يفتح المحتوى، لماذا؟</button>
+			</h2>
+			<div id="faq-c3" class="accordion-collapse collapse" aria-labelledby="faq-h3" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">غالبًا أحد الأسباب التالية:
+الكود غير صحيح.
+الكود مستخدم مسبقًا.
+الكود يخص مادة/قسم/درس مختلف.</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="accordion-item faq-item" data-faq="اختبار مخصص custom test easy medium hard">
+			<h2 class="accordion-header" id="faq-h4">
+				<button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c4" aria-expanded="false" aria-controls="faq-c4">ما هو الاختبار المخصص؟</button>
+			</h2>
+			<div id="faq-c4" class="accordion-collapse collapse" aria-labelledby="faq-h4" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">اختبار ينشئه الطالب من الدروس المفتوحة، مع تحديد عدد الأسئلة وتوزيع الصعوبة (سهل/متوسط/صعب) ضمن الحد المسموح.</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="accordion-item faq-item" data-faq="retake إعادة نفس الأسئلة new questions">
+			<h2 class="accordion-header" id="faq-h5">
+				<button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c5" aria-expanded="false" aria-controls="faq-c5">هل يمكن إعادة الاختبار بعد الانتهاء؟</button>
+			</h2>
+			<div id="faq-c5" class="accordion-collapse collapse" aria-labelledby="faq-h5" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">نعم. يمكنك الإعادة بطريقتين:
+إعادة بنفس الأسئلة.
+إعادة بأسئلة جديدة لكن بنفس الإعدادات.</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="accordion-item faq-item" data-faq="النتائج حفظ المحاولات badge إعادة">
+			<h2 class="accordion-header" id="faq-h6">
+				<button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c6" aria-expanded="false" aria-controls="faq-c6">هل تُحفظ النتائج عند إعادة الاختبار؟</button>
+			</h2>
+			<div id="faq-c6" class="accordion-collapse collapse" aria-labelledby="faq-h6" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">نعم. كل محاولة تُحفظ كسجل منفصل، وتظهر محاولات الإعادة مع شارة توضح أنها إعادة.</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="accordion-item faq-item" data-faq="زر إنشاء اختبار مخصص disabled 50">
+			<h2 class="accordion-header" id="faq-h7">
+				<button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c7" aria-expanded="false" aria-controls="faq-c7">لماذا زر إنشاء اختبار مخصص يتعطل أحيانًا؟</button>
+			</h2>
+			<div id="faq-c7" class="accordion-collapse collapse" aria-labelledby="faq-h7" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">إذا تجاوز مجموع الأسئلة 50، يتم تعطيل الزر تلقائيًا حتى تعود للمدى المسموح (10 إلى 50).</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="accordion-item faq-item" data-faq="نتائج الطالب teacher admin">
+			<h2 class="accordion-header" id="faq-h8">
+				<button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c8" aria-expanded="false" aria-controls="faq-c8">هل يمكن للمعلم متابعة نتائج الطلاب؟</button>
+			</h2>
+			<div id="faq-c8" class="accordion-collapse collapse" aria-labelledby="faq-h8" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">أي. 😁كامشين كل حركاتك</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="accordion-item faq-item" data-faq="خطأ 500 support">
+			<h2 class="accordion-header" id="faq-h10">
+				<button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c10" aria-expanded="false" aria-controls="faq-c10">ماذا أفعل إذا ظهر خطأ 500؟</button>
+			</h2>
+			<div id="faq-c10" class="accordion-collapse collapse" aria-labelledby="faq-h10" data-bs-parent="#faqAccordion">
+				<div class="accordion-body">
+					<p class="faq-answer">حدّث الصفحة، ثم جرّب تسجيل الخروج والدخول. إذا استمر الخطأ، أرسل صورة الخطأ ووقت حدوثه للمسؤول التقني.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="faqEmpty" class="faq-empty">لا توجد نتائج مطابقة لبحثك. جرّب كلمات مختلفة.</div>
+</div>
+{% endblock %}
+
+
+
+{% block scripts %}
+<script>
+	(function () {
+		const input = document.getElementById('faqSearchInput');
+		const items = Array.from(document.querySelectorAll('.faq-item'));
+		const empty = document.getElementById('faqEmpty');
+		const expandAllBtn = document.getElementById('faqExpandAll');
+		const collapseAllBtn = document.getElementById('faqCollapseAll');
+		const accordionRoot = document.getElementById('faqAccordion');
+
+		if (!input || !items.length || !empty) return;
+
+		function normalize(text) {
+			return (text || '').toLowerCase().trim();
+		}
+
+		function applyFilter() {
+			const q = normalize(input.value);
+			let visible = 0;
+
+			items.forEach((item) => {
+				const searchable = normalize(item.getAttribute('data-faq')) + ' ' + normalize(item.textContent);
+				const show = !q || searchable.includes(q);
+				item.style.display = show ? '' : 'none';
+				if (show) visible += 1;
+			});
+
+			empty.style.display = visible ? 'none' : 'block';
+		}
+
+		input.addEventListener('input', applyFilter);
+
+		function getCollapseFromButton(button) {
+			const target = button.getAttribute('data-bs-target');
+			if (!target || !target.startsWith('#')) return null;
+			return document.querySelector(target);
+		}
+
+		function setExpanded(button, collapse, expanded) {
+			if (!button || !collapse) return;
+			button.classList.toggle('collapsed', !expanded);
+			button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+			collapse.classList.toggle('show', expanded);
+		}
+
+		// Fallback toggling in case Bootstrap collapse doesn't initialize.
+		document.querySelectorAll('.faq-button').forEach((button) => {
+			button.addEventListener('click', function () {
+				if (window.bootstrap && window.bootstrap.Collapse) {
+					return;
+				}
+				const collapse = getCollapseFromButton(button);
+				if (!collapse) return;
+				const willOpen = !collapse.classList.contains('show');
+
+				if (accordionRoot && willOpen) {
+					accordionRoot.querySelectorAll('.accordion-collapse.show').forEach((openEl) => {
+						openEl.classList.remove('show');
+					});
+					accordionRoot.querySelectorAll('.faq-button').forEach((btn) => {
+						btn.classList.add('collapsed');
+						btn.setAttribute('aria-expanded', 'false');
+					});
+				}
+
+				setExpanded(button, collapse, willOpen);
+			});
+		});
+
+		if (expandAllBtn) {
+			expandAllBtn.addEventListener('click', function () {
+				document.querySelectorAll('.faq-button').forEach((button) => {
+					const collapse = getCollapseFromButton(button);
+					if (!collapse) return;
+					if (window.bootstrap && window.bootstrap.Collapse) {
+						window.bootstrap.Collapse.getOrCreateInstance(collapse).show();
+					} else {
+						setExpanded(button, collapse, true);
+					}
+				});
+			});
+		}
+
+		if (collapseAllBtn) {
+			collapseAllBtn.addEventListener('click', function () {
+				document.querySelectorAll('.faq-button').forEach((button) => {
+					const collapse = getCollapseFromButton(button);
+					if (!collapse) return;
+					if (window.bootstrap && window.bootstrap.Collapse) {
+						window.bootstrap.Collapse.getOrCreateInstance(collapse).hide();
+					} else {
+						setExpanded(button, collapse, false);
+					}
+				});
+			});
+		}
+	})();
+</script>
+{% endblock %}
