@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 from flask_login import login_required, current_user
 from werkzeug.exceptions import NotFound
+from mongoengine.errors import DoesNotExist
 
 from .models import (
     User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, 
@@ -380,13 +381,22 @@ def manage_subject_access(subject_id):
         return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
     
     students = User.objects(role="student").order_by('-created_at').all()
-    activated_students = {
-        sa.student_id.id: sa for sa in SubjectActivation.objects(subject_id=subject.id, active=True).all()
-    }
+    activated_students = {}
+    for sa in SubjectActivation.objects(subject_id=subject.id, active=True).all():
+        try:
+            key = sa.student_id.id
+        except (DoesNotExist, AttributeError):
+            continue
+        if key is not None:
+            activated_students[key] = sa
+
     codes = SubjectActivationCode.objects(subject_id=subject.id).order_by('-created_at').all()
     codes_by_student = {}
     for code in codes:
-        key = code.student_id.id if code.student_id else None
+        try:
+            key = code.student_id.id if code.student_id else None
+        except (DoesNotExist, AttributeError):
+            key = None
         if key is not None:
             codes_by_student.setdefault(key, []).append(code)
     
@@ -472,11 +482,22 @@ def manage_section_access(section_id):
         return redirect(url_for("teacher.manage_section_access", section_id=section.id))
     
     students = User.objects(role="student").order_by('-created_at').all()
-    activations = {sa.student_id.id: sa for sa in SectionActivation.objects(section_id=section.id, active=True).all()}
+    activations = {}
+    for sa in SectionActivation.objects(section_id=section.id, active=True).all():
+        try:
+            key = sa.student_id.id
+        except (DoesNotExist, AttributeError):
+            continue
+        if key is not None:
+            activations[key] = sa
+
     codes = ActivationCode.objects(section_id=section.id).order_by('-created_at').all()
     codes_by_student = {}
     for code in codes:
-        key = code.student_id.id if code.student_id else None
+        try:
+            key = code.student_id.id if code.student_id else None
+        except (DoesNotExist, AttributeError):
+            key = None
         if key is not None:
             codes_by_student.setdefault(key, []).append(code)
     
@@ -557,11 +578,22 @@ def manage_lesson_access(lesson_id):
         return redirect(url_for("teacher.manage_lesson_access", lesson_id=lesson.id))
     
     students = User.objects(role="student").order_by('-created_at').all()
-    activations = {la.student_id.id: la for la in LessonActivation.objects(lesson_id=lesson.id, active=True).all()}
+    activations = {}
+    for la in LessonActivation.objects(lesson_id=lesson.id, active=True).all():
+        try:
+            key = la.student_id.id
+        except (DoesNotExist, AttributeError):
+            continue
+        if key is not None:
+            activations[key] = la
+
     codes = LessonActivationCode.objects(lesson_id=lesson.id).order_by('-created_at').all()
     codes_by_student = {}
     for code in codes:
-        key = code.student_id.id if code.student_id else None
+        try:
+            key = code.student_id.id if code.student_id else None
+        except (DoesNotExist, AttributeError):
+            key = None
         if key is not None:
             codes_by_student.setdefault(key, []).append(code)
     

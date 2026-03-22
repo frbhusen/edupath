@@ -3,6 +3,11 @@ from pathlib import Path
 from werkzeug.exceptions import NotFound
 import time
 
+try:
+    from dotenv import load_dotenv
+except Exception:  # pragma: no cover - optional dependency in some environments
+    load_dotenv = None
+
 from .config import Config
 from .extensions import login_manager, init_mongo, cache
 from flask_login import current_user, logout_user
@@ -14,6 +19,11 @@ from .student import student_bp
 
 
 def create_app():
+    # Load workspace-level .env for local development before config resolution.
+    if load_dotenv:
+        env_path = Path(__file__).resolve().parent.parent / ".env"
+        load_dotenv(dotenv_path=env_path, override=False)
+
     app = Flask(__name__)
     app.config.from_object(Config)
     try:

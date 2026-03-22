@@ -5,6 +5,11 @@
     <h1 class="h4 mb-1">اختبار مخصص</h1>
     <p class="mb-0">{% if selected_subject_id %}اختر عدد الأسئلة من كل درس مفتوح.{% else %}اختر مادة للبدء.{% endif %}</p>
   </div>
+  {% if selected_subject_id %}
+    <a class="btn btn-light btn-sm" href="{{ url_for('student.subject_detail', subject_id=selected_subject_id) }}">رجوع</a>
+  {% else %}
+    <a class="btn btn-light btn-sm" href="{{ url_for('student.subjects') }}">رجوع</a>
+  {% endif %}
 </div>
 
 {% if not selected_subject_id %}

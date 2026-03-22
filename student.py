@@ -4,6 +4,7 @@ import random
 from datetime import datetime
 from flask_login import login_required, current_user
 from bson import ObjectId
+from mongoengine.errors import DoesNotExist
 
 from .models import Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer
 from .forms import ActivationForm, LessonActivationForm
@@ -49,14 +50,17 @@ class AccessContext:
         lesson_ids = [l.id for l in section.lessons]
 
         if lesson_ids:
-            self.lesson_activation_ids = {
-                la.lesson_id
-                for la in LessonActivation.objects(
-                    lesson_id__in=lesson_ids,
-                    student_id=student_id,
-                    active=True,
-                ).all()
-            }
+            self.lesson_activation_ids = set()
+            for la in LessonActivation.objects(
+                lesson_id__in=lesson_ids,
+                student_id=student_id,
+                active=True,
+            ).all():
+                try:
+                    if la.lesson_id and la.lesson_id.id:
+                        self.lesson_activation_ids.add(la.lesson_id.id)
+                except (DoesNotExist, AttributeError):
+                    continue
         else:
             self.lesson_activation_ids = set()
 
