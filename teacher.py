@@ -8,7 +8,8 @@ from mongoengine.errors import DoesNotExist
 from .models import (
     User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, 
     ActivationCode, SectionActivation, LessonActivation, LessonActivationCode,
-    SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt
+    SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt,
+    StudentGamification, XPEvent
 )
 from .activation_utils import (
     cascade_subject_activation, cascade_section_activation, cascade_lesson_activation,
@@ -283,6 +284,131 @@ def manage_attempt(attempt_id):
 def students():
     students = User.objects(role="student").order_by('-created_at').all()
     return render_template("teacher/students.html", students=students)
+
+
+def _rebuild_ranked_students():
+    profiles = list(StudentGamification.objects.order_by("-xp_total", "student_id").all())
+    if not profiles:
+        return []
+    student_ids = [p.student_id.id for p in profiles if p.student_id]
+    users = User.objects(id__in=student_ids).all() if student_ids else []
+    users_by_id = {u.id: u for u in users}
+
+    ranked = []
+    for idx, profile in enumerate(profiles, start=1):
+        if not profile.student_id:
+            continue
+        ranked.append(
+            {
+                "rank": idx,
+                "profile": profile,
+                "student": users_by_id.get(profile.student_id.id),
+            }
+        )
+    return ranked
+
+
+def _apply_xp_delta(profile, delta, actor_label):
+    delta = int(delta or 0)
+    current_xp = int(profile.xp_total or 0)
+    next_xp = max(0, current_xp + delta)
+    applied_delta = next_xp - current_xp
+    if applied_delta == 0:
+        return 0
+
+    profile.xp_total = next_xp
+    profile.level = (next_xp // 200) + 1
+    profile.updated_at = datetime.utcnow()
+    profile.save()
+
+    XPEvent(
+        student_id=profile.student_id.id,
+        event_type="admin_xp_adjust",
+        source_id=f"{actor_label}:{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}",
+        xp=applied_delta,
+    ).save()
+    return applied_delta
+
+
+@teacher_bp.route("/gamification", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def gamification_admin():
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+
+        if action in {"set_student_xp", "adjust_student_xp", "set_student_rank"}:
+            student_id = request.form.get("student_id")
+            student = User.objects(id=student_id, role="student").first()
+            if not student:
+                flash("الطالب غير موجود.", "error")
+                return redirect(url_for("teacher.gamification_admin"))
+
+            profile = StudentGamification.objects(student_id=student.id).first()
+            if not profile:
+                profile = StudentGamification(student_id=student.id, xp_total=0, level=1)
+                profile.save()
+
+            if action == "set_student_xp":
+                target_xp = max(0, int(request.form.get("target_xp") or 0))
+                delta = target_xp - int(profile.xp_total or 0)
+                applied = _apply_xp_delta(profile, delta, actor_label=f"set_xp:{current_user.id}")
+                flash(f"تم تحديث XP للطالب {student.username} (Δ {applied}).", "success")
+
+            elif action == "adjust_student_xp":
+                delta = int(request.form.get("xp_delta") or 0)
+                applied = _apply_xp_delta(profile, delta, actor_label=f"delta_xp:{current_user.id}")
+                flash(f"تم تعديل XP للطالب {student.username} (Δ {applied}).", "success")
+
+            elif action == "set_student_rank":
+                requested_rank = max(1, int(request.form.get("target_rank") or 1))
+                ranked = _rebuild_ranked_students()
+                others = [r for r in ranked if str(r["profile"].student_id.id) != str(student.id)]
+                if not others:
+                    flash("لا يوجد طلاب كفاية لإعادة الترتيب.", "info")
+                    return redirect(url_for("teacher.gamification_admin"))
+
+                requested_rank = min(requested_rank, len(others) + 1)
+                if requested_rank == 1:
+                    desired_xp = int(others[0]["profile"].xp_total or 0) + 1
+                elif requested_rank == len(others) + 1:
+                    desired_xp = max(0, int(others[-1]["profile"].xp_total or 0) - 1)
+                else:
+                    upper = int(others[requested_rank - 2]["profile"].xp_total or 0)
+                    lower = int(others[requested_rank - 1]["profile"].xp_total or 0)
+                    desired_xp = upper if upper == lower else max(lower, upper - 1)
+
+                delta = desired_xp - int(profile.xp_total or 0)
+                applied = _apply_xp_delta(profile, delta, actor_label=f"set_rank:{current_user.id}")
+                flash(
+                    f"تم ضبط XP للطالب {student.username} لمحاولة الوصول للرتبة {requested_rank} (Δ {applied}).",
+                    "success",
+                )
+
+            cache.clear()
+            return redirect(url_for("teacher.gamification_admin"))
+
+        if action == "set_lesson_xp":
+            lesson_id = request.form.get("lesson_id")
+            lesson = Lesson.objects(id=lesson_id).first()
+            if not lesson:
+                flash("الدرس غير موجود.", "error")
+                return redirect(url_for("teacher.gamification_admin"))
+
+            lesson_xp = max(0, int(request.form.get("lesson_xp") or 0))
+            lesson.xp_reward = lesson_xp
+            lesson.save()
+            cache.clear()
+            flash(f"تم تحديث XP للدرس {lesson.title} إلى {lesson_xp}.", "success")
+            return redirect(url_for("teacher.gamification_admin"))
+
+    ranked_students = _rebuild_ranked_students()
+    lessons = list(Lesson.objects().order_by("-created_at").all())
+    return render_template(
+        "teacher/gamification_manage.html",
+        ranked_students=ranked_students,
+        lessons=lessons,
+    )
 
 
 @teacher_bp.route("/students/<user_id>/edit", methods=["GET", "POST"])

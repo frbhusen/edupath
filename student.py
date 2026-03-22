@@ -1,12 +1,14 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify, Response
 import json
 import random
-from datetime import datetime
+import math
+from datetime import datetime, timedelta
+import time
 from flask_login import login_required, current_user
 from bson import ObjectId
 from mongoengine.errors import DoesNotExist
 
-from .models import Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer
+from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion
 from .forms import ActivationForm, LessonActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
 from .extensions import cache
@@ -144,6 +146,339 @@ def _extract_attempt_question_ids(attempt):
     # Fallback for old attempts created before question order was persisted.
     ordered_answers = AttemptAnswer.objects(attempt_id=attempt.id).order_by("id").all()
     return [str(ans.question_id.id) for ans in ordered_answers if ans.question_id]
+
+
+def _calculate_level(xp_total: int) -> int:
+    if xp_total < 0:
+        xp_total = 0
+    return (xp_total // 200) + 1
+
+
+def _get_or_create_gamification_profile(student_id):
+    profile = StudentGamification.objects(student_id=student_id).first()
+    if not profile:
+        profile = StudentGamification(student_id=student_id, xp_total=0, level=1)
+        profile.save()
+    return profile
+
+
+def _award_xp_for_attempt(student_id, event_type: str, source_id: str, score: int, total: int, is_retake: bool = False):
+    existing_event = XPEvent.objects(
+        student_id=student_id,
+        event_type=event_type,
+        source_id=source_id,
+    ).first()
+    profile = _get_or_create_gamification_profile(student_id)
+    if existing_event:
+        return 0, profile
+
+    base_xp = 20 if event_type == "custom_test_submit" else 15
+    pct = (score / total * 100) if total else 0
+    bonus_xp = 0
+    if pct >= 90:
+        bonus_xp = 20
+    elif pct >= 75:
+        bonus_xp = 10
+    elif pct >= 50:
+        bonus_xp = 5
+
+    earned_xp = base_xp + bonus_xp
+    if is_retake:
+        # Keep retakes rewarding but slightly lower to reduce exploitability.
+        earned_xp = max(5, int(earned_xp * 0.7))
+
+    XPEvent(
+        student_id=student_id,
+        event_type=event_type,
+        source_id=source_id,
+        xp=earned_xp,
+    ).save()
+
+    profile.xp_total = (profile.xp_total or 0) + earned_xp
+    profile.level = _calculate_level(profile.xp_total)
+    profile.updated_at = datetime.utcnow()
+    profile.save()
+    return earned_xp, profile
+
+
+def _award_flat_xp_once(student_id, event_type: str, source_id: str, amount: int):
+    existing_event = XPEvent.objects(
+        student_id=student_id,
+        event_type=event_type,
+        source_id=source_id,
+    ).first()
+    profile = _get_or_create_gamification_profile(student_id)
+    if existing_event:
+        return 0, profile
+
+    earned_xp = max(0, int(amount or 0))
+    XPEvent(
+        student_id=student_id,
+        event_type=event_type,
+        source_id=source_id,
+        xp=earned_xp,
+    ).save()
+
+    profile.xp_total = (profile.xp_total or 0) + earned_xp
+    profile.level = _calculate_level(profile.xp_total)
+    profile.updated_at = datetime.utcnow()
+    profile.save()
+    return earned_xp, profile
+
+
+def _avatar_text_for_user(user):
+    first = (getattr(user, "first_name", "") or "").strip()
+    last = (getattr(user, "last_name", "") or "").strip()
+    if first or last:
+        return (first[:1] + last[:1]).upper()
+    username = (getattr(user, "username", "") or "").strip()
+    return (username[:2] or "U").upper()
+
+
+def _serialize_leaderboard_entry(profile, user, rank, xp_override=None, student_id_override=None):
+    username = getattr(user, "username", "مستخدم") if user else "مستخدم"
+    student_obj_id = None
+    if profile and getattr(profile, "student_id", None):
+        student_obj_id = profile.student_id.id
+    elif student_id_override is not None:
+        student_obj_id = student_id_override
+
+    xp_value = int(xp_override if xp_override is not None else (getattr(profile, "xp_total", 0) or 0))
+    level_value = int(getattr(profile, "level", _calculate_level(xp_value)) or _calculate_level(xp_value))
+    return {
+        "rank": rank,
+        "username": username,
+        "xp": xp_value,
+        "level": level_value,
+        "badges": list(getattr(profile, "badges", []) or []),
+        "avatar": _avatar_text_for_user(user) if user else "U",
+        "is_top_3": rank <= 3,
+        "student_id": str(student_obj_id) if student_obj_id else None,
+    }
+
+
+def _normalize_leaderboard_scope(scope_value):
+    allowed = {"all", "weekly", "monthly", "seasonal"}
+    scope = (scope_value or "all").strip().lower()
+    return scope if scope in allowed else "all"
+
+
+def _leaderboard_page_cache_key(scope, page, per_page):
+    return f"leaderboard_page_{scope}_{page}_{per_page}"
+
+
+def _scope_start_datetime(scope: str):
+    now = datetime.utcnow()
+    if scope == "weekly":
+        return now - timedelta(days=7)
+    if scope == "monthly":
+        return now - timedelta(days=30)
+    if scope == "seasonal":
+        return now - timedelta(days=90)
+    return None
+
+
+def _aggregate_scope_rankings(scope: str, page: int, per_page: int):
+    start_dt = _scope_start_datetime(scope)
+    if start_dt is None:
+        return [], 0
+
+    events_coll = XPEvent._get_collection()
+    match_stage = {"created_at": {"$gte": start_dt}}
+
+    count_pipeline = [
+        {"$match": match_stage},
+        {"$group": {"_id": "$student_id", "xp_total": {"$sum": "$xp"}}},
+        {"$count": "total"},
+    ]
+    count_result = list(events_coll.aggregate(count_pipeline))
+    total_users = int(count_result[0]["total"]) if count_result else 0
+
+    rows_pipeline = [
+        {"$match": match_stage},
+        {"$group": {"_id": "$student_id", "xp_total": {"$sum": "$xp"}}},
+        {"$sort": {"xp_total": -1, "_id": 1}},
+        {"$skip": max(0, (page - 1) * per_page)},
+        {"$limit": per_page},
+    ]
+    rows = list(events_coll.aggregate(rows_pipeline))
+    return rows, total_users
+
+
+def _student_scope_xp(student_id, scope: str):
+    start_dt = _scope_start_datetime(scope)
+    if start_dt is None:
+        profile = StudentGamification.objects(student_id=student_id).first()
+        return int(profile.xp_total or 0) if profile else 0
+
+    events_coll = XPEvent._get_collection()
+    pipeline = [
+        {"$match": {"student_id": student_id, "created_at": {"$gte": start_dt}}},
+        {"$group": {"_id": "$student_id", "xp_total": {"$sum": "$xp"}}},
+    ]
+    result = list(events_coll.aggregate(pipeline))
+    if not result:
+        return 0
+    return int(result[0].get("xp_total", 0) or 0)
+
+
+def _leaderboard_payload_for_user(student_id, scope, page, per_page):
+    board = _build_leaderboard_page(page=page, per_page=per_page, scope=scope)
+    current_rank = None
+    current_xp = 0
+    if student_id is not None:
+        current_rank = _calculate_student_rank(student_id, scope=scope)
+        current_xp = _student_scope_xp(student_id=student_id, scope=scope)
+    return {
+        "ok": True,
+        "leaderboard": board,
+        "current_rank": current_rank,
+        "current_xp": current_xp,
+    }
+
+
+def _leaderboard_payload_signature(payload):
+    board = payload.get("leaderboard", {})
+    entries = board.get("entries", [])
+    signature_rows = tuple(
+        (e.get("student_id"), int(e.get("rank", 0)), int(e.get("xp", 0)))
+        for e in entries
+    )
+    return (
+        board.get("scope"),
+        int(board.get("page", 1)),
+        int(board.get("per_page", 20)),
+        tuple(signature_rows),
+        payload.get("current_rank"),
+        int(payload.get("current_xp", 0) or 0),
+    )
+
+
+def _build_leaderboard_page(page: int, per_page: int, scope: str = "all"):
+    scope = _normalize_leaderboard_scope(scope)
+    page = max(1, int(page or 1))
+    per_page = max(10, min(int(per_page or 20), 50))
+    cache_key = _leaderboard_page_cache_key(scope, page, per_page)
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    if scope == "all":
+        total_users = StudentGamification.objects.count()
+        total_pages = max(1, math.ceil(total_users / per_page)) if total_users else 1
+        if page > total_pages:
+            page = total_pages
+
+        start_rank = ((page - 1) * per_page) + 1
+        profiles = list(
+            StudentGamification.objects
+            .order_by("-xp_total", "student_id")
+            .skip((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+        student_ids = [p.student_id.id for p in profiles if p.student_id]
+        users = User.objects(id__in=student_ids).only("id", "username", "first_name", "last_name").all() if student_ids else []
+        users_by_id = {u.id: u for u in users}
+
+        entries = []
+        for i, profile in enumerate(profiles):
+            user = users_by_id.get(profile.student_id.id) if profile.student_id else None
+            entries.append(_serialize_leaderboard_entry(profile, user, start_rank + i))
+    else:
+        rows, total_users = _aggregate_scope_rankings(scope=scope, page=page, per_page=per_page)
+        total_pages = max(1, math.ceil(total_users / per_page)) if total_users else 1
+        if page > total_pages:
+            page = total_pages
+            rows, total_users = _aggregate_scope_rankings(scope=scope, page=page, per_page=per_page)
+
+        start_rank = ((page - 1) * per_page) + 1
+        student_ids = [row.get("_id") for row in rows if row.get("_id")]
+        users = User.objects(id__in=student_ids).only("id", "username", "first_name", "last_name").all() if student_ids else []
+        users_by_id = {u.id: u for u in users}
+        profiles = StudentGamification.objects(student_id__in=student_ids).only("student_id", "level", "badges").all() if student_ids else []
+        profiles_by_student_id = {p.student_id.id: p for p in profiles if p.student_id}
+
+        entries = []
+        for i, row in enumerate(rows):
+            sid = row.get("_id")
+            xp_value = int(row.get("xp_total", 0) or 0)
+            user = users_by_id.get(sid)
+            profile = profiles_by_student_id.get(sid)
+            entries.append(
+                _serialize_leaderboard_entry(
+                    profile=profile,
+                    user=user,
+                    rank=start_rank + i,
+                    xp_override=xp_value,
+                    student_id_override=sid,
+                )
+            )
+
+    payload = {
+        "entries": entries,
+        "page": page,
+        "per_page": per_page,
+        "scope": scope,
+        "total_users": total_users,
+        "total_pages": total_pages,
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    cache.set(cache_key, payload, timeout=15)
+    return payload
+
+
+def _calculate_student_rank(student_id, scope: str = "all"):
+    if not student_id:
+        return None
+    scope = _normalize_leaderboard_scope(scope)
+
+    if scope == "all":
+        profile = StudentGamification.objects(student_id=student_id).first()
+        if not profile:
+            return None
+
+        higher_count = StudentGamification.objects(
+            __raw__={
+                "$or": [
+                    {"xp_total": {"$gt": int(profile.xp_total or 0)}},
+                    {
+                        "xp_total": int(profile.xp_total or 0),
+                        "student_id": {"$lt": profile.student_id.id},
+                    },
+                ]
+            }
+        ).count()
+        return higher_count + 1
+
+    current_xp = _student_scope_xp(student_id=student_id, scope=scope)
+    if current_xp <= 0:
+        return None
+
+    start_dt = _scope_start_datetime(scope)
+    events_coll = XPEvent._get_collection()
+    pipeline = [
+        {"$match": {"created_at": {"$gte": start_dt}}},
+        {"$group": {"_id": "$student_id", "xp_total": {"$sum": "$xp"}}},
+        {
+            "$match": {
+                "$or": [
+                    {"xp_total": {"$gt": current_xp}},
+                    {
+                        "$and": [
+                            {"xp_total": current_xp},
+                            {"_id": {"$lt": student_id}},
+                        ]
+                    },
+                ]
+            }
+        },
+        {"$count": "higher"},
+    ]
+    higher_result = list(events_coll.aggregate(pipeline))
+    higher_count = int(higher_result[0]["higher"]) if higher_result else 0
+    return higher_count + 1
 
 
 def get_unlocked_lessons(student_id: int):
@@ -334,8 +669,20 @@ def section_detail(section_id):
     
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
+        completed_lesson_ids = set(
+            lc.lesson_id.id
+            for lc in LessonCompletion.objects(
+                lesson_id__in=[l.id for l in lessons],
+                student_id=current_user.id,
+            ).only("lesson_id").all()
+            if lc.lesson_id
+        )
         lessons_data = [
-            {"lesson": lesson, "is_open": access.lesson_open(lesson)}
+            {
+                "lesson": lesson,
+                "is_open": access.lesson_open(lesson),
+                "is_completed": lesson.id in completed_lesson_ids,
+            }
             for lesson in lessons
         ]
         tests_data = [
@@ -354,7 +701,7 @@ def section_detail(section_id):
             tests_data=tests_data,
         )
     # Teachers/admins can view everything unlocked
-    lessons_data = [{"lesson": l, "is_open": True} for l in lessons]
+    lessons_data = [{"lesson": l, "is_open": True, "is_completed": False} for l in lessons]
     tests_data = [{"test": t, "is_open": True} for t in tests]
     return render_template(
         "student/section_detail.html",
@@ -463,12 +810,21 @@ def lesson_detail(lesson_id):
         for test in tests:
             test._question_count = question_counts.get(test.id, 0)
     
+    is_completed = False
+    lesson_completion_xp = max(0, int(getattr(lesson, "xp_reward", 10) or 10))
+
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
         tests_data = [
             {"test": test, "is_open": access.test_open(test)}
             for test in tests
         ]
+        is_completed = bool(
+            LessonCompletion.objects(
+                lesson_id=lesson.id,
+                student_id=current_user.id,
+            ).first()
+        )
     else:
         tests_data = [{"test": t, "is_open": True} for t in tests]
 
@@ -478,7 +834,117 @@ def lesson_detail(lesson_id):
         section=section,
         resources=resources,
         tests_data=tests_data,
+        is_completed=is_completed,
+        lesson_completion_xp=lesson_completion_xp,
     )
+
+
+@student_bp.route("/lessons/<lesson_id>/complete", methods=["POST"])
+@login_required
+def complete_lesson(lesson_id):
+    if current_user.role != "student":
+        flash("هذه الخاصية متاحة للطلاب فقط.", "warning")
+        return redirect(url_for("student.lesson_detail", lesson_id=lesson_id))
+
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        return "404", 404
+
+    access = AccessContext(lesson.section, current_user.id)
+    if not access.lesson_open(lesson):
+        flash("قم بتفعيل الدرس أولاً.", "warning")
+        return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
+
+    existing_completion = LessonCompletion.objects(
+        lesson_id=lesson.id,
+        student_id=current_user.id,
+    ).first()
+
+    if existing_completion:
+        flash("تم إنهاء هذا الدرس مسبقاً.", "info")
+        return redirect(url_for("student.lesson_detail", lesson_id=lesson.id))
+
+    LessonCompletion(
+        lesson_id=lesson.id,
+        student_id=current_user.id,
+    ).save()
+
+    cache.delete(f"section_detail_{lesson.section.id}_{current_user.id}")
+
+    earned_xp, _ = _award_flat_xp_once(
+        student_id=current_user.id,
+        event_type="lesson_complete",
+        source_id=str(lesson.id),
+        amount=max(0, int(getattr(lesson, "xp_reward", 10) or 10)),
+    )
+
+    flash(f"أحسنت! تم إنهاء الدرس وربحت {earned_xp} XP.", "success")
+    return redirect(url_for("student.lesson_detail", lesson_id=lesson.id))
+
+
+@student_bp.route("/leaderboard")
+@login_required
+def leaderboard():
+    page = _to_int(request.args.get("page"), 1)
+    per_page = _to_int(request.args.get("per_page"), 20)
+    scope = _normalize_leaderboard_scope(request.args.get("scope"))
+    board = _build_leaderboard_page(page=page, per_page=per_page, scope=scope)
+
+    current_rank = None
+    current_profile = None
+    current_scope_xp = 0
+    if current_user.role == "student":
+        current_rank = _calculate_student_rank(current_user.id, scope=scope)
+        current_profile = StudentGamification.objects(student_id=current_user.id).first()
+        current_scope_xp = _student_scope_xp(student_id=current_user.id, scope=scope)
+
+    return render_template(
+        "student/leaderboard.html",
+        leaderboard=board,
+        scope=scope,
+        current_rank=current_rank,
+        current_profile=current_profile,
+        current_scope_xp=current_scope_xp,
+    )
+
+
+@student_bp.route("/leaderboard/data")
+@login_required
+def leaderboard_data():
+    page = _to_int(request.args.get("page"), 1)
+    per_page = _to_int(request.args.get("per_page"), 20)
+    scope = _normalize_leaderboard_scope(request.args.get("scope"))
+    student_id = current_user.id if current_user.role == "student" else None
+    return jsonify(_leaderboard_payload_for_user(student_id, scope, page, per_page))
+
+
+@student_bp.route("/leaderboard/stream")
+@login_required
+def leaderboard_stream():
+    page = _to_int(request.args.get("page"), 1)
+    per_page = _to_int(request.args.get("per_page"), 20)
+    scope = _normalize_leaderboard_scope(request.args.get("scope"))
+    student_id = current_user.id if current_user.role == "student" else None
+
+    def event_stream():
+        last_sig = None
+        yield ": leaderboard-stream-open\n\n"
+        while True:
+            payload = _leaderboard_payload_for_user(student_id, scope, page, per_page)
+            sig = _leaderboard_payload_signature(payload)
+            if sig != last_sig:
+                last_sig = sig
+                data = json.dumps(payload, ensure_ascii=False)
+                yield f"event: leaderboard\n"
+                yield f"data: {data}\n\n"
+            else:
+                yield ": keepalive\n\n"
+            time.sleep(5)
+
+    response = Response(event_stream(), mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
 
 @student_bp.route("/tests/<test_id>", methods=["GET", "POST"])
 @login_required
@@ -579,6 +1045,15 @@ def take_test(test_id):
                 )
                 ans.save()
         attempt.score = score
+        earned_xp, _ = _award_xp_for_attempt(
+            student_id=current_user.id,
+            event_type="test_submit",
+            source_id=str(attempt.id),
+            score=score,
+            total=total,
+            is_retake=is_retake,
+        )
+        attempt.xp_earned = earned_xp
         attempt.save()
         flash(f"حصلت على {score}/{total}", "success")
         return redirect(url_for("student.test_result", attempt_id=attempt.id))
@@ -823,7 +1298,8 @@ def test_result(attempt_id):
             "is_correct": ans.is_correct,
         })
 
-    return render_template("student/test_result.html", attempt=attempt, review=review)
+    gamification = StudentGamification.objects(student_id=attempt.student_id.id).first()
+    return render_template("student/test_result.html", attempt=attempt, review=review, gamification=gamification)
 
 
 @student_bp.route("/results/<attempt_id>/retake/same", methods=["POST"])
@@ -1190,6 +1666,15 @@ def custom_test_submit(attempt_id):
     attempt.score = score
     attempt.total = total
     attempt.status = "submitted"
+    earned_xp, _ = _award_xp_for_attempt(
+        student_id=current_user.id,
+        event_type="custom_test_submit",
+        source_id=str(attempt.id),
+        score=score,
+        total=total,
+        is_retake=bool(attempt.is_retake),
+    )
+    attempt.xp_earned = earned_xp
     attempt.save()
     return redirect(url_for("student.custom_test_result", attempt_id=attempt.id))
 
@@ -1229,7 +1714,8 @@ def custom_test_result(attempt_id):
             "is_correct": ans.is_correct if ans else False,
         })
 
-    return render_template("student/custom_test_result.html", attempt=attempt, review=review)
+    gamification = StudentGamification.objects(student_id=attempt.student_id.id).first()
+    return render_template("student/custom_test_result.html", attempt=attempt, review=review, gamification=gamification)
 
 
 @student_bp.route("/custom-tests/<attempt_id>/retake/same", methods=["POST"])

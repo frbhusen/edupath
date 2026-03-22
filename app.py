@@ -49,6 +49,33 @@ def create_app():
     # Add built-in functions to Jinja globals
     app.jinja_env.globals.update(max=max, min=min, range=range)
 
+    @app.context_processor
+    def inject_student_gamification():
+        if not current_user.is_authenticated:
+            return {"student_gamification_nav": None}
+        if (getattr(current_user, "role", "") or "").lower() != "student":
+            return {"student_gamification_nav": None}
+
+        try:
+            from .models import StudentGamification
+
+            profile = StudentGamification.objects(student_id=current_user.id).first()
+            if not profile:
+                return {
+                    "student_gamification_nav": {
+                        "level": 1,
+                        "xp_total": 0,
+                    }
+                }
+            return {
+                "student_gamification_nav": {
+                    "level": profile.level,
+                    "xp_total": profile.xp_total,
+                }
+            }
+        except Exception:
+            return {"student_gamification_nav": None}
+
     @app.route("/")
     def index():
         return render_template("index.html")

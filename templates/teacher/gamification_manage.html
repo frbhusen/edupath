@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إدارة الترتيب وXP</h1>
+    <p class="mb-0">تعديل XP للطلاب وإدارة XP الخاص بكل درس.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">العودة للوحة المعلم</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0">ترتيب الطلاب (All-time)</h5>
+      <span class="badge text-bg-secondary">{{ ranked_students|length }}</span>
+    </div>
+    {% if ranked_students %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>الطالب</th>
+              <th>XP</th>
+              <th>Level</th>
+              <th>تعديل مباشر</th>
+              <th>تعديل بالفرق</th>
+              <th>تعيين رتبة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in ranked_students %}
+              {% set student = item.student %}
+              {% set profile = item.profile %}
+              <tr>
+                <td class="fw-semibold">{{ item.rank }}</td>
+                <td>
+                  <div class="fw-semibold">{{ student.username if student else 'طالب غير معروف' }}</div>
+                  <div class="text-muted small">ID: {{ profile.student_id.id }}</div>
+                </td>
+                <td><span class="badge text-bg-primary">{{ profile.xp_total }}</span></td>
+                <td>{{ profile.level }}</td>
+                <td>
+                  <form method="post" class="d-flex gap-2">
+                    <input type="hidden" name="action" value="set_student_xp">
+                    <input type="hidden" name="student_id" value="{{ profile.student_id.id }}">
+                    <input type="number" name="target_xp" class="form-control form-control-sm" min="0" value="{{ profile.xp_total }}" style="max-width:120px" required>
+                    <button type="submit" class="btn btn-sm btn-outline-primary">حفظ</button>
+                  </form>
+                </td>
+                <td>
+                  <form method="post" class="d-flex gap-2">
+                    <input type="hidden" name="action" value="adjust_student_xp">
+                    <input type="hidden" name="student_id" value="{{ profile.student_id.id }}">
+                    <input type="number" name="xp_delta" class="form-control form-control-sm" value="0" style="max-width:120px" required>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">تطبيق</button>
+                  </form>
+                </td>
+                <td>
+                  <form method="post" class="d-flex gap-2">
+                    <input type="hidden" name="action" value="set_student_rank">
+                    <input type="hidden" name="student_id" value="{{ profile.student_id.id }}">
+                    <input type="number" name="target_rank" class="form-control form-control-sm" min="1" max="{{ ranked_students|length }}" value="{{ item.rank }}" style="max-width:100px" required>
+                    <button type="submit" class="btn btn-sm btn-outline-warning">ضبط</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد بيانات XP للطلاب بعد.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0">XP لكل درس</h5>
+      <span class="badge text-bg-secondary">{{ lessons|length }}</span>
+    </div>
+    {% if lessons %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>المادة/القسم</th>
+              <th>الدرس</th>
+              <th>XP الحالي</th>
+              <th>تحديث XP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lesson in lessons %}
+              <tr>
+                <td class="text-muted small">
+                  {{ lesson.section.subject.name if lesson.section and lesson.section.subject else '-' }}
+                  /
+                  {{ lesson.section.title if lesson.section else '-' }}
+                </td>
+                <td class="fw-semibold">{{ lesson.title }}</td>
+                <td><span class="badge text-bg-info">{{ lesson.xp_reward|default(10) }}</span></td>
+                <td>
+                  <form method="post" class="d-flex gap-2">
+                    <input type="hidden" name="action" value="set_lesson_xp">
+                    <input type="hidden" name="lesson_id" value="{{ lesson.id }}">
+                    <input type="number" name="lesson_xp" class="form-control form-control-sm" min="0" value="{{ lesson.xp_reward|default(10) }}" style="max-width:120px" required>
+                    <button type="submit" class="btn btn-sm btn-outline-success">حفظ</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد دروس حالياً.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

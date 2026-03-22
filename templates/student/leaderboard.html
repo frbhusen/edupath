@@ -1,0 +1,327 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="leaderboard-wrap">
+  <section class="leaderboard-hero shadow-sm">
+    <div>
+      <h1 class="h3 mb-1">لوحة الصدارة</h1>
+      <p class="mb-0 text-muted">ترتيب الطلاب حسب نقاط الخبرة XP مع تحديثات شبه لحظية.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <div>
+        <label for="scope-select" class="form-label small mb-1 text-muted">نوع التصنيف</label>
+        <select id="scope-select" class="form-select form-select-sm">
+          <option value="all" {% if scope == 'all' %}selected{% endif %}>كل الوقت</option>
+          <option value="weekly" {% if scope == 'weekly' %}selected{% endif %}>أسبوعي (آخر 7 أيام)</option>
+          <option value="monthly" {% if scope == 'monthly' %}selected{% endif %}>شهري (آخر 30 يوم)</option>
+          <option value="seasonal" {% if scope == 'seasonal' %}selected{% endif %}>موسمي (آخر 90 يوم)</option>
+        </select>
+      </div>
+      <span class="chip stat-chip">عدد الطلاب: {{ leaderboard.total_users }}</span>
+      {% if current_user.role|lower in ['teacher', 'admin'] %}
+        <span class="chip stat-chip">وضع المشرف: متابعة ترتيب الطلاب وXP</span>
+      {% endif %}
+      {% if current_rank %}
+        <span id="my-rank-chip" class="chip stat-chip success">ترتيبك: #{{ current_rank }}</span>
+      {% endif %}
+      {% if current_profile %}
+        <span id="my-xp-chip" class="chip stat-chip">XP ({{ scope }}): {{ current_scope_xp }}</span>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="leaderboard-list mt-4" id="leaderboard-list" data-page="{{ leaderboard.page }}" data-per-page="{{ leaderboard.per_page }}" data-scope="{{ scope }}">
+    {% if leaderboard.entries %}
+      {% for entry in leaderboard.entries %}
+        <article
+          class="leaderboard-row {% if entry.rank == 1 %}top-1{% elif entry.rank == 2 %}top-2{% elif entry.rank == 3 %}top-3{% endif %}"
+          data-student-id="{{ entry.student_id }}"
+          data-rank="{{ entry.rank }}"
+        >
+          <div class="rank-col">#{{ entry.rank }}</div>
+          <div class="avatar-col">{{ entry.avatar }}</div>
+          <div class="user-col">
+            <div class="fw-semibold">{{ entry.username }}</div>
+            <div class="meta-row">
+              <span class="meta-chip">Lvl {{ entry.level }}</span>
+              {% if entry.badges %}
+                {% for badge in entry.badges[:3] %}
+                  <span class="meta-chip badge-chip">{{ badge }}</span>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+          <div class="xp-col">
+            <span class="xp-pill">{{ entry.xp }} XP</span>
+          </div>
+        </article>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-light">لا توجد بيانات صدارة حالياً.</div>
+    {% endif %}
+  </section>
+
+  <nav class="d-flex justify-content-between align-items-center mt-4" aria-label="Pagination">
+    <a
+      class="btn btn-outline-primary btn-sm {% if leaderboard.page <= 1 %}disabled{% endif %}"
+      href="{{ url_for('student.leaderboard', page=leaderboard.page-1, per_page=leaderboard.per_page, scope=scope) }}"
+    >
+      السابق
+    </a>
+    <span class="text-muted small">صفحة {{ leaderboard.page }} من {{ leaderboard.total_pages }}</span>
+    <a
+      class="btn btn-outline-primary btn-sm {% if leaderboard.page >= leaderboard.total_pages %}disabled{% endif %}"
+      href="{{ url_for('student.leaderboard', page=leaderboard.page+1, per_page=leaderboard.per_page, scope=scope) }}"
+    >
+      التالي
+    </a>
+  </nav>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<style>
+  .leaderboard-wrap {
+    --bg-1: #f5f8ff;
+    --bg-2: #eef7ef;
+    --accent: #1d6fd8;
+    --accent-soft: #dbe9ff;
+    --gold: #ffd76a;
+    --silver: #d9dee8;
+    --bronze: #e8b890;
+  }
+  .leaderboard-hero {
+    border: 1px solid #e7ebf3;
+    border-radius: 18px;
+    background: linear-gradient(120deg, var(--bg-1), var(--bg-2));
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid #d6dfec;
+    background: #fff;
+    font-size: 0.85rem;
+  }
+  .chip.success {
+    border-color: #b9e0c1;
+    background: #ebfbef;
+    color: #1c7d34;
+  }
+  .leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .leaderboard-row {
+    border: 1px solid #e6ebf3;
+    border-radius: 16px;
+    background: #fff;
+    padding: 0.9rem;
+    display: grid;
+    grid-template-columns: 70px 52px 1fr auto;
+    gap: 0.75rem;
+    align-items: center;
+    transition: transform 280ms ease, box-shadow 280ms ease, background-color 280ms ease;
+  }
+  .leaderboard-row:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(30, 67, 115, 0.12);
+  }
+  .leaderboard-row.top-1 {
+    border-color: #f0cb57;
+    background: linear-gradient(90deg, #fff8dc, #fffdf5);
+  }
+  .leaderboard-row.top-2 {
+    border-color: #cfd5e2;
+    background: linear-gradient(90deg, #f7f9fc, #ffffff);
+  }
+  .leaderboard-row.top-3 {
+    border-color: #ddb08a;
+    background: linear-gradient(90deg, #fdf2ea, #ffffff);
+  }
+  .rank-col {
+    font-weight: 800;
+    color: #334e7d;
+    text-align: center;
+  }
+  .avatar-col {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-soft);
+    color: #0d3f87;
+    font-weight: 700;
+  }
+  .user-col .meta-row {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.25rem;
+  }
+  .meta-chip {
+    font-size: 0.75rem;
+    border-radius: 999px;
+    border: 1px solid #dae2ef;
+    background: #f7f9fc;
+    padding: 0.2rem 0.5rem;
+  }
+  .badge-chip {
+    border-color: #f2cf70;
+    background: #fff7da;
+  }
+  .xp-pill {
+    font-weight: 700;
+    color: #0e4c9a;
+    background: #ebf3ff;
+    border: 1px solid #c8dcfb;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    white-space: nowrap;
+  }
+  @keyframes pulseUpdate {
+    0% { box-shadow: 0 0 0 0 rgba(32, 106, 212, 0.3); }
+    100% { box-shadow: 0 0 0 12px rgba(32, 106, 212, 0); }
+  }
+  .row-updated {
+    animation: pulseUpdate 0.9s ease;
+  }
+  @media (max-width: 768px) {
+    .leaderboard-row {
+      grid-template-columns: 52px 44px 1fr;
+      grid-template-areas:
+        "rank avatar user"
+        "xp xp xp";
+    }
+    .rank-col { grid-area: rank; }
+    .avatar-col { grid-area: avatar; }
+    .user-col { grid-area: user; }
+    .xp-col { grid-area: xp; margin-top: 0.35rem; }
+  }
+</style>
+<script>
+  (function initLeaderboardLiveUpdates() {
+    const list = document.getElementById('leaderboard-list');
+    if (!list) return;
+
+    const page = Number(list.dataset.page || 1);
+    const perPage = Number(list.dataset.perPage || 20);
+    const scope = list.dataset.scope || 'all';
+    const endpoint = "{{ url_for('student.leaderboard_data') }}" + `?page=${page}&per_page=${perPage}&scope=${scope}`;
+    const streamEndpoint = "{{ url_for('student.leaderboard_stream') }}" + `?page=${page}&per_page=${perPage}&scope=${scope}`;
+
+    const scopeSelect = document.getElementById('scope-select');
+    if (scopeSelect) {
+      scopeSelect.addEventListener('change', function() {
+        const nextScope = this.value || 'all';
+        const params = new URLSearchParams(window.location.search);
+        params.set('scope', nextScope);
+        params.set('page', '1');
+        params.set('per_page', String(perPage));
+        window.location.href = "{{ url_for('student.leaderboard') }}" + `?${params.toString()}`;
+      });
+    }
+
+    function buildRow(entry) {
+      const topClass = entry.rank === 1 ? 'top-1' : (entry.rank === 2 ? 'top-2' : (entry.rank === 3 ? 'top-3' : ''));
+      const badges = (entry.badges || []).slice(0, 3).map((b) => `<span class="meta-chip badge-chip">${b}</span>`).join('');
+      return `
+        <article class="leaderboard-row ${topClass}" data-student-id="${entry.student_id}" data-rank="${entry.rank}">
+          <div class="rank-col">#${entry.rank}</div>
+          <div class="avatar-col">${entry.avatar}</div>
+          <div class="user-col">
+            <div class="fw-semibold">${entry.username}</div>
+            <div class="meta-row">
+              <span class="meta-chip">Lvl ${entry.level}</span>
+              ${badges}
+            </div>
+          </div>
+          <div class="xp-col"><span class="xp-pill">${entry.xp} XP</span></div>
+        </article>
+      `;
+    }
+
+    function refreshList(payload) {
+      const entries = payload && payload.leaderboard ? payload.leaderboard.entries || [] : [];
+      if (!entries.length) return;
+
+      const previousRanks = {};
+      Array.from(list.querySelectorAll('.leaderboard-row')).forEach((row) => {
+        previousRanks[row.dataset.studentId] = Number(row.dataset.rank || 0);
+      });
+
+      list.innerHTML = entries.map(buildRow).join('');
+
+      Array.from(list.querySelectorAll('.leaderboard-row')).forEach((row) => {
+        const sid = row.dataset.studentId;
+        const oldRank = previousRanks[sid];
+        const newRank = Number(row.dataset.rank || 0);
+        if (oldRank && oldRank !== newRank) {
+          row.classList.add('row-updated');
+          setTimeout(() => row.classList.remove('row-updated'), 1000);
+        }
+      });
+
+      const rankChip = document.getElementById('my-rank-chip');
+      if (rankChip && payload.current_rank) {
+        rankChip.textContent = `ترتيبك: #${payload.current_rank}`;
+      }
+      const xpChip = document.getElementById('my-xp-chip');
+      if (xpChip && typeof payload.current_xp === 'number') {
+        xpChip.textContent = `XP (${scope}): ${payload.current_xp}`;
+      }
+    }
+
+    async function pullUpdates() {
+      try {
+        const response = await fetch(endpoint, { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data || !data.ok) return;
+        refreshList(data);
+      } catch (err) {
+        // Silent fail keeps UI stable if network is intermittent.
+      }
+    }
+
+    let pollTimer = null;
+    function startPollingFallback() {
+      if (pollTimer) return;
+      pollTimer = setInterval(pullUpdates, 15000);
+    }
+
+    if (window.EventSource) {
+      const source = new EventSource(streamEndpoint);
+      source.addEventListener('leaderboard', (event) => {
+        try {
+          const data = JSON.parse(event.data || '{}');
+          if (!data || !data.ok) return;
+          refreshList(data);
+        } catch (err) {
+          // Keep stream alive even if one payload fails to parse.
+        }
+      });
+
+      source.onerror = function() {
+        startPollingFallback();
+      };
+
+      window.addEventListener('beforeunload', () => {
+        source.close();
+      });
+    } else {
+      startPollingFallback();
+    }
+  })();
+</script>
+{% endblock %}

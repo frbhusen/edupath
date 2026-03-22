@@ -22,6 +22,7 @@ class User(Document, UserMixin):
     
     meta = {
         'collection': 'users',
+        'strict': False,
         'indexes': [
             'username',
             'phone',
@@ -97,6 +98,7 @@ class Lesson(Document):
     link_url = StringField(max_length=500, null=True)
     link_label_2 = StringField(max_length=120, null=True)
     link_url_2 = StringField(max_length=500, null=True)
+    xp_reward = IntField(default=10, required=True)
     created_at = DateTimeField(default=datetime.utcnow)
     
     meta = {
@@ -210,6 +212,7 @@ class Attempt(Document):
     question_order_json = StringField(null=True)
     selection_settings_json = StringField(null=True)
     is_retake = BooleanField(default=False)
+    xp_earned = IntField(default=0)
     
     meta = {
         'collection': 'attempts',
@@ -269,6 +272,7 @@ class CustomTestAttempt(Document):
     question_order_json = StringField(required=True)  # JSON string of question order
     answer_order_json = StringField(required=True)  # JSON string of answer order
     is_retake = BooleanField(default=False)
+    xp_earned = IntField(default=0)
     
     meta = {
         'collection': 'custom_test_attempts',
@@ -295,6 +299,64 @@ class CustomTestAnswer(Document):
         'indexes': [
             'attempt_id',
             'question_id'
+        ]
+    }
+
+
+class StudentGamification(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    student_id = ReferenceField(User, required=True, unique=True)
+    xp_total = IntField(default=0, required=True)
+    level = IntField(default=1, required=True)
+    current_streak = IntField(default=0, required=True)
+    best_streak = IntField(default=0, required=True)
+    last_activity_date = DateTimeField(null=True)
+    badges = ListField(StringField(max_length=64), default=list)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'student_gamification',
+        'indexes': [
+            'student_id',
+            'xp_total',
+            'level',
+            {'fields': ['-xp_total', 'student_id']}
+        ]
+    }
+
+
+class XPEvent(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    student_id = ReferenceField(User, required=True)
+    event_type = StringField(required=True, max_length=64)
+    source_id = StringField(required=True, max_length=64)
+    xp = IntField(required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'xp_events',
+        'indexes': [
+            'student_id',
+            'event_type',
+            'source_id',
+            'created_at',
+            ('student_id', 'event_type', 'source_id')
+        ]
+    }
+
+
+class LessonCompletion(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    lesson_id = ReferenceField(Lesson, required=True)
+    student_id = ReferenceField(User, required=True)
+    completed_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'lesson_completions',
+        'indexes': [
+            'lesson_id',
+            'student_id',
+            ('lesson_id', 'student_id')
         ]
     }
 
