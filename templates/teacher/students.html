@@ -22,8 +22,11 @@
               <span class="badge text-bg-secondary">{{ student.role }}</span>
             </div>
             <div class="text-muted small mb-3">انضم {{ student.created_at.strftime('%Y-%m-%d') if student.created_at else 'N/A' }}</div>
-            <div class="mt-auto d-flex justify-content-end">
+            <div class="mt-auto d-flex justify-content-end gap-2">
               <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.edit_student', user_id=student.id) }}">تعديل</a>
+              <form method="post" action="{{ url_for('teacher.delete_student', student_id=student.id) }}" onsubmit="return confirm('هل أنت متأكد من حذف هذا الطالب؟ سيتم حذف جميع بياناته نهائياً.');">
+                <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+              </form>
             </div>
           </div>
         </div>

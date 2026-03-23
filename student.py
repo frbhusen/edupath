@@ -2,18 +2,26 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 import json
 import random
 import math
+import secrets
+from urllib.parse import quote
 from datetime import datetime, timedelta
 import time
 from flask_login import login_required, current_user
 from bson import ObjectId
 from mongoengine.errors import DoesNotExist
 
-from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, AttemptTextAnswer, TestTextQuestion, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate
+from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, AttemptTextAnswer, TestTextQuestion, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats
 from .forms import ActivationForm, LessonActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
 from .extensions import cache
 
 student_bp = Blueprint("student", __name__, template_folder="templates")
+
+DUEL_INVITE_COOLDOWN_SECONDS = 60
+DUEL_SAME_OPPONENT_COOLDOWN_SECONDS = 180
+DUEL_PENDING_LIMIT_PER_CHALLENGER = 3
+DUEL_WAITING_JOIN_TIMEOUT_SECONDS = 300
+DUEL_PAIR_RECENT_LOCK_SECONDS = 45
 
 
 class AccessContext:
@@ -573,6 +581,488 @@ def _calculate_student_rank(student_id, scope: str = "all"):
     return higher_count + 1
 
 
+def _duel_generate_token(length: int = 32):
+    # URL-safe one-time invitation token.
+    token = secrets.token_urlsafe(max(24, length))
+    return token[:64]
+
+
+def _duel_get_or_create_stats(student_id):
+    stats = DuelStats.objects(student_id=student_id).first()
+    if not stats:
+        stats = DuelStats(student_id=student_id)
+        stats.save()
+    return stats
+
+
+def _duel_get_scope_info(scope_type: str, scope_id: str):
+    scope_type = (scope_type or "").strip().lower()
+    scope_id = (scope_id or "").strip()
+    if not ObjectId.is_valid(scope_id):
+        return None, None, None
+
+    if scope_type == "lesson":
+        lesson = Lesson.objects(id=scope_id).first()
+        if not lesson:
+            return None, None, None
+        return "lesson", lesson.id, lesson.title
+
+    if scope_type == "section":
+        section = Section.objects(id=scope_id).first()
+        if not section:
+            return None, None, None
+        return "section", section.id, section.title
+
+    if scope_type == "subject":
+        subject = Subject.objects(id=scope_id).first()
+        if not subject:
+            return None, None, None
+        return "subject", subject.id, subject.name
+
+    return None, None, None
+
+
+def _duel_pick_questions(scope_type: str, scope_id, question_count: int = 15):
+    test_ids = []
+    if scope_type == "lesson":
+        test_ids = [t.id for t in Test.objects(lesson_id=scope_id).only("id").all()]
+    elif scope_type == "section":
+        test_ids = [t.id for t in Test.objects(section_id=scope_id).only("id").all()]
+    elif scope_type == "subject":
+        sections = Section.objects(subject_id=scope_id).only("id").all()
+        section_ids = [s.id for s in sections]
+        if section_ids:
+            test_ids = [t.id for t in Test.objects(section_id__in=section_ids).only("id").all()]
+
+    if not test_ids:
+        return []
+
+    questions = list(Question.objects(test_id__in=test_ids).all())
+    if len(questions) < question_count:
+        return []
+
+    random.shuffle(questions)
+    picked = questions[:question_count]
+    return [str(q.id) for q in picked]
+
+
+def _duel_time_left_seconds(duel, player_slot: str, now=None):
+    now = now or datetime.utcnow()
+    if not duel.started_at:
+        return int(duel.timer_seconds or 540)
+
+    elapsed = max(0, int((now - duel.started_at).total_seconds()))
+    penalty = int(duel.challenger_penalty_seconds or 0) if player_slot == "challenger" else int(duel.opponent_penalty_seconds or 0)
+    left = int(duel.timer_seconds or 540) - elapsed - penalty
+    return max(0, left)
+
+
+def _duel_player_slot(duel, user_id):
+    if duel.challenger_id and duel.challenger_id.id == user_id:
+        return "challenger"
+    if duel.opponent_id and duel.opponent_id.id == user_id:
+        return "opponent"
+    return None
+
+
+def _duel_slot_has_joined(duel, slot: str):
+    if slot == "challenger":
+        return bool(getattr(duel, "challenger_joined_at", None))
+    if slot == "opponent":
+        return bool(getattr(duel, "opponent_joined_at", None))
+    return False
+
+
+def _duel_slot_submitted(duel, slot: str):
+    if slot == "challenger":
+        return bool(getattr(duel, "challenger_submitted", False))
+    if slot == "opponent":
+        return bool(getattr(duel, "opponent_submitted", False))
+    return False
+
+
+def _duel_slot_finished_at(duel, slot: str):
+    if slot == "challenger":
+        return getattr(duel, "challenger_finished_at", None)
+    if slot == "opponent":
+        return getattr(duel, "opponent_finished_at", None)
+    return None
+
+
+def _duel_compute_phase(duel, slot: str):
+    slot_joined = _duel_slot_has_joined(duel, slot)
+    both_joined = _duel_slot_has_joined(duel, "challenger") and _duel_slot_has_joined(duel, "opponent")
+    my_submitted = _duel_slot_submitted(duel, slot)
+    opp_slot = "opponent" if slot == "challenger" else "challenger"
+    opp_submitted = _duel_slot_submitted(duel, opp_slot)
+
+    if duel.status == "completed":
+        return "completed"
+    if duel.status == "accepted_waiting" or not slot_joined or not both_joined:
+        return "waiting"
+    if duel.status == "live" and my_submitted and not opp_submitted:
+        return "submitted_waiting"
+    if duel.status == "live":
+        return "live"
+    return "waiting"
+
+
+def _duel_build_play_state(duel, slot: str):
+    opp_slot = "opponent" if slot == "challenger" else "challenger"
+    my_submitted = _duel_slot_submitted(duel, slot)
+    opp_submitted = _duel_slot_submitted(duel, opp_slot)
+
+    my_now = _duel_slot_finished_at(duel, slot) if my_submitted else None
+    opp_now = _duel_slot_finished_at(duel, opp_slot) if opp_submitted else None
+
+    return {
+        "phase": _duel_compute_phase(duel, slot),
+        "slot_joined": _duel_slot_has_joined(duel, slot),
+        "both_joined": _duel_slot_has_joined(duel, "challenger") and _duel_slot_has_joined(duel, "opponent"),
+        "my_submitted": my_submitted,
+        "opp_submitted": opp_submitted,
+        "my_left": _duel_time_left_seconds(duel, slot, now=my_now),
+        "opp_left": _duel_time_left_seconds(duel, opp_slot, now=opp_now),
+    }
+
+
+def _duel_compute_settlement_plan(
+    challenger_score: int,
+    opponent_score: int,
+    challenger_finished_at,
+    opponent_finished_at,
+    challenger_streak_before: int,
+    opponent_streak_before: int,
+):
+    challenger_score = int(challenger_score or 0)
+    opponent_score = int(opponent_score or 0)
+    challenger_streak_before = int(challenger_streak_before or 0)
+    opponent_streak_before = int(opponent_streak_before or 0)
+
+    if challenger_score > opponent_score:
+        winner_slot = "challenger"
+    elif opponent_score > challenger_score:
+        winner_slot = "opponent"
+    else:
+        cf = challenger_finished_at or datetime.max
+        of = opponent_finished_at or datetime.max
+        winner_slot = "challenger" if cf <= of else "opponent"
+
+    loser_slot = "opponent" if winner_slot == "challenger" else "challenger"
+    winner_streak_before = challenger_streak_before if winner_slot == "challenger" else opponent_streak_before
+    loser_streak_before = opponent_streak_before if loser_slot == "opponent" else challenger_streak_before
+
+    winner_streak_after = winner_streak_before + 1
+    base_win_xp = 35 if winner_streak_before >= 10 else 30
+
+    streak_bonus = 0
+    if winner_streak_after == 5:
+        streak_bonus = 30
+    elif winner_streak_after == 7:
+        streak_bonus = 50
+    elif winner_streak_after == 10:
+        streak_bonus = 75
+
+    loser_penalty = -5 if loser_streak_before >= 10 else 0
+    return {
+        "winner_slot": winner_slot,
+        "loser_slot": loser_slot,
+        "base_win_xp": base_win_xp,
+        "streak_bonus": streak_bonus,
+        "loser_penalty": loser_penalty,
+        "winner_streak_after": winner_streak_after,
+    }
+
+
+def _duel_invite_throttle_decision(
+    now,
+    pending_count: int,
+    latest_any_created_at,
+    latest_same_created_at,
+):
+    pending_count = int(pending_count or 0)
+    if pending_count >= DUEL_PENDING_LIMIT_PER_CHALLENGER:
+        return {
+            "allowed": False,
+            "reason": "pending_limit",
+            "remaining": None,
+        }
+
+    if latest_any_created_at:
+        since_last = (now - latest_any_created_at).total_seconds()
+        if since_last < DUEL_INVITE_COOLDOWN_SECONDS:
+            return {
+                "allowed": False,
+                "reason": "global_cooldown",
+                "remaining": max(0, int(DUEL_INVITE_COOLDOWN_SECONDS - since_last)),
+            }
+
+    if latest_same_created_at:
+        since_pair = (now - latest_same_created_at).total_seconds()
+        if since_pair < DUEL_SAME_OPPONENT_COOLDOWN_SECONDS:
+            return {
+                "allowed": False,
+                "reason": "same_opponent_cooldown",
+                "remaining": max(0, int(DUEL_SAME_OPPONENT_COOLDOWN_SECONDS - since_pair)),
+            }
+
+    return {
+        "allowed": True,
+        "reason": None,
+        "remaining": None,
+    }
+
+
+def _duel_should_apply_finish_penalty(other_time_left_seconds: int):
+    # Rule: deduct 15 seconds only when remaining time is >= 20 seconds.
+    return int(other_time_left_seconds or 0) >= 20
+
+
+def _duel_pair_lock_remaining_from_latest(now, latest_status, latest_baseline_dt):
+    if latest_status in {"pending", "accepted_waiting", "live"}:
+        return DUEL_PAIR_RECENT_LOCK_SECONDS
+    if not latest_baseline_dt:
+        return 0
+
+    elapsed = int((now - latest_baseline_dt).total_seconds())
+    remaining = DUEL_PAIR_RECENT_LOCK_SECONDS - elapsed
+    return max(0, remaining)
+
+
+def _duel_apply_xp_delta_once(student_id, event_type: str, source_id: str, delta_xp: int):
+    exists = XPEvent.objects(student_id=student_id, event_type=event_type, source_id=source_id).first()
+    if exists:
+        return 0
+
+    delta_xp = int(delta_xp or 0)
+    XPEvent(
+        student_id=student_id,
+        event_type=event_type,
+        source_id=source_id,
+        xp=delta_xp,
+    ).save()
+
+    profile = _get_or_create_gamification_profile(student_id)
+    profile.xp_total = int(profile.xp_total or 0) + delta_xp
+    profile.level = _calculate_level(profile.xp_total)
+    _update_badges(profile)
+    profile.updated_at = datetime.utcnow()
+    profile.save()
+    return delta_xp
+
+
+def _duel_try_settle(duel):
+    if duel.settled or duel.status != "completed":
+        return
+
+    challenger_id = duel.challenger_id.id if duel.challenger_id else None
+    opponent_id = duel.opponent_id.id if duel.opponent_id else None
+    if not challenger_id or not opponent_id:
+        return
+
+    challenger_stats = _duel_get_or_create_stats(challenger_id)
+    opponent_stats = _duel_get_or_create_stats(opponent_id)
+    challenger_before = int(challenger_stats.current_win_streak or 0)
+    opponent_before = int(opponent_stats.current_win_streak or 0)
+
+    plan = _duel_compute_settlement_plan(
+        challenger_score=int(duel.challenger_score or 0),
+        opponent_score=int(duel.opponent_score or 0),
+        challenger_finished_at=duel.challenger_finished_at,
+        opponent_finished_at=duel.opponent_finished_at,
+        challenger_streak_before=challenger_before,
+        opponent_streak_before=opponent_before,
+    )
+    winner_slot = plan["winner_slot"]
+    loser_slot = plan["loser_slot"]
+    winner_id = challenger_id if winner_slot == "challenger" else opponent_id
+    loser_id = opponent_id if winner_slot == "challenger" else challenger_id
+
+    winner_stats = challenger_stats if winner_slot == "challenger" else opponent_stats
+    loser_stats = opponent_stats if loser_slot == "opponent" else challenger_stats
+    base_win_xp = int(plan["base_win_xp"])
+    winner_stats.current_win_streak = int(plan["winner_streak_after"])
+    winner_stats.best_win_streak = max(int(winner_stats.best_win_streak or 0), int(winner_stats.current_win_streak or 0))
+    winner_stats.wins = int(winner_stats.wins or 0) + 1
+    winner_stats.total_duels = int(winner_stats.total_duels or 0) + 1
+    winner_stats.updated_at = datetime.utcnow()
+
+    streak_bonus = int(plan["streak_bonus"])
+
+    loser_stats.losses = int(loser_stats.losses or 0) + 1
+    loser_stats.total_duels = int(loser_stats.total_duels or 0) + 1
+    loser_stats.current_win_streak = 0
+    loser_stats.updated_at = datetime.utcnow()
+
+    loser_penalty = int(plan["loser_penalty"])
+
+    source_base = str(duel.id)
+    _duel_apply_xp_delta_once(winner_id, "duel_win", f"{source_base}:winner", base_win_xp)
+    _duel_apply_xp_delta_once(loser_id, "duel_loss", f"{source_base}:loser", 5 + loser_penalty)
+    if streak_bonus > 0:
+        _duel_apply_xp_delta_once(winner_id, "duel_streak_bonus", f"{source_base}:streak", streak_bonus)
+
+    first_slot = getattr(duel, "first_submitter_slot", None)
+    first_perfect = bool(getattr(duel, "first_submitter_perfect", False))
+    second_perfect = bool(getattr(duel, "second_submitter_perfect", False))
+    if first_perfect and first_slot in {"challenger", "opponent"}:
+        first_id = challenger_id if first_slot == "challenger" else opponent_id
+        _duel_apply_xp_delta_once(first_id, "duel_first_perfect_bonus", f"{source_base}:first_perfect", 5)
+
+    if first_perfect and second_perfect and first_slot in {"challenger", "opponent"}:
+        second_slot = "opponent" if first_slot == "challenger" else "challenger"
+        second_id = challenger_id if second_slot == "challenger" else opponent_id
+        fee_refund = int(duel.entry_fee_xp or 20)
+        _duel_apply_xp_delta_once(second_id, "duel_second_perfect_refund", f"{source_base}:second_refund", fee_refund)
+        _duel_apply_xp_delta_once(second_id, "duel_second_perfect_bonus", f"{source_base}:second_bonus", 3)
+
+    winner_stats.save()
+    loser_stats.save()
+
+    winner_user = User.objects(id=winner_id).first()
+    duel.winner_id = winner_user
+    duel.ended_at = duel.ended_at or datetime.utcnow()
+    duel.settled = True
+    duel.settlement_json = json.dumps(
+        {
+            "winner_id": str(winner_id),
+            "base_win_xp": base_win_xp,
+            "loser_xp": 5,
+            "loser_penalty": loser_penalty,
+            "streak_bonus": streak_bonus,
+            "first_submitter_slot": first_slot,
+            "first_submitter_perfect": first_perfect,
+            "second_submitter_perfect": second_perfect,
+        },
+        ensure_ascii=False,
+    )
+    duel.save()
+
+
+def _duel_expire_if_needed(duel):
+    if duel.status == "pending" and duel.expires_at and duel.expires_at < datetime.utcnow():
+        duel.status = "expired"
+        duel.ended_at = datetime.utcnow()
+        duel.save()
+        return True
+    return False
+
+
+def _duel_autosubmit_timeout(duel):
+    if duel.status != "live":
+        return
+
+    changed = False
+    now = datetime.utcnow()
+    if not duel.challenger_submitted and _duel_time_left_seconds(duel, "challenger", now=now) <= 0:
+        duel.challenger_submitted = True
+        duel.challenger_finished_at = now
+        duel.challenger_score = int(duel.challenger_score or 0)
+        changed = True
+
+    if not duel.opponent_submitted and _duel_time_left_seconds(duel, "opponent", now=now) <= 0:
+        duel.opponent_submitted = True
+        duel.opponent_finished_at = now
+        duel.opponent_score = int(duel.opponent_score or 0)
+        changed = True
+
+    if duel.challenger_submitted and duel.opponent_submitted:
+        duel.status = "completed"
+        duel.ended_at = now
+        changed = True
+
+    if changed:
+        duel.save()
+        if duel.status == "completed":
+            _duel_try_settle(duel)
+
+
+def _duel_refund_entry_if_needed(duel):
+    if not duel or not duel.fee_applied:
+        return
+
+    fee = int(duel.entry_fee_xp or 20)
+    _duel_apply_xp_delta_once(duel.challenger_id.id, "duel_entry_refund", f"{duel.id}:challenger_refund", fee)
+    _duel_apply_xp_delta_once(duel.opponent_id.id, "duel_entry_refund", f"{duel.id}:opponent_refund", fee)
+
+
+def _duel_expire_waiting_if_needed(duel):
+    if duel.status != "accepted_waiting":
+        return False
+
+    baseline = duel.started_at or duel.opponent_joined_at or duel.challenger_joined_at or duel.created_at
+    if not baseline:
+        return False
+
+    deadline = baseline + timedelta(seconds=DUEL_WAITING_JOIN_TIMEOUT_SECONDS)
+    if datetime.utcnow() < deadline:
+        return False
+
+    duel.status = "expired"
+    duel.ended_at = datetime.utcnow()
+    duel.save()
+    _duel_refund_entry_if_needed(duel)
+    return True
+
+
+def _duel_maintenance_tick_for_student(student_id):
+    if not student_id:
+        return
+
+    active_rows = list(
+        Duel.objects(
+            __raw__={
+                "$or": [
+                    {"challenger_id": student_id},
+                    {"opponent_id": student_id},
+                ],
+                "status": {"$in": ["pending", "accepted_waiting", "live", "completed"]},
+            }
+        )
+        .order_by("-created_at")
+        .limit(20)
+        .all()
+    )
+
+    for duel in active_rows:
+        if duel.status == "pending":
+            _duel_expire_if_needed(duel)
+            continue
+        if duel.status == "accepted_waiting":
+            _duel_expire_waiting_if_needed(duel)
+            continue
+        if duel.status == "live":
+            _duel_autosubmit_timeout(duel)
+            continue
+        if duel.status == "completed":
+            _duel_try_settle(duel)
+
+
+def _duel_pair_recent_lock_remaining(challenger_id, opponent_id, now=None):
+    now = now or datetime.utcnow()
+    latest_pair = (
+        Duel.objects(
+            __raw__={
+                "$or": [
+                    {"challenger_id": challenger_id, "opponent_id": opponent_id},
+                    {"challenger_id": opponent_id, "opponent_id": challenger_id},
+                ]
+            }
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if not latest_pair:
+        return 0
+
+    baseline = latest_pair.ended_at or latest_pair.created_at
+    return _duel_pair_lock_remaining_from_latest(
+        now=now,
+        latest_status=latest_pair.status,
+        latest_baseline_dt=baseline,
+    )
+
+
 def get_unlocked_lessons(student_id: int):
     """Collect all lessons the student can access across all sections.
     Optimized to avoid N+1 queries by bulk loading data.
@@ -616,6 +1106,21 @@ def get_unlocked_lessons(student_id: int):
                 unlocked.append(lesson)
     
     return unlocked
+
+
+@student_bp.before_request
+def student_duel_maintenance():
+    if not current_user.is_authenticated:
+        return None
+    if (current_user.role or "").lower() != "student":
+        return None
+
+    try:
+        _duel_maintenance_tick_for_student(current_user.id)
+    except Exception:
+        # Maintenance should never block user flows.
+        return None
+    return None
 
 @student_bp.route("/subjects")
 @login_required
@@ -1264,6 +1769,604 @@ def leaderboard_stream():
     response.headers["Cache-Control"] = "no-cache"
     response.headers["X-Accel-Buffering"] = "no"
     return response
+
+
+@student_bp.route("/duels", methods=["GET", "POST"])
+@login_required
+def duels_home():
+    if (current_user.role or "").lower() != "student":
+        flash("صفحة التحديات متاحة للطلاب فقط.", "error")
+        return redirect(url_for("index"))
+
+    created_duel = None
+    share_link = None
+    whatsapp_share = None
+    telegram_share = None
+
+    unlocked_lessons = get_unlocked_lessons(current_user.id)
+    section_ids = list({l.section_id.id for l in unlocked_lessons if l.section_id})
+    subject_ids = []
+    if section_ids:
+        sections = list(Section.objects(id__in=section_ids).only("id", "subject_id", "title").all())
+        subject_ids = list({s.subject_id.id for s in sections if s.subject_id})
+    else:
+        sections = []
+    subjects = list(Subject.objects(id__in=subject_ids).only("id", "name").all()) if subject_ids else []
+
+    if request.method == "POST":
+        opponent_username = (request.form.get("opponent_username") or "").strip()
+        scope_type = (request.form.get("scope_type") or "").strip().lower()
+        scope_id = (request.form.get("scope_id") or "").strip()
+
+        now = datetime.utcnow()
+        pending_count = Duel.objects(challenger_id=current_user.id, status="pending").count()
+        latest_any = (
+            Duel.objects(challenger_id=current_user.id)
+            .order_by("-created_at")
+            .only("created_at")
+            .first()
+        )
+
+        opponent = User.objects(username=opponent_username, role="student").first() if opponent_username else None
+        if not opponent:
+            flash("اسم المستخدم غير موجود.", "error")
+            return redirect(url_for("student.duels_home"))
+        if opponent.id == current_user.id:
+            flash("لا يمكنك تحدي نفسك.", "error")
+            return redirect(url_for("student.duels_home"))
+
+        latest_same_opponent = (
+            Duel.objects(challenger_id=current_user.id, opponent_id=opponent.id)
+            .order_by("-created_at")
+            .only("created_at")
+            .first()
+        )
+
+        throttle = _duel_invite_throttle_decision(
+            now=now,
+            pending_count=int(pending_count or 0),
+            latest_any_created_at=(latest_any.created_at if latest_any else None),
+            latest_same_created_at=(latest_same_opponent.created_at if latest_same_opponent else None),
+        )
+        if not throttle.get("allowed"):
+            reason = throttle.get("reason")
+            remaining = throttle.get("remaining")
+            if reason == "pending_limit":
+                flash("لديك عدد كبير من الدعوات المعلقة. انتظر الرد أو الإلغاء أولاً.", "warning")
+            elif reason == "global_cooldown":
+                flash(f"انتظر {int(remaining or 0)} ثانية قبل إرسال دعوة جديدة.", "warning")
+            elif reason == "same_opponent_cooldown":
+                flash(f"يمكنك تحدي نفس الخصم بعد {int(remaining or 0)} ثانية.", "warning")
+            else:
+                flash("تعذر إنشاء الدعوة الآن. حاول لاحقاً.", "warning")
+            return redirect(url_for("student.duels_home"))
+
+        pair_lock_remaining = _duel_pair_recent_lock_remaining(current_user.id, opponent.id, now=now)
+        if pair_lock_remaining > 0:
+            flash(f"هذا الثنائي في فترة تهدئة. حاول بعد {pair_lock_remaining} ثانية.", "warning")
+            return redirect(url_for("student.duels_home"))
+
+        norm_scope_type, norm_scope_id, scope_title = _duel_get_scope_info(scope_type, scope_id)
+        if not norm_scope_type:
+            flash("نطاق التحدي غير صالح.", "error")
+            return redirect(url_for("student.duels_home"))
+
+        question_ids = _duel_pick_questions(norm_scope_type, norm_scope_id, question_count=15)
+        if len(question_ids) < 15:
+            flash("يجب توفر 15 سؤالاً على الأقل في هذا النطاق.", "error")
+            return redirect(url_for("student.duels_home"))
+
+        challenger_profile = _get_or_create_gamification_profile(current_user.id)
+        opponent_profile = _get_or_create_gamification_profile(opponent.id)
+        if int(challenger_profile.xp_total or 0) < 20 or int(opponent_profile.xp_total or 0) < 20:
+            flash("يلزم أن يمتلك كل لاعب 20 XP على الأقل لبدء التحدي.", "error")
+            return redirect(url_for("student.duels_home"))
+
+        active_existing = Duel.objects(
+            __raw__={
+                "$or": [
+                    {"challenger_id": current_user.id, "opponent_id": opponent.id},
+                    {"challenger_id": opponent.id, "opponent_id": current_user.id},
+                ],
+                "status": {"$in": ["pending", "accepted_waiting", "live"]},
+            }
+        ).first()
+        if active_existing:
+            flash("يوجد تحدي نشط بالفعل بينكما.", "warning")
+            return redirect(url_for("student.duel_play", duel_id=str(active_existing.id)))
+
+        token = _duel_generate_token()
+        while Duel.objects(invite_token=token).first():
+            token = _duel_generate_token()
+
+        created_duel = Duel(
+            challenger_id=current_user.id,
+            opponent_id=opponent.id,
+            opponent_username_snapshot=opponent.username,
+            scope_type=norm_scope_type,
+            scope_id=norm_scope_id,
+            scope_title=scope_title,
+            invite_token=token,
+            question_ids_json=json.dumps(question_ids, ensure_ascii=False),
+            question_count=15,
+            timer_seconds=540,
+            entry_fee_xp=20,
+            expires_at=datetime.utcnow() + timedelta(minutes=15),
+        )
+        created_duel.save()
+
+        share_link = url_for("student.duel_invite", token=token, _external=True)
+        share_message = f"تحدي ودي على EduPath: {share_link}"
+        whatsapp_share = f"https://wa.me/?text={quote(share_message)}"
+        telegram_share = f"https://t.me/share/url?url={quote(share_link)}&text={quote('انضم للتحدي الودي على EduPath')}"
+        flash("تم إنشاء دعوة التحدي بنجاح.", "success")
+
+    incoming = list(Duel.objects(opponent_id=current_user.id).order_by("-created_at").limit(25).all())
+    outgoing = list(Duel.objects(challenger_id=current_user.id).order_by("-created_at").limit(25).all())
+
+    for duel in incoming + outgoing:
+        _duel_expire_if_needed(duel)
+
+    stats_top = list(DuelStats.objects().order_by("-wins", "-current_win_streak", "student_id").limit(10).all())
+    top_ids = [s.student_id.id for s in stats_top if s.student_id]
+    top_users = User.objects(id__in=top_ids).only("id", "username", "first_name", "last_name").all() if top_ids else []
+    top_users_by_id = {u.id: u for u in top_users}
+
+    scope_choices = {
+        "lessons": [{"id": str(l.id), "label": l.title} for l in unlocked_lessons],
+        "sections": [{"id": str(s.id), "label": s.title} for s in sections],
+        "subjects": [{"id": str(s.id), "label": s.name} for s in subjects],
+    }
+
+    return render_template(
+        "student/duels.html",
+        incoming=incoming,
+        outgoing=outgoing,
+        scope_choices=scope_choices,
+        created_duel=created_duel,
+        share_link=share_link,
+        whatsapp_share=whatsapp_share,
+        telegram_share=telegram_share,
+        top_stats=stats_top,
+        top_users_by_id=top_users_by_id,
+        users_by_id=top_users_by_id,
+    )
+
+
+@student_bp.route("/duels/pending-popup", methods=["GET"])
+@login_required
+def duels_pending_popup():
+    if (current_user.role or "").lower() != "student":
+        return jsonify({"ok": True, "invites": []})
+
+    rows = list(Duel.objects(opponent_id=current_user.id, status="pending").order_by("-created_at").limit(3).all())
+    payload = []
+    for duel in rows:
+        if _duel_expire_if_needed(duel):
+            continue
+        payload.append(
+            {
+                "id": str(duel.id),
+                "token": duel.invite_token,
+                "from": (duel.challenger_id.full_name if duel.challenger_id else "لاعب"),
+                "scope": duel.scope_title,
+                "expires_at": duel.expires_at.isoformat() + "Z" if duel.expires_at else None,
+                "url": url_for("student.duel_invite", token=duel.invite_token),
+            }
+        )
+    return jsonify({"ok": True, "invites": payload})
+
+
+@student_bp.route("/duels/invite/<token>", methods=["GET"])
+@login_required
+def duel_invite(token):
+    duel = Duel.objects(invite_token=token).first()
+    if not duel:
+        return "404", 404
+
+    slot = _duel_player_slot(duel, current_user.id)
+    if not slot:
+        flash("هذه الدعوة ليست موجهة لحسابك.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    _duel_expire_if_needed(duel)
+    challenger_name = duel.challenger_id.full_name if duel.challenger_id else "لاعب"
+    return render_template("student/duel_invite.html", duel=duel, slot=slot, challenger_name=challenger_name)
+
+
+@student_bp.route("/duels/<duel_id>/respond", methods=["POST"])
+@login_required
+def duel_respond(duel_id):
+    duel = Duel.objects(id=duel_id).first() if ObjectId.is_valid(duel_id) else None
+    if not duel:
+        return "404", 404
+
+    slot = _duel_player_slot(duel, current_user.id)
+    if slot != "opponent":
+        flash("فقط اللاعب المستلم يمكنه الرد على الدعوة.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    if _duel_expire_if_needed(duel):
+        flash("انتهت صلاحية الدعوة.", "warning")
+        return redirect(url_for("student.duels_home"))
+
+    action = (request.form.get("action") or "").strip().lower()
+    if duel.status != "pending":
+        flash("لا يمكن الرد على هذه الدعوة الآن.", "warning")
+        return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+    if action == "decline":
+        duel.status = "declined"
+        duel.ended_at = datetime.utcnow()
+        duel.save()
+        flash("تم رفض الدعوة بدون أي خصم XP.", "info")
+        return redirect(url_for("student.duels_home"))
+
+    if action != "accept":
+        flash("إجراء غير صالح.", "error")
+        return redirect(url_for("student.duel_invite", token=duel.invite_token))
+
+    challenger_profile = _get_or_create_gamification_profile(duel.challenger_id.id)
+    opponent_profile = _get_or_create_gamification_profile(duel.opponent_id.id)
+    fee = int(duel.entry_fee_xp or 20)
+    if int(challenger_profile.xp_total or 0) < fee or int(opponent_profile.xp_total or 0) < fee:
+        flash("لا يمكن قبول الدعوة: أحد اللاعبين لا يملك XP كافٍ.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    _duel_apply_xp_delta_once(duel.challenger_id.id, "duel_entry_fee", f"{duel.id}:challenger_fee", -fee)
+    _duel_apply_xp_delta_once(duel.opponent_id.id, "duel_entry_fee", f"{duel.id}:opponent_fee", -fee)
+
+    duel.fee_applied = True
+    duel.invite_consumed = True
+    # Reset any stale runtime fields before waiting room starts.
+    duel.challenger_joined_at = None
+    duel.opponent_joined_at = None
+    duel.started_at = None
+    duel.challenger_submitted = False
+    duel.opponent_submitted = False
+    duel.challenger_finished_at = None
+    duel.opponent_finished_at = None
+    duel.challenger_score = 0
+    duel.opponent_score = 0
+    duel.challenger_penalty_seconds = 0
+    duel.opponent_penalty_seconds = 0
+    duel.status = "accepted_waiting"
+    duel.save()
+
+    flash("تم قبول الدعوة. انتظر حتى ينضم اللاعبان لبدء المباراة.", "success")
+    return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+
+@student_bp.route("/duels/<duel_id>/cancel", methods=["POST"])
+@login_required
+def duel_cancel(duel_id):
+    duel = Duel.objects(id=duel_id).first() if ObjectId.is_valid(duel_id) else None
+    if not duel:
+        return "404", 404
+
+    if not duel.challenger_id or duel.challenger_id.id != current_user.id:
+        flash("فقط مرسل الدعوة يمكنه إلغاءها.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    if duel.status != "pending":
+        flash("لا يمكن إلغاء دعوة غير معلقة.", "warning")
+        return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+    duel.status = "canceled"
+    duel.ended_at = datetime.utcnow()
+    duel.save()
+    flash("تم إلغاء الدعوة.", "success")
+    return redirect(url_for("student.duels_home"))
+
+
+@student_bp.route("/duels/<duel_id>/join", methods=["POST"])
+@login_required
+def duel_join(duel_id):
+    duel = Duel.objects(id=duel_id).first() if ObjectId.is_valid(duel_id) else None
+    if not duel:
+        return "404", 404
+
+    slot = _duel_player_slot(duel, current_user.id)
+    if not slot:
+        flash("غير مصرح لك بالانضمام لهذا التحدي.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    if duel.status not in {"accepted_waiting", "live"}:
+        flash("لا يمكن الانضمام في هذه الحالة.", "warning")
+        return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+    now = datetime.utcnow()
+    if slot == "challenger" and not duel.challenger_joined_at:
+        duel.challenger_joined_at = now
+    if slot == "opponent" and not duel.opponent_joined_at:
+        duel.opponent_joined_at = now
+
+    if duel.status == "accepted_waiting" and duel.challenger_joined_at and duel.opponent_joined_at:
+        duel.status = "live"
+        duel.started_at = now
+
+    duel.save()
+    return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+
+@student_bp.route("/duels/<duel_id>", methods=["GET"])
+@login_required
+def duel_play(duel_id):
+    duel = Duel.objects(id=duel_id).first() if ObjectId.is_valid(duel_id) else None
+    if not duel:
+        return "404", 404
+
+    slot = _duel_player_slot(duel, current_user.id)
+    if not slot:
+        flash("غير مصرح لك بدخول هذا التحدي.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    _duel_expire_if_needed(duel)
+    _duel_autosubmit_timeout(duel)
+
+    if duel.status in {"pending", "declined", "expired", "canceled"}:
+        return render_template("student/duel_invite.html", duel=duel, slot=slot, challenger_name=(duel.challenger_id.full_name if duel.challenger_id else "لاعب"))
+
+    question_ids = []
+    try:
+        question_ids = json.loads(duel.question_ids_json or "[]")
+    except Exception:
+        question_ids = []
+    questions = list(Question.objects(id__in=[qid for qid in question_ids if ObjectId.is_valid(str(qid))]).all()) if question_ids else []
+    qmap = {str(q.id): q for q in questions}
+    ordered_questions = [qmap[qid] for qid in question_ids if qid in qmap]
+
+    player_answers = list(DuelAnswer.objects(duel_id=duel.id, player_id=current_user.id).all())
+    answers_by_qid = {str(a.question_id.id): str(a.choice_id) if a.choice_id else "" for a in player_answers if a.question_id}
+
+    state = _duel_build_play_state(duel, slot)
+    my_left = int(state["my_left"])
+    opp_left = int(state["opp_left"])
+    opp_slot = "opponent" if slot == "challenger" else "challenger"
+    opponent_user = duel.opponent_id if slot == "challenger" else duel.challenger_id
+    phase = state["phase"]
+
+    return render_template(
+        "student/duel_play.html",
+        duel=duel,
+        phase=phase,
+        slot=slot,
+        opponent_user=opponent_user,
+        questions=ordered_questions,
+        answers_by_qid=answers_by_qid,
+        my_left=my_left,
+        opp_left=opp_left,
+        my_submitted=state["my_submitted"],
+        opp_submitted=state["opp_submitted"],
+    )
+
+
+@student_bp.route("/duels/<duel_id>/state", methods=["GET"])
+@login_required
+def duel_state(duel_id):
+    duel = Duel.objects(id=duel_id).first() if ObjectId.is_valid(duel_id) else None
+    if not duel:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+
+    slot = _duel_player_slot(duel, current_user.id)
+    if not slot:
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+
+    _duel_expire_if_needed(duel)
+    _duel_autosubmit_timeout(duel)
+    state = _duel_build_play_state(duel, slot)
+    opp_slot = "opponent" if slot == "challenger" else "challenger"
+    opponent_perfect_first_warning = (
+        bool(getattr(duel, "first_submitter_perfect", False))
+        and getattr(duel, "first_submitter_slot", None) == opp_slot
+        and not bool(state["my_submitted"])
+        and bool(state["opp_submitted"])
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "status": duel.status,
+            "phase": state["phase"],
+            "my_left": int(state["my_left"]),
+            "opp_left": int(state["opp_left"]),
+            "my_submitted": bool(state["my_submitted"]),
+            "opp_submitted": bool(state["opp_submitted"]),
+            "slot_joined": bool(state["slot_joined"]),
+            "both_joined": bool(state["both_joined"]),
+            "challenger_score": int(duel.challenger_score or 0),
+            "opponent_score": int(duel.opponent_score or 0),
+            "opponent_perfect_first_warning": opponent_perfect_first_warning,
+            "opponent_time_deduction_seconds": 60 if opponent_perfect_first_warning else 0,
+        }
+    )
+
+
+@student_bp.route("/duels/<duel_id>/review", methods=["GET"])
+@login_required
+def duel_review(duel_id):
+    duel = Duel.objects(id=duel_id).first() if ObjectId.is_valid(duel_id) else None
+    if not duel:
+        return "404", 404
+
+    slot = _duel_player_slot(duel, current_user.id)
+    if not slot:
+        flash("غير مصرح لك بمراجعة هذا التحدي.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    if duel.status != "completed":
+        flash("المراجعة متاحة فقط بعد انتهاء التحدي.", "warning")
+        return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+    question_ids = []
+    try:
+        question_ids = json.loads(duel.question_ids_json or "[]")
+    except Exception:
+        question_ids = []
+
+    valid_qids = [qid for qid in question_ids if ObjectId.is_valid(str(qid))]
+    questions = list(Question.objects(id__in=valid_qids).all()) if valid_qids else []
+    qmap = {str(q.id): q for q in questions}
+
+    all_answers = list(DuelAnswer.objects(duel_id=duel.id).all())
+    answers_by_key = {}
+    for a in all_answers:
+        if not a.question_id or not a.player_id:
+            continue
+        answers_by_key[(str(a.player_id.id), str(a.question_id.id))] = a
+
+    my_user = duel.challenger_id if slot == "challenger" else duel.opponent_id
+    opponent_user = duel.opponent_id if slot == "challenger" else duel.challenger_id
+    my_user_id = str(my_user.id) if my_user else ""
+    opponent_user_id = str(opponent_user.id) if opponent_user else ""
+
+    review = []
+    for qid in question_ids:
+        q = qmap.get(str(qid))
+        if not q:
+            continue
+
+        choices_by_id = {str(c.choice_id): c for c in q.choices}
+        correct_choice = None
+        if q.correct_choice_id:
+            correct_choice = choices_by_id.get(str(q.correct_choice_id))
+        if not correct_choice:
+            correct_choice = next((c for c in q.choices if c.is_correct), None)
+
+        my_ans = answers_by_key.get((my_user_id, str(q.id)))
+        opp_ans = answers_by_key.get((opponent_user_id, str(q.id)))
+        my_selected = choices_by_id.get(str(my_ans.choice_id)) if my_ans and my_ans.choice_id else None
+        opp_selected = choices_by_id.get(str(opp_ans.choice_id)) if opp_ans and opp_ans.choice_id else None
+
+        review.append(
+            {
+                "question": q,
+                "my_selected": my_selected,
+                "my_is_correct": bool(my_ans.is_correct) if my_ans else False,
+                "opp_selected": opp_selected,
+                "opp_is_correct": bool(opp_ans.is_correct) if opp_ans else False,
+                "correct_choice": correct_choice,
+            }
+        )
+
+    return render_template(
+        "student/duel_review.html",
+        duel=duel,
+        my_user=my_user,
+        opponent_user=opponent_user,
+        review=review,
+    )
+
+
+@student_bp.route("/duels/<duel_id>/submit", methods=["POST"])
+@login_required
+def duel_submit(duel_id):
+    duel = Duel.objects(id=duel_id).first() if ObjectId.is_valid(duel_id) else None
+    if not duel:
+        return "404", 404
+
+    slot = _duel_player_slot(duel, current_user.id)
+    if not slot:
+        flash("غير مصرح لك بتسليم هذا التحدي.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    if not _duel_slot_has_joined(duel, slot):
+        flash("يجب الانضمام للمباراة أولاً قبل التسليم.", "warning")
+        return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+    _duel_autosubmit_timeout(duel)
+    if duel.status != "live":
+        flash("المباراة ليست قيد اللعب حالياً.", "warning")
+        return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+    now = datetime.utcnow()
+    my_left = _duel_time_left_seconds(duel, slot, now=now)
+
+    question_ids = []
+    try:
+        question_ids = json.loads(duel.question_ids_json or "[]")
+    except Exception:
+        question_ids = []
+    questions = list(Question.objects(id__in=[qid for qid in question_ids if ObjectId.is_valid(str(qid))]).all()) if question_ids else []
+    qmap = {str(q.id): q for q in questions}
+
+    DuelAnswer.objects(duel_id=duel.id, player_id=current_user.id).delete()
+    score = 0
+    for qid in question_ids:
+        q = qmap.get(str(qid))
+        if not q:
+            continue
+        selected = (request.form.get(f"q_{qid}") or "").strip()
+        if selected and ObjectId.is_valid(selected):
+            is_correct = bool(q.correct_choice_id and str(q.correct_choice_id) == selected)
+            if is_correct:
+                score += 1
+            DuelAnswer(
+                duel_id=duel.id,
+                player_id=current_user.id,
+                question_id=q.id,
+                choice_id=ObjectId(selected),
+                is_correct=is_correct,
+            ).save()
+
+    was_already_submitted = _duel_slot_submitted(duel, slot)
+
+    if slot == "challenger":
+        duel.challenger_submitted = True
+        duel.challenger_finished_at = now
+        duel.challenger_score = score
+    else:
+        duel.opponent_submitted = True
+        duel.opponent_finished_at = now
+        duel.opponent_score = score
+
+    total_questions = max(0, len(question_ids))
+    submitted_perfect = total_questions > 0 and score >= total_questions
+
+    other_slot = "opponent" if slot == "challenger" else "challenger"
+    other_submitted = duel.opponent_submitted if slot == "challenger" else duel.challenger_submitted
+    if not was_already_submitted and not other_submitted:
+        duel.first_submitter_slot = slot
+        duel.first_submitter_perfect = bool(submitted_perfect)
+        if submitted_perfect:
+            # Perfect first finisher applies a full-minute time hit to the remaining player.
+            if other_slot == "challenger":
+                duel.challenger_penalty_seconds = int(duel.challenger_penalty_seconds or 0) + 60
+            else:
+                duel.opponent_penalty_seconds = int(duel.opponent_penalty_seconds or 0) + 60
+        else:
+            other_left = _duel_time_left_seconds(duel, other_slot, now=now)
+            if _duel_should_apply_finish_penalty(other_left):
+                if other_slot == "challenger":
+                    duel.challenger_penalty_seconds = int(duel.challenger_penalty_seconds or 0) + 15
+                else:
+                    duel.opponent_penalty_seconds = int(duel.opponent_penalty_seconds or 0) + 15
+    elif not was_already_submitted and other_submitted:
+        duel.second_submitter_perfect = bool(submitted_perfect)
+
+    if duel.challenger_submitted and duel.opponent_submitted:
+        duel.status = "completed"
+        duel.ended_at = now
+
+    duel.save()
+    if duel.status == "completed":
+        _duel_try_settle(duel)
+
+    if my_left <= 0:
+        flash("انتهى الوقت وتم تسليم نتيجتك تلقائياً.", "warning")
+    else:
+        flash("تم تسليم إجابات التحدي.", "success")
+    return redirect(url_for("student.duel_play", duel_id=str(duel.id)))
+
+
+@student_bp.route("/duels/leaderboard", methods=["GET"])
+@login_required
+def duel_leaderboard():
+    stats_top = list(DuelStats.objects().order_by("-wins", "-current_win_streak", "student_id").limit(10).all())
+    student_ids = [s.student_id.id for s in stats_top if s.student_id]
+    users = User.objects(id__in=student_ids).only("id", "username", "first_name", "last_name").all() if student_ids else []
+    users_by_id = {u.id: u for u in users}
+    return render_template("student/duel_leaderboard.html", stats_top=stats_top, users_by_id=users_by_id)
 
 @student_bp.route("/tests/<test_id>", methods=["GET", "POST"])
 @login_required

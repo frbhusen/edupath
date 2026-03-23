@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+{% block content %}
+{% set duel_status_ar = {
+  'pending': 'معلّقة',
+  'accepted_waiting': 'بانتظار الانضمام',
+  'live': 'جارية',
+  'completed': 'مكتملة',
+  'declined': 'مرفوضة',
+  'expired': 'منتهية',
+  'canceled': 'ملغاة'
+} %}
+<div id="duelPlayRoot" data-duel-state-url="{{ url_for('student.duel_state', duel_id=duel.id) }}" data-phase="{{ phase }}" data-my-submitted="{{ 1 if my_submitted else 0 }}">
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">مباراة التحدي</h1>
+    <p class="mb-0">{{ duel.scope_title }} - الحالة: {{ duel_status_ar.get(duel.status, duel.status) }}</p>
+  </div>
+  <div class="text-end">
+    <div class="small text-muted">الوقت المتبقي</div>
+    <div id="test-timer" class="badge text-bg-warning fs-6" data-left-seconds="{{ my_left }}">--:--</div>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.duels_home') }}">كل التحديات</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
+    <div>
+      <strong>الخصم:</strong> {{ opponent_user.full_name if opponent_user else 'لاعب' }}
+    </div>
+    <div>
+      <strong>وقتي:</strong> <span id="myTimer" data-left-seconds="{{ my_left }}">--:--</span>
+    </div>
+    <div>
+      <strong>وقت الخصم:</strong> <span id="oppTimer" data-left-seconds="{{ opp_left }}">--:--</span>
+    </div>
+    <div>
+      <strong>النتيجة:</strong>
+      <span id="duelScore">{{ duel.challenger_score }} - {{ duel.opponent_score }}</span>
+    </div>
+  </div>
+</div>
+
+{% if phase == 'waiting' %}
+  <div class="card">
+    <div class="card-body text-center">
+      <p class="mb-2">لن تظهر الأسئلة حتى ينضم اللاعبان.</p>
+      <p class="text-muted small mb-3">إذا كنت لم تنضم بعد اضغط زر الانضمام. إذا انضممت بالفعل فانتظر انضمام اللاعب الآخر.</p>
+      <form method="post" action="{{ url_for('student.duel_join', duel_id=duel.id) }}">
+        <button class="btn btn-cta" type="submit">انضم الآن</button>
+      </form>
+    </div>
+  </div>
+{% elif phase == 'live' %}
+  <form method="post" action="{{ url_for('student.duel_submit', duel_id=duel.id) }}" id="duel-test-form">
+    {% for q in questions %}
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
+          {% if q.question_images %}
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              {% for img in q.question_images %}
+                <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 240px;">
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="list-group">
+            {% for c in q.choices %}
+              <label class="list-group-item" for="q{{ q.id }}_{{ loop.index }}">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <input class="form-check-input me-2" type="radio" name="q_{{ q.id }}" value="{{ c.choice_id }}" id="q{{ q.id }}_{{ loop.index }}" {% if answers_by_qid.get(q.id|string) == c.choice_id|string %}checked{% endif %} required>
+                  <span>{{ c.text }}</span>
+                  {% if c.image_url %}
+                    <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;">
+                  {% endif %}
+                </div>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    <div class="d-grid mb-4">
+      <button type="submit" class="btn btn-cta btn-lg">إرسال الإجابات</button>
+    </div>
+  </form>
+{% elif phase == 'submitted_waiting' %}
+  <div class="card">
+    <div class="card-body text-center">
+      <h5 class="mb-2">تم تسليم إجاباتك</h5>
+      <p class="text-muted mb-0">ننتظر انتهاء الخصم وسيتم تحديث الصفحة تلقائياً.</p>
+    </div>
+  </div>
+{% elif phase == 'completed' %}
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">انتهت المباراة</h5>
+      <p class="mb-1">نتيجة المتحدي: {{ duel.challenger_score }}</p>
+      <p class="mb-1">نتيجة الخصم: {{ duel.opponent_score }}</p>
+      <p class="mb-0">الفائز: {{ duel.winner_id.full_name if duel.winner_id else 'لم يحدد بعد' }}</p>
+
+      {% set first_slot = duel.first_submitter_slot %}
+      {% set second_slot = 'opponent' if first_slot == 'challenger' else ('challenger' if first_slot == 'opponent' else None) %}
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        {% if duel.first_submitter_perfect and first_slot == slot %}
+          <span class="badge text-bg-success">مكافأة 100% (المنهي الأول): +5 XP</span>
+        {% elif duel.first_submitter_perfect and first_slot and first_slot != slot %}
+          <span class="badge text-bg-info">الخصم حصل على مكافأة 100% الأولى: +5 XP</span>
+        {% endif %}
+
+        {% if duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot == slot %}
+          <span class="badge text-bg-success">استرجاع رسوم الدخول: +20 XP</span>
+          <span class="badge text-bg-success">مكافأة 100% (المنهي الثاني): +3 XP</span>
+        {% elif duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot and second_slot != slot %}
+          <span class="badge text-bg-info">الخصم استرجع الرسوم: +20 XP</span>
+          <span class="badge text-bg-info">الخصم حصل على مكافأة المنهي الثاني: +3 XP</span>
+        {% endif %}
+      </div>
+
+      <div class="mt-3">
+        <a class="btn btn-outline-secondary" href="{{ url_for('student.duel_review', duel_id=duel.id) }}">مراجعة الأسئلة</a>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-light">الحالة الحالية لا تسمح بعرض واجهة اللعب.</div>
+{% endif %}
+
+<div id="duelFinishOverlay" class="duel-finish-overlay d-none" aria-hidden="true">
+  <div class="duel-finish-popup shadow-lg" role="alertdialog" aria-live="assertive" aria-modal="true">
+    <div id="duelFinishOverlayTitle" class="duel-finish-title">الخصم أنهى التحدي</div>
+    <p id="duelFinishOverlayBody" class="mb-3">تسليمك الآن مهم. الوقت عندك ما زال يعمل.</p>
+    <button id="duelFinishOverlayBtn" type="button" class="btn btn-cta">متابعة الحل</button>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .duel-finish-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.58);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    padding: 1rem;
+  }
+
+  .duel-finish-popup {
+    width: min(560px, 96vw);
+    background: #fff;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    border: 3px solid #dc3545;
+    text-align: center;
+  }
+
+  .duel-finish-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #b02a37;
+    margin-bottom: 0.75rem;
+  }
+</style>
+<script>
+  (function () {
+    const root = document.getElementById('duelPlayRoot');
+    if (!root) return;
+
+    const stateUrl = root.dataset.duelStateUrl || '';
+    if (!stateUrl) return;
+
+    let currentPhase = root.dataset.phase || '';
+    let mySubmitted = root.dataset.mySubmitted === '1';
+    const timerEl = document.getElementById('myTimer');
+    const oppTimerEl = document.getElementById('oppTimer');
+    const scoreEl = document.getElementById('duelScore');
+    const topTimerEl = document.getElementById('test-timer');
+    const finishOverlayEl = document.getElementById('duelFinishOverlay');
+    const finishOverlayTitleEl = document.getElementById('duelFinishOverlayTitle');
+    const finishOverlayBodyEl = document.getElementById('duelFinishOverlayBody');
+    const finishOverlayBtn = document.getElementById('duelFinishOverlayBtn');
+    let shownOpponentFinishedNotice = false;
+
+    function formatTime(seconds) {
+      const safe = Math.max(0, parseInt(seconds || 0, 10));
+      const mins = Math.floor(safe / 60);
+      const secs = safe % 60;
+      return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+
+    function renderTimer(el, seconds) {
+      if (!el || !Number.isFinite(seconds)) return;
+      const safe = Math.max(0, parseInt(seconds, 10));
+      el.dataset.leftSeconds = String(safe);
+      el.textContent = formatTime(safe);
+    }
+
+    function showOpponentFinishedNotice(titleText, bodyText) {
+      if (shownOpponentFinishedNotice) return;
+      if (finishOverlayTitleEl && titleText) finishOverlayTitleEl.textContent = titleText;
+      if (finishOverlayBodyEl && bodyText) finishOverlayBodyEl.textContent = bodyText;
+      if (finishOverlayEl) {
+        finishOverlayEl.classList.remove('d-none');
+        finishOverlayEl.setAttribute('aria-hidden', 'false');
+      }
+      shownOpponentFinishedNotice = true;
+    }
+
+    function hideOpponentFinishedNotice() {
+      if (!finishOverlayEl) return;
+      finishOverlayEl.classList.add('d-none');
+      finishOverlayEl.setAttribute('aria-hidden', 'true');
+    }
+
+    if (finishOverlayBtn) {
+      finishOverlayBtn.addEventListener('click', hideOpponentFinishedNotice);
+    }
+
+    if (finishOverlayEl) {
+      finishOverlayEl.addEventListener('click', function (event) {
+        if (event.target === finishOverlayEl) {
+          hideOpponentFinishedNotice();
+        }
+      });
+    }
+
+    function applyState(data) {
+      if (!data || !data.ok) return;
+
+      if (data.phase && data.phase !== currentPhase) {
+        window.location.reload();
+        return;
+      }
+
+      currentPhase = data.phase || currentPhase;
+      mySubmitted = !!data.my_submitted;
+
+      renderTimer(timerEl, data.my_left);
+      renderTimer(topTimerEl, data.my_left);
+      renderTimer(oppTimerEl, data.opp_left);
+      if (scoreEl && Number.isFinite(data.challenger_score) && Number.isFinite(data.opponent_score)) {
+        scoreEl.textContent = String(data.challenger_score) + ' - ' + String(data.opponent_score);
+      }
+
+      if (currentPhase === 'live' && !mySubmitted && data.opp_submitted) {
+        if (data.opponent_perfect_first_warning) {
+          showOpponentFinishedNotice(
+            'تنبيه قوي: اللاعب الأول حصل على 100%',
+            'تم خصم دقيقة كاملة من وقتك لأن اللاعب الأول أنهى الاختبار بنسبة 100%.'
+          );
+        } else {
+          showOpponentFinishedNotice(
+            'الخصم أنهى التحدي',
+            'تسليمك الآن مهم. الوقت عندك ما زال يعمل.'
+          );
+        }
+      }
+
+      if (data.status === 'completed') {
+        window.location.reload();
+      }
+    }
+
+    renderTimer(timerEl, parseInt(timerEl ? timerEl.dataset.leftSeconds : '0', 10));
+    renderTimer(topTimerEl, parseInt(topTimerEl ? topTimerEl.dataset.leftSeconds : '0', 10));
+    renderTimer(oppTimerEl, parseInt(oppTimerEl ? oppTimerEl.dataset.leftSeconds : '0', 10));
+
+    async function pollState() {
+      try {
+        const res = await fetch(stateUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        applyState(data);
+      } catch (_err) {
+      }
+    }
+
+    const localTick = setInterval(() => {
+      if (!timerEl || mySubmitted || currentPhase !== 'live') return;
+      const current = parseInt(timerEl.dataset.leftSeconds || '0', 10);
+      if (!Number.isFinite(current)) return;
+      renderTimer(timerEl, Math.max(0, current - 1));
+      renderTimer(topTimerEl, Math.max(0, current - 1));
+    }, 1000);
+
+    const syncTick = setInterval(pollState, 1000);
+    pollState();
+
+    window.addEventListener('beforeunload', function () {
+      clearInterval(localTick);
+      clearInterval(syncTick);
+    });
+  })();
+</script>
+{% endblock %}

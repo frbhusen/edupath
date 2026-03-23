@@ -41,6 +41,7 @@
       <a class="action-card" href="{{ url_for('student.results') }}"><span class="icon">📊</span><span>النتائج</span></a>
 	<a class="action-card" href="{{ url_for('student.frequently_wrong') }}"><span class="icon">🔁</span><span>الأخطاء المتكررة</span></a>
       <a class="action-card" href="{{ url_for('student.leaderboard') }}"><span class="icon">🏆</span><span>لوحة الصدارة</span></a>
+			<a class="action-card" href="{{ url_for('student.duels_home') }}"><span class="icon">⚔️</span><span>التحديات الودية</span></a>
       <a class="action-card" href="{{ url_for('student.study_plans') }}"><span class="icon">🗂️</span><span>خطتي الدراسية</span></a>
 			<a class="action-card" href="{{ url_for('student.certificates') }}"><span class="icon">🎓</span><span>شهاداتي</span></a>
     {% elif current_user.role in ['teacher', 'admin'] %}

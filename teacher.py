@@ -18,7 +18,7 @@ from .models import (
     SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt, CustomTestAnswer,
     StudentGamification, XPEvent, Assignment, AssignmentSubmission, LessonCompletion,
     StudyPlan, StudyPlanItem, AssignmentAttempt, TestTextQuestion, AttemptTextAnswer,
-    DiscussionQuestion, DiscussionAnswer, Certificate
+    DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats
 )
 from .activation_utils import (
     cascade_subject_activation, cascade_section_activation, cascade_lesson_activation,
@@ -386,6 +386,82 @@ def delete_custom_attempt(attempt_id):
 def students():
     students = User.objects(role="student").order_by('-created_at').all()
     return render_template("teacher/students.html", students=students)
+
+
+@teacher_bp.route("/students/<student_id>/delete", methods=["POST"])
+@login_required
+@role_required("teacher")
+def delete_student(student_id):
+    student = User.objects(id=student_id, role="student").first() if ObjectId.is_valid(student_id) else None
+    if not student:
+        flash("الطالب غير موجود.", "error")
+        return redirect(url_for("teacher.students"))
+
+    # 1) Delete regular attempts and their answer rows.
+    regular_attempt_ids = [a.id for a in Attempt.objects(student_id=student.id).only("id").all()]
+    if regular_attempt_ids:
+        AttemptAnswer.objects(attempt_id__in=regular_attempt_ids).delete()
+        AttemptTextAnswer.objects(attempt_id__in=regular_attempt_ids).delete()
+        Attempt.objects(id__in=regular_attempt_ids).delete()
+
+    # 2) Delete custom attempts and their answer rows.
+    custom_attempt_ids = [a.id for a in CustomTestAttempt.objects(student_id=student.id).only("id").all()]
+    if custom_attempt_ids:
+        CustomTestAnswer.objects(attempt_id__in=custom_attempt_ids).delete()
+        CustomTestAttempt.objects(id__in=custom_attempt_ids).delete()
+
+    # 3) Delete activations/codes and student progress.
+    SectionActivation.objects(student_id=student.id).delete()
+    ActivationCode.objects(student_id=student.id).delete()
+    LessonActivation.objects(student_id=student.id).delete()
+    LessonActivationCode.objects(student_id=student.id).delete()
+    SubjectActivation.objects(student_id=student.id).delete()
+    SubjectActivationCode.objects(student_id=student.id).delete()
+    LessonCompletion.objects(student_id=student.id).delete()
+
+    # 4) Delete assignments/submissions related to the student.
+    AssignmentSubmission.objects(student_id=student.id).delete()
+    AssignmentAttempt.objects(student_id=student.id).delete()
+
+    targeted_assignment_ids = [a.id for a in Assignment.objects(target_student_id=student.id).only("id").all()]
+    if targeted_assignment_ids:
+        AssignmentSubmission.objects(assignment_id__in=targeted_assignment_ids).delete()
+        AssignmentAttempt.objects(assignment_id__in=targeted_assignment_ids).delete()
+        Assignment.objects(id__in=targeted_assignment_ids).delete()
+
+    # 5) Delete study plans and plan items owned by the student.
+    plan_ids = [p.id for p in StudyPlan.objects(student_id=student.id).only("id").all()]
+    created_plan_ids = [p.id for p in StudyPlan.objects(created_by=student.id).only("id").all()]
+    if created_plan_ids:
+        plan_ids = list(set(plan_ids + created_plan_ids))
+    if plan_ids:
+        StudyPlanItem.objects(plan_id__in=plan_ids).delete()
+        StudyPlan.objects(id__in=plan_ids).delete()
+
+    # 6) Delete discussion questions/answers authored by the student.
+    question_ids = [q.id for q in DiscussionQuestion.objects(author_id=student.id).only("id").all()]
+    if question_ids:
+        DiscussionAnswer.objects(question_id__in=question_ids).delete()
+        DiscussionQuestion.objects(id__in=question_ids).delete()
+    DiscussionAnswer.objects(author_id=student.id).delete()
+
+    # 7) Delete certificates and gamification profile/events.
+    Certificate.objects(student_id=student.id).delete()
+    XPEvent.objects(student_id=student.id).delete()
+    StudentGamification.objects(student_id=student.id).delete()
+
+    # 8) Delete duel records and duel stats.
+    duel_ids = [d.id for d in Duel.objects(__raw__={"$or": [{"challenger_id": student.id}, {"opponent_id": student.id}]}).only("id").all()]
+    if duel_ids:
+        DuelAnswer.objects(duel_id__in=duel_ids).delete()
+        Duel.objects(id__in=duel_ids).delete()
+    DuelStats.objects(student_id=student.id).delete()
+
+    # 9) Delete user account.
+    student.delete()
+
+    flash("تم حذف الطالب وجميع بياناته المرتبطة بنجاح.", "success")
+    return redirect(url_for("teacher.students"))
 
 
 @teacher_bp.route("/discussions", methods=["GET", "POST"])

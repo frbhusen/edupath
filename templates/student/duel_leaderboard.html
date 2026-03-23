@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">لوحة صدارة التحديات</h1>
+    <p class="mb-0">أفضل 10 لاعبين حسب عدد الانتصارات.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.duels_home') }}">العودة للتحديات</a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    {% if stats_top %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead><tr><th>#</th><th>اللاعب</th><th>فوز</th><th>خسارة</th><th>السلسلة الحالية</th><th>أفضل سلسلة</th></tr></thead>
+          <tbody>
+            {% for row in stats_top %}
+              {% set user = users_by_id.get(row.student_id.id if row.student_id else None) %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ user.full_name if user else 'لاعب' }}</td>
+                <td>{{ row.wins }}</td>
+                <td>{{ row.losses }}</td>
+                <td>{{ row.current_win_streak }}</td>
+                <td>{{ row.best_win_streak }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد مباريات مكتملة بعد.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

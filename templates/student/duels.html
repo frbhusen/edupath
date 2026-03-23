@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% block content %}
+{% set duel_status_ar = {
+  'pending': 'معلّقة',
+  'accepted_waiting': 'بانتظار الانضمام',
+  'live': 'جارية',
+  'completed': 'مكتملة',
+  'declined': 'مرفوضة',
+  'expired': 'منتهية',
+  'canceled': 'ملغاة'
+} %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">التحديات الودية</h1>
+    <p class="mb-0">أرسل دعوة باسم المستخدم، وابدأ المباراة عند انضمام الطرفين.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.duel_leaderboard') }}">لوحة صدارة التحديات</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">إرسال دعوة جديدة</h5>
+        <form method="post" action="{{ url_for('student.duels_home') }}">
+          <div class="mb-2">
+            <label class="form-label">اسم مستخدم الخصم</label>
+            <input type="text" name="opponent_username" class="form-control" required maxlength="80" placeholder="username">
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label">نطاق التحدي</label>
+            <select name="scope_type" id="scope_type" class="form-select" required>
+              <option value="">اختر النوع</option>
+              <option value="lesson">درس</option>
+              <option value="section">قسم</option>
+              <option value="subject">مادة</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">العنصر</label>
+            <select name="scope_id" id="scope_id" class="form-select" required>
+              <option value="">اختر النوع أولاً</option>
+            </select>
+          </div>
+
+          <div class="small text-muted mb-3">القواعد: 15 سؤال، 9 دقائق، خصم 20 XP لكل لاعب عند قبول الدعوة.</div>
+          <button class="btn btn-cta" type="submit">إنشاء دعوة</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">مشاركة الدعوة</h5>
+        {% if share_link %}
+          <div class="mb-2"><input type="text" class="form-control" value="{{ share_link }}" readonly></div>
+          <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-success btn-sm" href="{{ whatsapp_share }}" target="_blank" rel="noopener">واتساب</a>
+            <a class="btn btn-info btn-sm" href="{{ telegram_share }}" target="_blank" rel="noopener">تلجرام</a>
+            <button class="btn btn-primary btn-sm" type="button" onclick="nativeShare('{{ share_link }}')">مشاركة عامة</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="copyShareLink('{{ share_link }}')">نسخ الرابط</button>
+          </div>
+        {% else %}
+          <div class="text-muted">بعد إنشاء الدعوة سيظهر رابط المشاركة هنا.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">الدعوات الواردة</h5>
+        {% if incoming %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>من</th><th>النطاق</th><th>الحالة</th><th></th></tr></thead>
+              <tbody>
+                {% for duel in incoming %}
+                  <tr>
+                    <td>{{ duel.challenger_id.full_name if duel.challenger_id else 'لاعب' }}</td>
+                    <td>{{ duel.scope_title }}</td>
+                    <td>{{ duel_status_ar.get(duel.status, duel.status) }}</td>
+                    <td class="d-flex gap-1">
+                      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.duel_play', duel_id=duel.id) }}">فتح</a>
+                      {% if duel.status == 'completed' %}
+                        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.duel_review', duel_id=duel.id) }}">مراجعة</a>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted">لا توجد دعوات واردة.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">دعواتي المرسلة</h5>
+        {% if outgoing %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>إلى</th><th>النطاق</th><th>الحالة</th><th></th></tr></thead>
+              <tbody>
+                {% for duel in outgoing %}
+                  <tr>
+                    <td>{{ duel.opponent_username_snapshot }}</td>
+                    <td>{{ duel.scope_title }}</td>
+                    <td>{{ duel_status_ar.get(duel.status, duel.status) }}</td>
+                    <td class="d-flex gap-1">
+                      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.duel_play', duel_id=duel.id) }}">فتح</a>
+                      {% if duel.status == 'completed' %}
+                        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.duel_review', duel_id=duel.id) }}">مراجعة</a>
+                      {% endif %}
+                      {% if duel.status == 'pending' %}
+                        <form method="post" action="{{ url_for('student.duel_cancel', duel_id=duel.id) }}" onsubmit="return confirm('إلغاء هذه الدعوة؟');">
+                          <button type="submit" class="btn btn-outline-danger btn-sm">إلغاء</button>
+                        </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted">لا توجد دعوات مرسلة.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body">
+    <h5 class="card-title">أعلى 10 لاعبين (حسب الانتصارات)</h5>
+    {% if top_stats %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>#</th><th>اللاعب</th><th>فوز</th><th>خسارة</th><th>سلسلة</th></tr></thead>
+          <tbody>
+            {% for row in top_stats %}
+              {% set user = users_by_id.get(row.student_id.id if row.student_id else None) %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ user.full_name if user else 'لاعب' }}</td>
+                <td>{{ row.wins }}</td>
+                <td>{{ row.losses }}</td>
+                <td>{{ row.current_win_streak }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted">لا توجد نتائج تحديات بعد.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const scopeChoices = JSON.parse(String.raw`{{ scope_choices|tojson|safe }}`);
+  const scopeTypeEl = document.getElementById('scope_type');
+  const scopeIdEl = document.getElementById('scope_id');
+
+  function fillScopeOptions() {
+    const type = scopeTypeEl.value;
+    let rows = [];
+    if (type === 'lesson') rows = scopeChoices.lessons || [];
+    if (type === 'section') rows = scopeChoices.sections || [];
+    if (type === 'subject') rows = scopeChoices.subjects || [];
+
+    scopeIdEl.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = rows.length ? 'اختر العنصر' : 'لا توجد عناصر متاحة';
+    scopeIdEl.appendChild(placeholder);
+
+    rows.forEach((row) => {
+      const opt = document.createElement('option');
+      opt.value = row.id;
+      opt.textContent = row.label;
+      scopeIdEl.appendChild(opt);
+    });
+  }
+
+  function copyShareLink(link) {
+    navigator.clipboard.writeText(link)
+      .then(() => alert('تم نسخ الرابط.'))
+      .catch(() => alert('تعذر نسخ الرابط.'));
+  }
+
+  function nativeShare(link) {
+    if (navigator.share) {
+      navigator.share({
+        title: 'EduPath Duel Invite',
+        text: 'انضم لتحدي ودي على EduPath',
+        url: link,
+      }).catch(() => {});
+      return;
+    }
+    copyShareLink(link);
+  }
+
+  scopeTypeEl.addEventListener('change', fillScopeOptions);
+</script>
+{% endblock %}

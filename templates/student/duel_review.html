@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">مراجعة التحدي الودي</h1>
+    <p class="mb-0">{{ duel.scope_title }} - المباراة مكتملة</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.duel_play', duel_id=duel.id) }}">العودة للمباراة</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
+    <div><strong>أنت:</strong> {{ my_user.full_name if my_user else 'لاعب' }}</div>
+    <div><strong>الخصم:</strong> {{ opponent_user.full_name if opponent_user else 'لاعب' }}</div>
+    <div><strong>النتيجة:</strong> {{ duel.challenger_score }} - {{ duel.opponent_score }}</div>
+    <div><strong>الفائز:</strong> {{ duel.winner_id.full_name if duel.winner_id else 'لم يحدد' }}</div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">مراجعة الأسئلة</h5>
+    {% if review %}
+      <div class="list-group list-group-flush">
+        {% for item in review %}
+          <div class="list-group-item">
+            <div class="fw-semibold mb-1">س{{ loop.index }}. {{ item.question.text }}</div>
+
+            {% if item.question.question_images %}
+              <div class="d-flex flex-wrap gap-2 my-2">
+                {% for img in item.question.question_images %}
+                  <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 220px;">
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="mb-1">
+              <span class="text-muted small">إجابتك:</span>
+              {% if item.my_selected %}
+                <span class="fw-semibold {% if item.my_is_correct %}text-success{% else %}text-danger{% endif %}">{{ item.my_selected.text }}</span>
+                {% if item.my_selected.image_url %}
+                  <div class="mt-2">
+                    <img src="{{ item.my_selected.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                  </div>
+                {% endif %}
+              {% else %}
+                <span class="text-danger">لم يتم اختيار إجابة</span>
+              {% endif %}
+            </div>
+
+            <div class="mb-1">
+              <span class="text-muted small">إجابة الخصم:</span>
+              {% if item.opp_selected %}
+                <span class="fw-semibold {% if item.opp_is_correct %}text-success{% else %}text-danger{% endif %}">{{ item.opp_selected.text }}</span>
+                {% if item.opp_selected.image_url %}
+                  <div class="mt-2">
+                    <img src="{{ item.opp_selected.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                  </div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">لم يتم اختيار إجابة</span>
+              {% endif %}
+            </div>
+
+            <div>
+              <span class="text-muted small">الإجابة الصحيحة:</span>
+              {% if item.correct_choice %}
+                <span class="fw-semibold text-success">{{ item.correct_choice.text }}</span>
+                {% if item.correct_choice.image_url %}
+                  <div class="mt-2">
+                    <img src="{{ item.correct_choice.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                  </div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">غير محدد</span>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد بيانات مراجعة لهذا التحدي.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

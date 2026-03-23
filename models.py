@@ -392,6 +392,111 @@ class XPEvent(Document):
     }
 
 
+class Duel(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    challenger_id = ReferenceField(User, required=True)
+    opponent_id = ReferenceField(User, required=True)
+    opponent_username_snapshot = StringField(required=True, max_length=80)
+
+    scope_type = StringField(required=True, choices=["lesson", "section", "subject"])
+    scope_id = ObjectIdField(required=True)
+    scope_title = StringField(required=True, max_length=220)
+
+    invite_token = StringField(required=True, unique=True, max_length=64)
+    invite_consumed = BooleanField(default=False, required=True)
+    status = StringField(
+        required=True,
+        default="pending",
+        choices=["pending", "accepted_waiting", "live", "completed", "declined", "expired", "canceled"],
+    )
+
+    question_ids_json = StringField(required=True)
+    question_count = IntField(default=15, required=True)
+    timer_seconds = IntField(default=540, required=True)
+    entry_fee_xp = IntField(default=20, required=True)
+
+    challenger_joined_at = DateTimeField(null=True)
+    opponent_joined_at = DateTimeField(null=True)
+    started_at = DateTimeField(null=True)
+    ended_at = DateTimeField(null=True)
+    expires_at = DateTimeField(required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    challenger_submitted = BooleanField(default=False, required=True)
+    opponent_submitted = BooleanField(default=False, required=True)
+    challenger_finished_at = DateTimeField(null=True)
+    opponent_finished_at = DateTimeField(null=True)
+
+    challenger_score = IntField(default=0, required=True)
+    opponent_score = IntField(default=0, required=True)
+    winner_id = ReferenceField(User, null=True)
+
+    first_submitter_slot = StringField(choices=["challenger", "opponent"], null=True)
+    first_submitter_perfect = BooleanField(default=False, required=True)
+    second_submitter_perfect = BooleanField(default=False, required=True)
+
+    challenger_penalty_seconds = IntField(default=0, required=True)
+    opponent_penalty_seconds = IntField(default=0, required=True)
+
+    fee_applied = BooleanField(default=False, required=True)
+    settled = BooleanField(default=False, required=True)
+    settlement_json = StringField(null=True)
+
+    meta = {
+        'collection': 'duels',
+        'indexes': [
+            'challenger_id',
+            'opponent_id',
+            'invite_token',
+            'status',
+            'expires_at',
+            'created_at',
+            ('challenger_id', 'opponent_id', 'status')
+        ]
+    }
+
+
+class DuelAnswer(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    duel_id = ReferenceField(Duel, required=True)
+    player_id = ReferenceField(User, required=True)
+    question_id = ReferenceField(Question, required=True)
+    choice_id = ObjectIdField(null=True)
+    is_correct = BooleanField(default=False, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'duel_answers',
+        'indexes': [
+            'duel_id',
+            'player_id',
+            'question_id',
+            ('duel_id', 'player_id', 'question_id')
+        ]
+    }
+
+
+class DuelStats(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    student_id = ReferenceField(User, required=True, unique=True)
+    wins = IntField(default=0, required=True)
+    losses = IntField(default=0, required=True)
+    current_win_streak = IntField(default=0, required=True)
+    best_win_streak = IntField(default=0, required=True)
+    total_duels = IntField(default=0, required=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'duel_stats',
+        'indexes': [
+            'student_id',
+            'wins',
+            'current_win_streak',
+            {'fields': ['-wins', '-current_win_streak', 'student_id']}
+        ]
+    }
+
+
 class LessonCompletion(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     lesson_id = ReferenceField(Lesson, required=True)

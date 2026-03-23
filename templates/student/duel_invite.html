@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block content %}
+{% set duel_status_ar = {
+  'pending': 'معلّقة',
+  'accepted_waiting': 'بانتظار الانضمام',
+  'live': 'جارية',
+  'completed': 'مكتملة',
+  'declined': 'مرفوضة',
+  'expired': 'منتهية',
+  'canceled': 'ملغاة'
+} %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">دعوة تحدي ودي</h1>
+    <p class="mb-0">{{ duel.scope_title }} - الحالة: {{ duel_status_ar.get(duel.status, duel.status) }}</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.duels_home') }}">كل التحديات</a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <p class="mb-2"><strong>المُرسل:</strong> {{ challenger_name }}</p>
+    <p class="mb-2"><strong>عدد الأسئلة:</strong> {{ duel.question_count }} | <strong>الوقت:</strong> 9 دقائق</p>
+    <p class="mb-3"><strong>رسوم الدخول:</strong> {{ duel.entry_fee_xp }} XP لكل لاعب</p>
+
+    {% if duel.status == 'pending' and slot == 'opponent' %}
+      <form method="post" action="{{ url_for('student.duel_respond', duel_id=duel.id) }}" class="d-flex gap-2">
+        <button class="btn btn-success" type="submit" name="action" value="accept">قبول</button>
+        <button class="btn btn-outline-danger" type="submit" name="action" value="decline">رفض</button>
+      </form>
+    {% elif duel.status in ['accepted_waiting', 'live', 'completed'] %}
+      <a class="btn btn-cta" href="{{ url_for('student.duel_play', duel_id=duel.id) }}">فتح المباراة</a>
+    {% else %}
+      <div class="alert alert-light mb-0">لا يمكن التفاعل مع هذه الدعوة حالياً.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

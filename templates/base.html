@@ -69,6 +69,22 @@
     {% block content %}{% endblock %}
   </main>
 
+  <div id="duelInviteToast" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1200; display: none; max-width: 360px;">
+    <div class="card shadow">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h6 class="mb-0">دعوة تحدي جديدة</h6>
+          <button type="button" class="btn-close" aria-label="Close" onclick="hideDuelInviteToast()"></button>
+        </div>
+        <div id="duelInviteToastText" class="small text-muted mb-3"></div>
+        <div class="d-flex gap-2 justify-content-end">
+          <button class="btn btn-outline-secondary btn-sm" type="button" onclick="hideDuelInviteToast()">لاحقاً</button>
+          <a id="duelInviteToastOpen" href="#" class="btn btn-primary btn-sm">فتح</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer class="custom-footer footer">
         <div class="container">
             <div class="col-3-f">
@@ -207,6 +223,67 @@
         });
       }, 5000);
     });
+
+    {% if current_user.is_authenticated and (current_user.role|lower) == 'student' %}
+    (function initDuelInvitePopup() {
+      const storageKey = 'duel_seen_tokens_v1';
+      let seen = [];
+      let queue = [];
+      let toastVisible = false;
+      try {
+        seen = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      } catch (e) {
+        seen = [];
+      }
+
+      const toastEl = document.getElementById('duelInviteToast');
+      const toastTextEl = document.getElementById('duelInviteToastText');
+      const toastOpenEl = document.getElementById('duelInviteToastOpen');
+
+      window.hideDuelInviteToast = function hideDuelInviteToast() {
+        if (!toastEl) return;
+        toastEl.style.display = 'none';
+        toastVisible = false;
+        setTimeout(showNextInviteToast, 120);
+      };
+
+      function showNextInviteToast() {
+        if (toastVisible || !queue.length || !toastEl || !toastTextEl || !toastOpenEl) return;
+        const inv = queue.shift();
+        toastTextEl.textContent = `من ${inv.from} في ${inv.scope}`;
+        toastOpenEl.href = inv.url || '#';
+        toastEl.style.display = 'block';
+        toastVisible = true;
+      }
+
+      function remember(token) {
+        if (!token) return;
+        if (!seen.includes(token)) {
+          seen.push(token);
+          if (seen.length > 80) seen = seen.slice(seen.length - 80);
+          localStorage.setItem(storageKey, JSON.stringify(seen));
+        }
+      }
+
+      function pollInvites() {
+        fetch('{{ url_for("student.duels_pending_popup") }}', { credentials: 'same-origin' })
+          .then((r) => r.json())
+          .then((payload) => {
+            const invites = (payload && payload.invites) ? payload.invites : [];
+            invites.forEach((inv) => {
+              if (!inv || !inv.token || seen.includes(inv.token)) return;
+              remember(inv.token);
+              queue.push(inv);
+            });
+            showNextInviteToast();
+          })
+          .catch(() => {});
+      }
+
+      setTimeout(pollInvites, 1200);
+      setInterval(pollInvites, 12000);
+    })();
+    {% endif %}
   </script>
   {% block scripts %}{% endblock %}
 </body>
