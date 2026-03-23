@@ -36,7 +36,7 @@
   <div class="action-grid">
     {% if current_user.role == 'student' %}
       <a class="action-card" href="{{ url_for('student.subjects') }}"><span class="icon">📚</span><span>المواد</span></a>
-			<a class="action-card" href="{{ url_for('student.pinned_discussions') }}"><span class="icon">📌</span><span>الأسئلة المثبتة</span></a>
+			<a class="action-card" href="{{ url_for('student.pinned_discussions') }}"><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a>
       <a class="action-card" href="{{ url_for('student.assignments') }}"><span class="icon">📝</span><span>واجباتي</span></a>
       <a class="action-card" href="{{ url_for('student.results') }}"><span class="icon">📊</span><span>النتائج</span></a>
 	<a class="action-card" href="{{ url_for('student.frequently_wrong') }}"><span class="icon">🔁</span><span>الأخطاء المتكررة</span></a>
@@ -47,7 +47,7 @@
     {% elif current_user.role in ['teacher', 'admin'] %}
       <a class="action-card" href="{{ url_for('teacher.dashboard') }}"><span class="icon">🧭</span><span>لوحة المعلم</span></a>
 			<a class="action-card" href="{{ url_for('student.subjects') }}"><span class="icon">📚</span><span>المواد</span></a>
-			<a class="action-card" href="{{ url_for('student.pinned_discussions') }}"><span class="icon">📌</span><span>الأسئلة المثبتة</span></a>
+			<a class="action-card" href="{{ url_for('student.pinned_discussions') }}"><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a>
       <a class="action-card" href="{{ url_for('teacher.analytics_dashboard') }}"><span class="icon">📈</span><span>التحليلات</span></a>
       <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}"><span class="icon">✅</span><span>إدارة الواجبات</span></a>
       <a class="action-card" href="{{ url_for('teacher.study_plans_manage') }}"><span class="icon">🗓️</span><span>إدارة الخطط</span></a>

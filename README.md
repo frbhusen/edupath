@@ -9,6 +9,11 @@ A simple study platform where teachers manage subjects, sections, lessons, and M
 - Friendly Duels between students with invite links, synchronized timers, and live notifications
 - Duel rewards and gamification: XP entry fee, win/loss settlement, perfect-score bonuses, and XP change popup
 - Post-duel review page showing questions, images, your answer, opponent answer, and correct answer
+- Certificates system with issuance and verification flow
+- Leaderboards for student progression and duel rankings
+- Frequently Wrong review to focus on commonly missed questions
+- Pinned Q&A section (Arabic: "الأسئلة والأجوبة المثبتة") for highlighted discussions
+- Assignments workflow for publishing, solving, and submission tracking
 - SQLite database file stored locally
 
 ## Setup
