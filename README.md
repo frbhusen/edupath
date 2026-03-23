@@ -6,6 +6,9 @@ A simple study platform where teachers manage subjects, sections, lessons, and M
 - Register/login with roles: teacher or student
 - Teacher: create/edit subjects, sections, lessons, tests, questions and choices
 - Student: browse content, take MCQ tests, view scores
+- Friendly Duels between students with invite links, synchronized timers, and live notifications
+- Duel rewards and gamification: XP entry fee, win/loss settlement, perfect-score bonuses, and XP change popup
+- Post-duel review page showing questions, images, your answer, opponent answer, and correct answer
 - SQLite database file stored locally
 
 ## Setup

@@ -221,6 +221,36 @@
     padding: 0.5rem 0.65rem;
   }
 
+  .duel-xp-item-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .duel-xp-sign {
+    min-width: 1.6rem;
+    text-align: center;
+    font-weight: 800;
+    border-radius: 999px;
+    padding: 0.18rem 0.42rem;
+    font-size: 0.78rem;
+  }
+
+  .duel-xp-sign.plus {
+    background: #d1e7dd;
+    color: #0f5132;
+  }
+
+  .duel-xp-sign.minus {
+    background: #f8d7da;
+    color: #842029;
+  }
+
+  .duel-xp-sign.zero {
+    background: #e2e3e5;
+    color: #41464b;
+  }
+
   @keyframes duelXpPop {
     from { transform: translateY(12px) scale(0.97); opacity: 0; }
     to { transform: translateY(0) scale(1); opacity: 1; }
@@ -326,13 +356,23 @@
           const label = document.createElement('div');
           label.textContent = String(item.label || 'XP');
 
-          const delta = document.createElement('div');
+          const deltaWrap = document.createElement('div');
+          deltaWrap.className = 'duel-xp-item-value';
+
+          const signBadge = document.createElement('span');
           const value = parseInt(item.xp || 0, 10);
-          delta.textContent = (value > 0 ? '+' : '') + String(value);
+          signBadge.className = 'duel-xp-sign ' + (value > 0 ? 'plus' : (value < 0 ? 'minus' : 'zero'));
+          signBadge.textContent = value > 0 ? '+' : (value < 0 ? '-' : '0');
+
+          const delta = document.createElement('span');
+          delta.textContent = String(Math.abs(value));
           delta.className = 'fw-bold ' + (value > 0 ? 'text-success' : (value < 0 ? 'text-danger' : 'text-muted'));
 
+          deltaWrap.appendChild(signBadge);
+          deltaWrap.appendChild(delta);
+
           row.appendChild(label);
-          row.appendChild(delta);
+          row.appendChild(deltaWrap);
           xpBreakdownEl.appendChild(row);
         });
       }
