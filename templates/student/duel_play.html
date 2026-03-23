@@ -132,6 +132,16 @@
     <button id="duelFinishOverlayBtn" type="button" class="btn btn-cta">متابعة الحل</button>
   </div>
 </div>
+
+<div id="duelXpOverlay" class="duel-finish-overlay d-none" aria-hidden="true">
+  <div class="duel-xp-popup shadow-lg" role="dialog" aria-live="polite" aria-modal="true">
+    <div class="duel-xp-title">تغيّر نقاط XP بعد التحدي</div>
+    <div id="duelXpDelta" class="duel-xp-delta">0 XP</div>
+    <div id="duelXpTotals" class="small text-muted mb-3"></div>
+    <div id="duelXpBreakdown" class="duel-xp-breakdown"></div>
+    <button id="duelXpOverlayBtn" type="button" class="btn btn-cta mt-3">ممتاز</button>
+  </div>
+</div>
 </div>
 {% endblock %}
 
@@ -163,6 +173,58 @@
     color: #b02a37;
     margin-bottom: 0.75rem;
   }
+
+  .duel-xp-popup {
+    width: min(560px, 96vw);
+    background: radial-gradient(circle at top, #fff 0%, #f2fbff 100%);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    border: 3px solid #0d6efd;
+    text-align: center;
+    animation: duelXpPop 260ms ease-out;
+  }
+
+  .duel-xp-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    color: #0b3d91;
+  }
+
+  .duel-xp-delta {
+    font-size: 2.1rem;
+    font-weight: 900;
+    margin-bottom: 0.35rem;
+  }
+
+  .duel-xp-delta.positive { color: #198754; }
+  .duel-xp-delta.negative { color: #dc3545; }
+  .duel-xp-delta.neutral { color: #6c757d; }
+
+  .duel-xp-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    text-align: start;
+    max-height: 220px;
+    overflow: auto;
+    padding-right: 0.25rem;
+  }
+
+  .duel-xp-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #dce7ff;
+    border-radius: 0.65rem;
+    background: #fff;
+    padding: 0.5rem 0.65rem;
+  }
+
+  @keyframes duelXpPop {
+    from { transform: translateY(12px) scale(0.97); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
 </style>
 <script>
   (function () {
@@ -182,6 +244,12 @@
     const finishOverlayTitleEl = document.getElementById('duelFinishOverlayTitle');
     const finishOverlayBodyEl = document.getElementById('duelFinishOverlayBody');
     const finishOverlayBtn = document.getElementById('duelFinishOverlayBtn');
+    const xpOverlayEl = document.getElementById('duelXpOverlay');
+    const xpOverlayBtn = document.getElementById('duelXpOverlayBtn');
+    const xpDeltaEl = document.getElementById('duelXpDelta');
+    const xpTotalsEl = document.getElementById('duelXpTotals');
+    const xpBreakdownEl = document.getElementById('duelXpBreakdown');
+    const xpSummary = JSON.parse(String.raw`{{ (xp_summary or {})|tojson|safe }}`);
     let shownOpponentFinishedNotice = false;
 
     function formatTime(seconds) {
@@ -223,6 +291,70 @@
       finishOverlayEl.addEventListener('click', function (event) {
         if (event.target === finishOverlayEl) {
           hideOpponentFinishedNotice();
+        }
+      });
+    }
+
+    function showXpOverlayOnce() {
+      if (currentPhase !== 'completed') return;
+      if (!xpSummary || !xpSummary.has_any || !xpOverlayEl) return;
+
+      const seenKey = 'duel_xp_popup_seen_' + String('{{ duel.id }}');
+      if (sessionStorage.getItem(seenKey) === '1') return;
+      sessionStorage.setItem(seenKey, '1');
+
+      const total = parseInt(xpSummary.total || 0, 10);
+      const sign = total > 0 ? '+' : '';
+
+      if (xpDeltaEl) {
+        xpDeltaEl.textContent = sign + String(total) + ' XP';
+        xpDeltaEl.classList.remove('positive', 'negative', 'neutral');
+        xpDeltaEl.classList.add(total > 0 ? 'positive' : (total < 0 ? 'negative' : 'neutral'));
+      }
+
+      if (xpTotalsEl) {
+        xpTotalsEl.textContent = 'إجمالي XP: ' + String(xpSummary.before_total) + ' → ' + String(xpSummary.after_total);
+      }
+
+      if (xpBreakdownEl) {
+        xpBreakdownEl.innerHTML = '';
+        const items = Array.isArray(xpSummary.items) ? xpSummary.items : [];
+        items.forEach((item) => {
+          const row = document.createElement('div');
+          row.className = 'duel-xp-item';
+
+          const label = document.createElement('div');
+          label.textContent = String(item.label || 'XP');
+
+          const delta = document.createElement('div');
+          const value = parseInt(item.xp || 0, 10);
+          delta.textContent = (value > 0 ? '+' : '') + String(value);
+          delta.className = 'fw-bold ' + (value > 0 ? 'text-success' : (value < 0 ? 'text-danger' : 'text-muted'));
+
+          row.appendChild(label);
+          row.appendChild(delta);
+          xpBreakdownEl.appendChild(row);
+        });
+      }
+
+      xpOverlayEl.classList.remove('d-none');
+      xpOverlayEl.setAttribute('aria-hidden', 'false');
+    }
+
+    function hideXpOverlay() {
+      if (!xpOverlayEl) return;
+      xpOverlayEl.classList.add('d-none');
+      xpOverlayEl.setAttribute('aria-hidden', 'true');
+    }
+
+    if (xpOverlayBtn) {
+      xpOverlayBtn.addEventListener('click', hideXpOverlay);
+    }
+
+    if (xpOverlayEl) {
+      xpOverlayEl.addEventListener('click', function (event) {
+        if (event.target === xpOverlayEl) {
+          hideXpOverlay();
         }
       });
     }
@@ -288,6 +420,7 @@
 
     const syncTick = setInterval(pollState, 1000);
     pollState();
+    setTimeout(showXpOverlayOnce, 150);
 
     window.addEventListener('beforeunload', function () {
       clearInterval(localTick);

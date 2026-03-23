@@ -851,6 +851,49 @@ def _duel_apply_xp_delta_once(student_id, event_type: str, source_id: str, delta
     return delta_xp
 
 
+def _duel_get_xp_change_summary(duel, student_id):
+    source_prefix = f"{duel.id}:"
+    events = list(
+        XPEvent.objects(student_id=student_id, source_id__startswith=source_prefix)
+        .order_by("created_at")
+        .all()
+    )
+
+    labels = {
+        "duel_entry_fee": "رسوم دخول التحدي",
+        "duel_win": "مكافأة الفوز",
+        "duel_loss": "XP نتيجة الخسارة",
+        "duel_streak_bonus": "مكافأة سلسلة الانتصارات",
+        "duel_first_perfect_bonus": "مكافأة 100% (المنهي الأول)",
+        "duel_second_perfect_refund": "استرجاع رسوم الدخول",
+        "duel_second_perfect_bonus": "مكافأة 100% (المنهي الثاني)",
+    }
+
+    items = []
+    total_delta = 0
+    for row in events:
+        xp = int(getattr(row, "xp", 0) or 0)
+        total_delta += xp
+        items.append(
+            {
+                "label": labels.get(getattr(row, "event_type", ""), getattr(row, "event_type", "XP")),
+                "xp": xp,
+            }
+        )
+
+    profile = _get_or_create_gamification_profile(student_id)
+    after_total = int(profile.xp_total or 0)
+    before_total = after_total - total_delta
+
+    return {
+        "has_any": bool(items),
+        "total": total_delta,
+        "before_total": before_total,
+        "after_total": after_total,
+        "items": items,
+    }
+
+
 def _duel_try_settle(duel):
     if duel.settled or duel.status != "completed":
         return
@@ -2125,6 +2168,7 @@ def duel_play(duel_id):
     opp_slot = "opponent" if slot == "challenger" else "challenger"
     opponent_user = duel.opponent_id if slot == "challenger" else duel.challenger_id
     phase = state["phase"]
+    xp_summary = _duel_get_xp_change_summary(duel, current_user.id) if phase == "completed" else None
 
     return render_template(
         "student/duel_play.html",
@@ -2138,6 +2182,7 @@ def duel_play(duel_id):
         opp_left=opp_left,
         my_submitted=state["my_submitted"],
         opp_submitted=state["opp_submitted"],
+        xp_summary=xp_summary,
     )
 
 
