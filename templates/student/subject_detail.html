@@ -3,7 +3,6 @@
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
     <h1 class="h4 mb-1">{{ subject.name }}</h1>
-    <p class="mb-0">{{ subject.description or 'لا يوجد وصف.' }}</p>
   </div>
   <div class="d-flex gap-2 align-items-center">
     {% if current_user.role == 'student' %}

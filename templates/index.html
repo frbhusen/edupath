@@ -4,7 +4,7 @@
 	<div>
 		{% if current_user.is_authenticated and current_user.role == 'student' %}
 			<h1 class="h4 mb-1">مرحباً {{ current_user.first_name }} في EduPath</h1>
-			<p class="mb-0">لوحة التحكم الرئيسية للطالب: تعلم، نفذ خطتك، وتابع تقدمك.</p>
+			<p class="mb-0">لوحة التحكم الرئيسية للطالب: تعلم، اختبر نفسك، وتابع تقدمك.</p>
 		{% elif current_user.is_authenticated and current_user.role in ['teacher', 'admin'] %}
 			<h1 class="h4 mb-1">مرحباً {{ current_user.username }} في EduPath</h1>
 			<p class="mb-0">لوحة تشغيل احترافية لإدارة التعلم، التحليلات، والتقارير.</p>
@@ -64,30 +64,5 @@
 </div>
 {% endif %}
 
-<div class="row g-3">
-	<div class="col-12 col-md-4">
-		<div class="card h-100">
-			<div class="card-body">
-				<h5 class="card-title">مواد منظمة</h5>
-				<p class="text-muted">تصفح المواد والأقسام المنظمة بوضوح.</p>
-			</div>
-		</div>
-	</div>
-	<div class="col-12 col-md-4">
-		<div class="card h-100">
-			<div class="card-body">
-				<h5 class="card-title">دروس تفاعلية</h5>
-				<p class="text-muted">اقرأ الدروس بتصميم نظيف ومتسق.</p>
-			</div>
-		</div>
-	</div>
-	<div class="col-12 col-md-4">
-		<div class="card h-100">
-			<div class="card-body">
-				<h5 class="card-title">اختبارات سريعة</h5>
-				<p class="text-muted">أجب على الاختبارات وراجع الإجابات الصحيحة فوراً.</p>
-			</div>
-		</div>
-	</div>
-</div>
+
 {% endblock %}

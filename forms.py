@@ -9,8 +9,8 @@ class RegisterForm(FlaskForm):
         "اسم المستخدم (بالإنجليزية فقط)", 
         validators=[
             DataRequired(), 
-            Length(min=3, max=20),
-            Regexp(r'^[A-Za-z0-9_]+$', message="اسم المستخدم يجب أن يكون بالإنجليزية فقط (حروف/أرقام/_)"),
+            Length(min=3, max=80),
+            Regexp(r'^[A-Za-z0-9_ ]+$', message="اسم المستخدم يجب أن يكون بالإنجليزية فقط (حروف/أرقام/_)"),
         ]
     )
     phone = StringField(
