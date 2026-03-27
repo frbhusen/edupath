@@ -70,7 +70,9 @@
               <th>المستخدم</th>
               <th>الدور</th>
               <th>المواد المخصصة</th>
+              <th>سجل التعديلات</th>
               <th>تحديث المواد</th>
+              <th>حذف الحساب</th>
             </tr>
           </thead>
           <tbody>
@@ -90,6 +92,9 @@
                   {% endif %}
                 </td>
                 <td>
+                  <a class="btn btn-outline-dark btn-sm" href="{{ url_for('admin.staff_activity_logs', user_id=u.id) }}">عرض السجل</a>
+                </td>
+                <td>
                   {% if u.role in ['teacher', 'question_editor'] %}
                     <form method="post" action="{{ url_for('admin.staff_assign_subjects', user_id=u.id) }}" class="d-flex gap-2 align-items-start">
                       <select class="form-select form-select-sm" name="subject_ids" multiple size="4" style="min-width: 220px;">
@@ -102,6 +107,11 @@
                   {% else %}
                     <span class="text-muted small">صلاحية كاملة</span>
                   {% endif %}
+                </td>
+                <td>
+                  <form method="post" action="{{ url_for('admin.delete_user_account', user_id=u.id) }}" onsubmit="return confirm('سيتم حذف الحساب وجميع بياناته المرتبطة نهائياً. هل أنت متأكد؟');">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">حذف نهائي</button>
+                  </form>
                 </td>
               </tr>
             {% endfor %}

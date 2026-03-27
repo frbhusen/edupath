@@ -16,6 +16,7 @@ from .auth import auth_bp
 from .admin import admin_bp
 from .teacher import teacher_bp
 from .student import student_bp
+from .staff_activity import log_staff_activity_from_request
 
 
 def _migrate_legacy_teacher_role_once(app):
@@ -158,6 +159,7 @@ def create_app():
                 app.logger.warning(f"SLOW: {request.method} {request.path} took {elapsed:.3f}s")
             else:
                 app.logger.debug(f"{request.method} {request.path} took {elapsed:.3f}s")
+        log_staff_activity_from_request(response)
         return response
 
     return app

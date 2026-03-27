@@ -109,6 +109,35 @@ class StaffSubjectAccessAudit(Document):
     }
 
 
+class StaffActivityLog(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    staff_user_id = ReferenceField(User, required=True)
+    staff_role = StringField(required=True, max_length=40)
+    endpoint = StringField(required=True, max_length=120)
+    action = StringField(required=True, max_length=120)
+    http_method = StringField(required=True, max_length=10)
+    path = StringField(required=True, max_length=300)
+    target_type = StringField(max_length=80, null=True)
+    target_id = StringField(max_length=80, null=True)
+    details = StringField(max_length=500, null=True)
+    status_code = IntField(required=True, default=200)
+    success = BooleanField(required=True, default=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'staff_activity_logs',
+        'indexes': [
+            'staff_user_id',
+            'staff_role',
+            'endpoint',
+            'http_method',
+            'target_type',
+            'success',
+            'created_at',
+        ]
+    }
+
+
 class Section(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     subject_id = ReferenceField(Subject, required=True)

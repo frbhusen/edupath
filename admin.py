@@ -28,8 +28,10 @@ from .models import (
     SubjectActivationCode,
     StaffSubjectAccess,
     StaffSubjectAccessAudit,
+    StaffActivityLog,
 )
 from .permissions import is_admin
+from .account_cleanup import delete_user_with_related_data
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")
 
@@ -42,7 +44,6 @@ ALLOWED_MODELS = {
     "lesson_resource": LessonResource,
     "test": Test,
     "question": Question,
-    "choice": Choice,
     "attempt": Attempt,
     "attempt_answer": AttemptAnswer,
     "section_activation": SectionActivation,
@@ -110,6 +111,9 @@ def dashboard():
     counts = {}
     for name, model in ALLOWED_MODELS.items():
         try:
+            if not hasattr(model, "objects"):
+                counts[name] = "-"
+                continue
             counts[name] = model.objects().count()
         except Exception:
             counts[name] = "?"
@@ -136,6 +140,36 @@ def staff_accounts():
         subjects=subjects,
         staff_users=staff_users,
         subjects_by_user=by_user,
+    )
+
+
+@admin_bp.route("/staff/<user_id>/logs", methods=["GET"])
+@login_required
+def staff_activity_logs(user_id):
+    admin_required()
+
+    staff_user = User.objects(id=user_id).first() if ObjectId.is_valid(user_id) else None
+    if not staff_user:
+        flash("المستخدم غير موجود.", "error")
+        return redirect(url_for("admin.staff_accounts"))
+
+    role = (staff_user.role or "").lower()
+    if role not in {"admin", "teacher", "question_editor"}:
+        flash("السجل متاح فقط لحسابات الطاقم.", "warning")
+        return redirect(url_for("admin.staff_accounts"))
+
+    action_filter = (request.args.get("action") or "").strip().lower()
+    query = StaffActivityLog.objects(staff_user_id=staff_user.id)
+    if action_filter:
+        query = query.filter(action__icontains=action_filter)
+
+    logs = list(query.order_by("-created_at").limit(300).all())
+
+    return render_template(
+        "admin/staff_activity_logs.html",
+        staff_user=staff_user,
+        logs=logs,
+        action_filter=action_filter,
     )
 
 
@@ -252,6 +286,32 @@ def migrate_legacy_teachers_to_admin():
     return redirect(url_for("admin.staff_accounts"))
 
 
+@admin_bp.route("/users/<user_id>/delete", methods=["POST"])
+@login_required
+def delete_user_account(user_id):
+    admin_required()
+
+    user = User.objects(id=user_id).first() if ObjectId.is_valid(user_id) else None
+    if not user:
+        flash("الحساب غير موجود.", "error")
+        return redirect(url_for("admin.staff_accounts"))
+
+    if str(user.id) == str(current_user.id):
+        flash("لا يمكنك حذف حسابك الحالي.", "error")
+        return redirect(url_for("admin.staff_accounts"))
+
+    role = (user.role or "").lower()
+    if role == "admin":
+        other_admin_exists = User.objects(role="admin", id__ne=user.id).first()
+        if not other_admin_exists:
+            flash("لا يمكن حذف آخر حساب admin.", "error")
+            return redirect(url_for("admin.staff_accounts"))
+
+    delete_user_with_related_data(user)
+    flash("تم حذف الحساب وجميع بياناته المرتبطة.", "success")
+    return redirect(url_for("admin.staff_accounts"))
+
+
 @admin_bp.route("/results")
 @login_required
 def results_manage():
@@ -336,7 +396,7 @@ def delete_custom_result(attempt_id):
 def table_view(table_name):
     admin_required()
     model = ALLOWED_MODELS.get(table_name)
-    if not model:
+    if not model or not hasattr(model, "objects"):
         abort(404)
     rows = model.objects().limit(100).all()
     # Get field names from model
@@ -390,7 +450,7 @@ def table_view(table_name):
 def table_new(table_name):
     admin_required()
     model = ALLOWED_MODELS.get(table_name)
-    if not model:
+    if not model or not hasattr(model, "objects"):
         abort(404)
     if request.method == "POST":
         payload_raw = request.form.get("payload", "{}")
@@ -415,7 +475,7 @@ def table_new(table_name):
 def table_edit(table_name, row_id):
     admin_required()
     model = ALLOWED_MODELS.get(table_name)
-    if not model:
+    if not model or not hasattr(model, "objects"):
         abort(404)
     obj = model.objects(id=ObjectId(row_id)).first()
     if not obj:
@@ -442,7 +502,7 @@ def table_edit(table_name, row_id):
 def table_delete(table_name, row_id):
     admin_required()
     model = ALLOWED_MODELS.get(table_name)
-    if not model:
+    if not model or not hasattr(model, "objects"):
         abort(404)
     obj = model.objects(id=ObjectId(row_id)).first()
     if not obj:

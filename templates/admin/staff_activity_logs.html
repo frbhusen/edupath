@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h2 class="mb-1">سجل تعديلات الطاقم</h2>
+    <p class="text-muted mb-0">{{ staff_user.full_name }} ({{ staff_user.username }}) - {{ staff_user.role }}</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin.staff_accounts') }}">العودة لإدارة الطاقم</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label">فلترة حسب اسم الإجراء</label>
+        <input type="text" class="form-control" name="action" value="{{ action_filter }}" placeholder="مثال: edit_test أو delete_subject">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary" type="submit">تطبيق</button>
+      </div>
+      <div class="col-auto">
+        <a class="btn btn-outline-secondary" href="{{ url_for('admin.staff_activity_logs', user_id=staff_user.id) }}">مسح الفلتر</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">آخر {{ logs|length }} عملية تعديل</h5>
+    {% if logs %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>الوقت</th>
+              <th>الإجراء</th>
+              <th>الهدف</th>
+              <th>النتيجة</th>
+              <th>المسار</th>
+              <th>تفاصيل</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in logs %}
+            <tr>
+              <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '-' }}</td>
+              <td>
+                <div class="fw-semibold">{{ row.action }}</div>
+                <div class="small text-muted">{{ row.http_method }} | {{ row.endpoint }}</div>
+              </td>
+              <td>
+                {% if row.target_type or row.target_id %}
+                  <span class="badge text-bg-light border">{{ row.target_type or 'target' }}</span>
+                  <div class="small text-muted">{{ row.target_id or '-' }}</div>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.success %}
+                  <span class="badge text-bg-success">نجاح ({{ row.status_code }})</span>
+                {% else %}
+                  <span class="badge text-bg-danger">فشل ({{ row.status_code }})</span>
+                {% endif %}
+              </td>
+              <td><span class="small">{{ row.path }}</span></td>
+              <td><span class="small">{{ row.details or '-' }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد تعديلات مسجلة لهذا الحساب بعد.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
