@@ -222,6 +222,20 @@ def dashboard():
         section_ids = [s.id for s in sections]
         lessons = list(Lesson.objects(section_id__in=section_ids).all())
         tests = list(Test.objects(section_id__in=section_ids).all())
+
+        # Bulk count questions per test (MCQ + text) to avoid per-row queries.
+        test_ids = [t.id for t in tests]
+        mcq_counts = {}
+        text_counts = {}
+        if test_ids:
+            for q in Question.objects(test_id__in=test_ids).only("test_id").all():
+                tid = q.test_id.id if q.test_id else None
+                if tid:
+                    mcq_counts[tid] = mcq_counts.get(tid, 0) + 1
+            for tq in TestTextQuestion.objects(test_id__in=test_ids).only("test_id").all():
+                tid = tq.test_id.id if tq.test_id else None
+                if tid:
+                    text_counts[tid] = text_counts.get(tid, 0) + 1
         
         # Group by section
         lessons_by_section = {}
@@ -239,6 +253,7 @@ def dashboard():
             if section_id not in tests_by_section:
                 tests_by_section[section_id] = []
             tests_by_section[section_id].append(test)
+            test._cached_question_count = mcq_counts.get(test.id, 0) + text_counts.get(test.id, 0)
             
             # Also group by lesson if test is linked to lesson
             if test.lesson_id:
