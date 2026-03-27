@@ -73,7 +73,16 @@ class StudentEditForm(FlaskForm):
     username = StringField("اسم المستخدم", validators=[DataRequired(), Length(min=3, max=80)])
     phone = StringField("رقم الهاتف", validators=[DataRequired(), Length(min=7, max=20)])
     password = PasswordField("كلمة مرور جديدة", validators=[Optional(), Length(min=6)])
-    role = SelectField("الدور", choices=[("student", "طالب"), ("teacher", "معلم")], validators=[DataRequired()])
+    role = SelectField(
+        "الدور",
+        choices=[
+            ("student", "طالب"),
+            ("teacher", "معلم"),
+            ("question_editor", "محرر أسئلة"),
+            ("admin", "مشرف"),
+        ],
+        validators=[DataRequired()]
+    )
     submit = SubmitField("حفظ")
 
 

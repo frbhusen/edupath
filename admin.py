@@ -26,7 +26,10 @@ from .models import (
     LessonActivationCode,
     SubjectActivation,
     SubjectActivationCode,
+    StaffSubjectAccess,
+    StaffSubjectAccessAudit,
 )
+from .permissions import is_admin
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")
 
@@ -52,11 +55,9 @@ ALLOWED_MODELS = {
 
 
 def admin_required():
-    # Allow teacher role to access admin editor (admin role disabled for now)
     if not current_user.is_authenticated:
         abort(403)
-    role = (current_user.role or "").lower()
-    if role not in {"teacher", "admin"}:
+    if not is_admin(current_user):
         abort(403)
 
 
@@ -113,6 +114,142 @@ def dashboard():
         except Exception:
             counts[name] = "?"
     return render_template("admin/dashboard.html", counts=counts)
+
+
+@admin_bp.route("/staff", methods=["GET"])
+@login_required
+def staff_accounts():
+    admin_required()
+
+    subjects = list(Subject.objects().order_by("created_at").all())
+    staff_users = list(User.objects(role__in=["admin", "teacher", "question_editor"]).order_by("first_name", "last_name").all())
+
+    access_rows = list(StaffSubjectAccess.objects(active=True, staff_user_id__in=[u.id for u in staff_users]).all()) if staff_users else []
+    by_user = {}
+    for row in access_rows:
+        if not row.staff_user_id or not row.subject_id:
+            continue
+        by_user.setdefault(row.staff_user_id.id, []).append(row.subject_id)
+
+    return render_template(
+        "admin/staff_accounts.html",
+        subjects=subjects,
+        staff_users=staff_users,
+        subjects_by_user=by_user,
+    )
+
+
+@admin_bp.route("/staff/create", methods=["POST"])
+@login_required
+def staff_create_account():
+    admin_required()
+
+    role = (request.form.get("role") or "").strip().lower()
+    if role not in {"admin", "teacher", "question_editor"}:
+        flash("دور غير صالح.", "error")
+        return redirect(url_for("admin.staff_accounts"))
+
+    first_name = (request.form.get("first_name") or "").strip()
+    last_name = (request.form.get("last_name") or "").strip()
+    username = (request.form.get("username") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    password = (request.form.get("password") or "").strip()
+
+    if not all([first_name, last_name, username, phone, password]):
+        flash("يرجى تعبئة جميع الحقول.", "error")
+        return redirect(url_for("admin.staff_accounts"))
+
+    if User.objects(username=username).first() or User.objects(phone=phone).first():
+        flash("اسم المستخدم أو رقم الهاتف مستخدم مسبقاً.", "error")
+        return redirect(url_for("admin.staff_accounts"))
+
+    user = User(
+        first_name=first_name,
+        last_name=last_name,
+        username=username,
+        phone=phone,
+        role=role,
+    )
+    user.set_password(password)
+    user.save()
+
+    flash("تم إنشاء الحساب بنجاح.", "success")
+    return redirect(url_for("admin.staff_accounts"))
+
+
+@admin_bp.route("/staff/<user_id>/subjects", methods=["POST"])
+@login_required
+def staff_assign_subjects(user_id):
+    admin_required()
+
+    staff_user = User.objects(id=user_id).first() if ObjectId.is_valid(user_id) else None
+    if not staff_user:
+        flash("المستخدم غير موجود.", "error")
+        return redirect(url_for("admin.staff_accounts"))
+
+    role = (staff_user.role or "").lower()
+    if role not in {"teacher", "question_editor"}:
+        flash("تخصيص المواد متاح فقط للمعلم أو محرر الأسئلة.", "warning")
+        return redirect(url_for("admin.staff_accounts"))
+
+    selected_ids = [sid for sid in request.form.getlist("subject_ids") if ObjectId.is_valid(sid)]
+    selected_obj_ids = [ObjectId(sid) for sid in selected_ids]
+
+    existing_rows = list(StaffSubjectAccess.objects(staff_user_id=staff_user.id).all())
+    before_ids = [row.subject_id.id for row in existing_rows if row.subject_id and row.active]
+
+    for row in existing_rows:
+        should_be_active = bool(row.subject_id and row.subject_id.id in selected_obj_ids)
+        if row.active != should_be_active:
+            row.active = should_be_active
+            row.updated_at = datetime.utcnow()
+            row.save()
+
+    existing_subject_ids = {row.subject_id.id for row in existing_rows if row.subject_id}
+    for sid in selected_obj_ids:
+        if sid in existing_subject_ids:
+            continue
+        StaffSubjectAccess(
+            staff_user_id=staff_user.id,
+            subject_id=sid,
+            assigned_by=current_user.id,
+            active=True,
+            assigned_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        ).save()
+
+    after_ids = [sid for sid in selected_obj_ids]
+    StaffSubjectAccessAudit(
+        staff_user_id=staff_user.id,
+        changed_by=current_user.id,
+        before_subject_ids=before_ids,
+        after_subject_ids=after_ids,
+        note="admin_subject_assignment_update",
+    ).save()
+
+    flash("تم تحديث المواد المخصصة للمستخدم.", "success")
+    return redirect(url_for("admin.staff_accounts"))
+
+
+@admin_bp.route("/staff/migrate-legacy-teachers", methods=["POST"])
+@login_required
+def migrate_legacy_teachers_to_admin():
+    admin_required()
+
+    legacy_rows = list(User.objects(role="teacher").all())
+    migrated = 0
+    skipped = 0
+    for user in legacy_rows:
+        has_scope = bool(StaffSubjectAccess.objects(staff_user_id=user.id, active=True).first())
+        if has_scope:
+            skipped += 1
+            continue
+        user.role = "admin"
+        user.save()
+        migrated += 1
+
+    flash(f"تم تحويل {migrated} حساباً من teacher إلى admin. تم تخطي {skipped} حسابات لديها تخصيص مواد.", "info")
+    return redirect(url_for("admin.staff_accounts"))
 
 
 @admin_bp.route("/results")

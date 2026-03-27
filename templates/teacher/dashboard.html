@@ -9,11 +9,13 @@
     </p>
   </div>
   <div class="d-flex gap-2">
+    {% if current_user.role == 'admin' %}
     <a
       class="btn btn-outline-light btn-sm"
       href="{{ url_for('teacher.students') }}"
       >الطلاب</a
     >
+    {% endif %}
     <a
       class="btn btn-outline-light btn-sm"
       href="{{ url_for('teacher.results_overview') }}"
@@ -24,24 +26,26 @@
       href="{{ url_for('teacher.assignments_manage') }}"
       >الواجبات</a
     >
-    <a
-      class="btn btn-outline-light btn-sm"
-      href="{{ url_for('teacher.reports_dashboard') }}"
-      >التقارير</a
-    >
-    <a
-      class="btn btn-outline-info btn-sm"
-      href="{{ url_for('teacher.gamification_admin') }}"
-      >إدارة XP</a
-    >
-    <a
-      class="btn btn-outline-warning btn-sm"
-      href="{{ url_for('admin.dashboard') }}"
-      >قاعدة البيانات</a
-    >
-    <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.new_subject') }}"
-      >+ إنشاء مادة</a
-    >
+    {% if current_user.role == 'admin' %}
+      <a
+        class="btn btn-outline-light btn-sm"
+        href="{{ url_for('teacher.reports_dashboard') }}"
+        >التقارير</a
+      >
+      <a
+        class="btn btn-outline-info btn-sm"
+        href="{{ url_for('teacher.gamification_admin') }}"
+        >إدارة XP</a
+      >
+      <a
+        class="btn btn-outline-warning btn-sm"
+        href="{{ url_for('admin.dashboard') }}"
+        >قاعدة البيانات</a
+      >
+      <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.new_subject') }}"
+        >+ إنشاء مادة</a
+      >
+    {% endif %}
   </div>
 </div>
 
@@ -157,7 +161,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        {% for lesson in section._cached_lessons|default(section.lessons, true)|sort(attribute='title')
+                        {% for lesson in section._cached_lessons|default(section.lessons, true)
                         %} {% set locked_by_section = section.requires_code %}
                         <tr>
                           <td class="fw-semibold">{{ lesson.title }}</td>
@@ -231,7 +235,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        {% for test in section._cached_tests|default(section.tests, true)|sort(attribute='title') %}
+                        {% for test in section._cached_tests|default(section.tests, true) %}
                         {% set locked_by_section = section.requires_code %}
                         <tr>
                           <td class="fw-semibold">{{ test.title }}</td>

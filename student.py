@@ -1169,7 +1169,7 @@ def student_duel_maintenance():
 @login_required
 @cache.cached(timeout=60, key_prefix=lambda: f"subjects_{current_user.id}_{current_user.role}")
 def subjects():
-    subs = list(Subject.objects().order_by('-created_at').all())
+    subs = list(Subject.objects().order_by('created_at').all())
     
     # Bulk load sections to avoid N+1 in template
     if subs:
@@ -3338,7 +3338,7 @@ def retake_test_new_questions(attempt_id):
 @student_bp.route("/custom-tests/new", methods=["GET", "POST"])
 @login_required
 def custom_test_new():
-    subjects = list(Subject.objects().order_by('name').all())
+    subjects = list(Subject.objects().order_by('created_at').all())
     selected_subject_id = request.args.get("subject_id") or request.form.get("subject_id")
     if selected_subject_id and not ObjectId.is_valid(str(selected_subject_id)):
         selected_subject_id = None

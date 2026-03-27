@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-3">إدارة حسابات الطاقم</h2>
+<p class="text-muted">إنشاء حسابات admin/teacher/question_editor وتخصيص المواد للمستخدمين المقيدين بالمادة.</p>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">إنشاء حساب طاقم جديد</h5>
+        <form method="post" action="{{ url_for('admin.staff_create_account') }}" class="row g-2">
+          <div class="col-6">
+            <label class="form-label">الاسم الأول</label>
+            <input class="form-control" name="first_name" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">اسم العائلة</label>
+            <input class="form-control" name="last_name" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">اسم المستخدم</label>
+            <input class="form-control" name="username" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">رقم الهاتف</label>
+            <input class="form-control" name="phone" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">كلمة المرور</label>
+            <input class="form-control" type="password" name="password" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">الدور</label>
+            <select class="form-select" name="role" required>
+              <option value="admin">Admin</option>
+              <option value="teacher">Teacher</option>
+              <option value="question_editor">Question Editor</option>
+            </select>
+          </div>
+          <div class="col-12 d-flex justify-content-end">
+            <button class="btn btn-primary" type="submit">إنشاء الحساب</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">تحويل legacy teacher إلى admin</h5>
+        <p class="text-muted small mb-3">استخدم هذا الخيار لمرة أولى فقط بعد تحديث نظام الأدوار. سيتم تحويل حسابات teacher التي لا تملك تخصيص مواد إلى admin.</p>
+        <form method="post" action="{{ url_for('admin.migrate_legacy_teachers_to_admin') }}" onsubmit="return confirm('تأكيد تحويل حسابات legacy teacher إلى admin؟');">
+          <button class="btn btn-outline-warning" type="submit">تشغيل التحويل</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">حسابات الطاقم الحالية</h5>
+    {% if staff_users %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>الاسم</th>
+              <th>المستخدم</th>
+              <th>الدور</th>
+              <th>المواد المخصصة</th>
+              <th>تحديث المواد</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in staff_users %}
+              {% set assigned = subjects_by_user.get(u.id, []) %}
+              <tr>
+                <td>{{ u.full_name }}</td>
+                <td>{{ u.username }}</td>
+                <td>{{ u.role }}</td>
+                <td>
+                  {% if assigned %}
+                    {% for s in assigned %}
+                      <span class="badge text-bg-secondary me-1">{{ s.name }}</span>
+                    {% endfor %}
+                  {% else %}
+                    <span class="text-muted">لا يوجد</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if u.role in ['teacher', 'question_editor'] %}
+                    <form method="post" action="{{ url_for('admin.staff_assign_subjects', user_id=u.id) }}" class="d-flex gap-2 align-items-start">
+                      <select class="form-select form-select-sm" name="subject_ids" multiple size="4" style="min-width: 220px;">
+                        {% for s in subjects %}
+                          <option value="{{ s.id }}" {% if s in assigned %}selected{% endif %}>{{ s.name }}</option>
+                        {% endfor %}
+                      </select>
+                      <button class="btn btn-outline-primary btn-sm" type="submit">حفظ</button>
+                    </form>
+                  {% else %}
+                    <span class="text-muted small">صلاحية كاملة</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد حسابات طاقم حالياً.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

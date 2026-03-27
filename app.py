@@ -18,6 +18,28 @@ from .teacher import teacher_bp
 from .student import student_bp
 
 
+def _migrate_legacy_teacher_role_once(app):
+    """One-time migration for old installs where teacher was the full admin role."""
+    try:
+        from .models import User
+
+        has_modern_admin = bool(User.objects(role__in=["admin", "question_editor"]).first())
+        if has_modern_admin:
+            return
+
+        legacy_rows = list(User.objects(role="teacher").all())
+        if not legacy_rows:
+            return
+
+        for row in legacy_rows:
+            row.role = "admin"
+            row.save()
+
+        app.logger.warning("Migrated %s legacy teacher account(s) to admin role.", len(legacy_rows))
+    except Exception as exc:
+        app.logger.error("Legacy role migration failed: %s", exc)
+
+
 def create_app():
     # Load workspace-level .env for local development before config resolution.
     if load_dotenv:
@@ -32,6 +54,7 @@ def create_app():
         pass
 
     init_mongo(app)
+    _migrate_legacy_teacher_role_once(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
     

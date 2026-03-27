@@ -16,7 +16,7 @@ class User(Document, UserMixin):
     phone = StringField(unique=True, required=True, max_length=10)
     email = StringField(unique=False, sparse=True, null=True, max_length=120)
     password_hash = StringField(required=True, max_length=256)
-    role = StringField(required=True, default="student", choices=['teacher', 'student', 'admin'])
+    role = StringField(required=True, default="student", choices=['admin', 'teacher', 'question_editor', 'student'])
     created_at = DateTimeField(default=datetime.utcnow)
     current_session_token = StringField(max_length=64, null=True)
     
@@ -68,6 +68,45 @@ class Subject(Document):
     @property
     def sections(self):
         return Section.objects(subject_id=self).all()
+
+
+class StaffSubjectAccess(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    staff_user_id = ReferenceField(User, required=True)
+    subject_id = ReferenceField(Subject, required=True)
+    assigned_by = ReferenceField(User, null=True)
+    active = BooleanField(default=True, required=True)
+    assigned_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'staff_subject_access',
+        'indexes': [
+            'staff_user_id',
+            'subject_id',
+            'active',
+            ('staff_user_id', 'subject_id')
+        ]
+    }
+
+
+class StaffSubjectAccessAudit(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    staff_user_id = ReferenceField(User, required=True)
+    changed_by = ReferenceField(User, required=True)
+    before_subject_ids = ListField(ObjectIdField(), default=list)
+    after_subject_ids = ListField(ObjectIdField(), default=list)
+    note = StringField(max_length=240, null=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'staff_subject_access_audit',
+        'indexes': [
+            'staff_user_id',
+            'changed_by',
+            'created_at'
+        ]
+    }
 
 
 class Section(Document):

@@ -26,6 +26,7 @@ from .activation_utils import (
 )
 from .forms import SubjectForm, SectionForm, LessonForm, TestForm, StudentEditForm
 from .extensions import cache
+from .permissions import is_admin, is_question_editor, has_subject_access, get_staff_subject_ids
 
 teacher_bp = Blueprint("teacher", __name__, template_folder="templates")
 
@@ -74,7 +75,7 @@ def _award_certificate_xp_once(student_id, certificate_id, amount: int = 30):
 
 # Role guard decorator
 
-def role_required(role):
+def role_required(*roles):
     def decorator(fn):
         from functools import wraps
         @wraps(fn)
@@ -82,14 +83,110 @@ def role_required(role):
             if not current_user.is_authenticated:
                 flash("ليس لديك صلاحية للوصول إلى هذه الصفحة.", "error")
                 return redirect(url_for("auth.login"))
-            # Allow admins to access teacher routes as well
-            allowed_roles = {role, "admin"}
-            if (current_user.role or "").lower() not in {r.lower() for r in allowed_roles}:
+            allowed_roles = {"admin", *[str(r).lower() for r in roles]}
+            if (current_user.role or "").lower() not in allowed_roles:
                 flash("ليس لديك صلاحية للوصول إلى هذه الصفحة.", "error")
                 return redirect(url_for("auth.login"))
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def _deny_permission():
+    flash("ليس لديك صلاحية للوصول إلى هذه الصفحة.", "error")
+    return redirect(url_for("auth.login"))
+
+
+def _ensure_subject_scope(subject_id):
+    if is_admin(current_user):
+        return None
+    if has_subject_access(current_user, subject_id):
+        return None
+    return _deny_permission()
+
+
+def _ensure_scope_for_section(section):
+    if not section or not section.subject_id:
+        return _deny_permission()
+    return _ensure_subject_scope(section.subject_id.id)
+
+
+def _ensure_scope_for_lesson(lesson):
+    if not lesson or not lesson.section_id:
+        return _deny_permission()
+    return _ensure_scope_for_section(lesson.section_id)
+
+
+def _ensure_scope_for_test(test):
+    if not test or not test.section_id:
+        return _deny_permission()
+    return _ensure_scope_for_section(test.section_id)
+
+
+def _allowed_subject_ids_for_current_user():
+    if is_admin(current_user):
+        return None
+    return set(get_staff_subject_ids(current_user.id))
+
+
+def _subject_allowed_for_current_user(subject_id):
+    allowed = _allowed_subject_ids_for_current_user()
+    if allowed is None:
+        return True
+    if not subject_id:
+        return False
+    return subject_id in allowed
+
+
+def _subject_id_for_lesson(lesson):
+    if not lesson or not lesson.section_id or not lesson.section_id.subject_id:
+        return None
+    return lesson.section_id.subject_id.id
+
+
+def _subject_id_for_section(section):
+    if not section or not section.subject_id:
+        return None
+    return section.subject_id.id
+
+
+def _subject_id_for_test(test):
+    if not test or not test.section_id or not test.section_id.subject_id:
+        return None
+    return test.section_id.subject_id.id
+
+
+def _subject_id_for_assignment(assignment):
+    if not assignment:
+        return None
+    if assignment.subject_id:
+        return assignment.subject_id.id
+    if assignment.section_id and assignment.section_id.subject_id:
+        return assignment.section_id.subject_id.id
+    if assignment.lesson_id and assignment.lesson_id.section_id and assignment.lesson_id.section_id.subject_id:
+        return assignment.lesson_id.section_id.subject_id.id
+    return None
+
+
+def _custom_attempt_subject_id(custom_attempt):
+    if not custom_attempt:
+        return None
+
+    question_ids = []
+    try:
+        payload = json.loads(custom_attempt.selections_json or "[]")
+        if isinstance(payload, list):
+            question_ids = [qid for qid in payload if ObjectId.is_valid(str(qid))]
+    except Exception:
+        question_ids = []
+
+    if not question_ids:
+        return None
+
+    question = Question.objects(id=ObjectId(str(question_ids[0]))).first()
+    if not question or not question.test_id:
+        return None
+    return _subject_id_for_test(question.test_id)
 
 @teacher_bp.route("/dashboard")
 @login_required
@@ -100,7 +197,11 @@ def dashboard():
     page = request.args.get('page', 1, type=int)
     per_page = 10
     
-    subjects_query = Subject.objects().order_by('-created_at')
+    if is_admin(current_user):
+        subjects_query = Subject.objects().order_by('created_at')
+    else:
+        allowed_ids = [s.id for s in Subject.objects().only('id').all() if has_subject_access(current_user, s.id)]
+        subjects_query = Subject.objects(id__in=allowed_ids).order_by('created_at')
     total_subjects = subjects_query.count()
     subjects = list(subjects_query.skip((page - 1) * per_page).limit(per_page))
     
@@ -175,9 +276,26 @@ def dashboard():
 # Redirect teacher base to dashboard for Up navigation
 @teacher_bp.route("/")
 @login_required
-@role_required("teacher")
+@role_required("teacher", "question_editor")
 def root():
+    if is_question_editor(current_user):
+        return redirect(url_for("teacher.question_editor_dashboard"))
     return redirect(url_for("teacher.dashboard"))
+
+
+@teacher_bp.route("/question-editor", methods=["GET"])
+@login_required
+@role_required("question_editor", "admin")
+def question_editor_dashboard():
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
+
+    tests_q = Test.objects()
+    if allowed_subject_ids is not None:
+        allowed_sections = [s.id for s in Section.objects(subject_id__in=list(allowed_subject_ids)).only("id").all()]
+        tests_q = tests_q.filter(section_id__in=allowed_sections)
+
+    tests = list(tests_q.order_by("created_at").all())
+    return render_template("teacher/question_editor_dashboard.html", tests=tests)
 
 
 @teacher_bp.route("/results")
@@ -190,12 +308,17 @@ def results_overview():
 
     regular_attempts = list(Attempt.objects().all())
     custom_attempts = list(CustomTestAttempt.objects(status="submitted").all())
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
 
     # Merge both regular and custom attempts for the management overview.
     attempts = []
     for attempt in regular_attempts:
         try:
             _ = attempt.student_id.id
+            if allowed_subject_ids is not None:
+                sid = _subject_id_for_test(attempt.test_id)
+                if sid not in allowed_subject_ids:
+                    continue
             attempt._result_type = "regular"
             attempt._taken_at = attempt.started_at
             attempts.append(attempt)
@@ -205,6 +328,10 @@ def results_overview():
     for attempt in custom_attempts:
         try:
             _ = attempt.student_id.id
+            if allowed_subject_ids is not None:
+                sid = _custom_attempt_subject_id(attempt)
+                if sid not in allowed_subject_ids:
+                    continue
             attempt._result_type = "custom"
             attempt._taken_at = attempt.created_at
             attempts.append(attempt)
@@ -245,14 +372,23 @@ def student_results(student_id):
     custom_attempts = list(
         CustomTestAttempt.objects(student_id=student.id, status="submitted").all()
     )
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
 
     attempts = []
     for attempt in regular_attempts:
+        if allowed_subject_ids is not None:
+            sid = _subject_id_for_test(attempt.test_id)
+            if sid not in allowed_subject_ids:
+                continue
         attempt._result_type = "regular"
         attempt._taken_at = attempt.started_at
         attempts.append(attempt)
 
     for attempt in custom_attempts:
+        if allowed_subject_ids is not None:
+            sid = _custom_attempt_subject_id(attempt)
+            if sid not in allowed_subject_ids:
+                continue
         attempt._result_type = "custom"
         attempt._taken_at = attempt.created_at
         attempts.append(attempt)
@@ -283,6 +419,8 @@ def manage_attempt(attempt_id):
     attempt = Attempt.objects(id=attempt_id).first()
     if not attempt:
         raise NotFound()
+    if not _subject_allowed_for_current_user(_subject_id_for_test(attempt.test_id)):
+        return _deny_permission()
     student = attempt.student_id
     test = attempt.test_id
     questions = Question.objects(test_id=test.id).all()
@@ -369,6 +507,8 @@ def delete_custom_attempt(attempt_id):
     if not attempt:
         flash("محاولة الاختبار المخصص غير موجودة.", "error")
         return redirect(url_for("teacher.results_overview"))
+    if not _subject_allowed_for_current_user(_custom_attempt_subject_id(attempt)):
+        return _deny_permission()
 
     CustomTestAnswer.objects(attempt_id=attempt.id).delete()
     attempt.delete()
@@ -382,7 +522,7 @@ def delete_custom_attempt(attempt_id):
 
 @teacher_bp.route("/students", methods=["GET"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def students():
     students = User.objects(role="student").order_by('-created_at').all()
     return render_template("teacher/students.html", students=students)
@@ -390,7 +530,7 @@ def students():
 
 @teacher_bp.route("/students/<student_id>/delete", methods=["POST"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def delete_student(student_id):
     student = User.objects(id=student_id, role="student").first() if ObjectId.is_valid(student_id) else None
     if not student:
@@ -468,6 +608,8 @@ def delete_student(student_id):
 @login_required
 @role_required("teacher")
 def discussions_manage():
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
+
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
 
@@ -475,6 +617,8 @@ def discussions_manage():
             question_id = (request.form.get("question_id") or "").strip()
             body = (request.form.get("body") or "").strip()
             question = DiscussionQuestion.objects(id=question_id).first() if ObjectId.is_valid(question_id) else None
+            if question and not _subject_allowed_for_current_user(_subject_id_for_lesson(question.lesson_id)):
+                return _deny_permission()
             if not question or not body:
                 flash("تعذر إضافة الرد. تأكد من صحة البيانات.", "error")
                 return redirect(url_for("teacher.discussions_manage"))
@@ -490,6 +634,8 @@ def discussions_manage():
         if action == "toggle_pin":
             question_id = (request.form.get("question_id") or "").strip()
             question = DiscussionQuestion.objects(id=question_id).first() if ObjectId.is_valid(question_id) else None
+            if question and not _subject_allowed_for_current_user(_subject_id_for_lesson(question.lesson_id)):
+                return _deny_permission()
             if question:
                 question.is_pinned = not bool(getattr(question, "is_pinned", False))
                 question.save()
@@ -499,6 +645,8 @@ def discussions_manage():
         if action == "toggle_resolved":
             question_id = (request.form.get("question_id") or "").strip()
             question = DiscussionQuestion.objects(id=question_id).first() if ObjectId.is_valid(question_id) else None
+            if question and not _subject_allowed_for_current_user(_subject_id_for_lesson(question.lesson_id)):
+                return _deny_permission()
             if question:
                 question.is_resolved = not bool(question.is_resolved)
                 question.save()
@@ -508,6 +656,8 @@ def discussions_manage():
         if action == "delete_question":
             question_id = (request.form.get("question_id") or "").strip()
             question = DiscussionQuestion.objects(id=question_id).first() if ObjectId.is_valid(question_id) else None
+            if question and not _subject_allowed_for_current_user(_subject_id_for_lesson(question.lesson_id)):
+                return _deny_permission()
             if question:
                 DiscussionAnswer.objects(question_id=question.id).delete()
                 question.delete()
@@ -517,6 +667,8 @@ def discussions_manage():
         if action == "delete_answer":
             answer_id = (request.form.get("answer_id") or "").strip()
             answer = DiscussionAnswer.objects(id=answer_id).first() if ObjectId.is_valid(answer_id) else None
+            if answer and answer.question_id and not _subject_allowed_for_current_user(_subject_id_for_lesson(answer.question_id.lesson_id)):
+                return _deny_permission()
             if answer:
                 answer.delete()
                 flash("تم حذف الرد.", "success")
@@ -524,8 +676,16 @@ def discussions_manage():
 
     lesson_id = (request.args.get("lesson_id") or "").strip()
     questions_q = DiscussionQuestion.objects()
+    if allowed_subject_ids is not None:
+        allowed_sections = [s.id for s in Section.objects(subject_id__in=list(allowed_subject_ids)).only("id").all()]
+        allowed_lessons = [l.id for l in Lesson.objects(section_id__in=allowed_sections).only("id").all()] if allowed_sections else []
+        questions_q = questions_q.filter(lesson_id__in=allowed_lessons)
     if lesson_id and ObjectId.is_valid(lesson_id):
-        questions_q = questions_q.filter(lesson_id=ObjectId(lesson_id))
+        lesson_obj = Lesson.objects(id=ObjectId(lesson_id)).first()
+        if lesson_obj and _subject_allowed_for_current_user(_subject_id_for_lesson(lesson_obj)):
+            questions_q = questions_q.filter(lesson_id=ObjectId(lesson_id))
+        else:
+            questions_q = questions_q.filter(id=None)
 
     questions = list(questions_q.order_by("-is_pinned", "is_resolved", "-created_at").all())
     answers = list(DiscussionAnswer.objects(question_id__in=[q.id for q in questions]).order_by("created_at").all()) if questions else []
@@ -549,7 +709,11 @@ def discussions_manage():
     users_by_id = {u.id: u for u in User.objects(id__in=list(user_ids)).all()} if user_ids else {}
     lessons = list(Lesson.objects(id__in=list(lesson_ids)).all()) if lesson_ids else []
     lessons_by_id = {l.id: l for l in lessons}
-    all_lessons = list(Lesson.objects().order_by("title").all())
+    all_lessons_q = Lesson.objects()
+    if allowed_subject_ids is not None:
+        allowed_sections = [s.id for s in Section.objects(subject_id__in=list(allowed_subject_ids)).only("id").all()]
+        all_lessons_q = all_lessons_q.filter(section_id__in=allowed_sections)
+    all_lessons = list(all_lessons_q.order_by("created_at").all())
 
     return render_template(
         "teacher/discussions_manage.html",
@@ -566,12 +730,16 @@ def discussions_manage():
 @login_required
 @role_required("teacher")
 def certificates_manage():
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
+
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
 
         if action == "delete":
             certificate_id = (request.form.get("certificate_id") or "").strip()
             cert = Certificate.objects(id=certificate_id).first() if ObjectId.is_valid(certificate_id) else None
+            if cert and not _subject_allowed_for_current_user(_subject_id_for_lesson(cert.lesson_id)):
+                return _deny_permission()
             if cert:
                 cert.delete()
                 flash("تم حذف الشهادة.", "success")
@@ -583,6 +751,8 @@ def certificates_manage():
             certificate_url = (request.form.get("certificate_url") or "").strip()
             student = User.objects(id=student_id, role="student").first() if ObjectId.is_valid(student_id) else None
             lesson = Lesson.objects(id=lesson_id).first() if ObjectId.is_valid(lesson_id) else None
+            if lesson and not _subject_allowed_for_current_user(_subject_id_for_lesson(lesson)):
+                return _deny_permission()
             if not student or not lesson:
                 flash("بيانات الطالب أو الدرس غير صحيحة.", "error")
                 return redirect(url_for("teacher.certificates_manage"))
@@ -610,13 +780,22 @@ def certificates_manage():
             return redirect(url_for("teacher.certificates_manage"))
 
     certificates = list(Certificate.objects().order_by("-issued_at").all())
+    if allowed_subject_ids is not None:
+        certificates = [
+            c for c in certificates
+            if _subject_id_for_lesson(c.lesson_id) in allowed_subject_ids
+        ]
     student_ids = [c.student_id.id for c in certificates if c.student_id]
     lesson_ids = [c.lesson_id.id for c in certificates if c.lesson_id]
     students_map = {u.id: u for u in User.objects(id__in=student_ids).all()} if student_ids else {}
     lessons_map = {l.id: l for l in Lesson.objects(id__in=lesson_ids).all()} if lesson_ids else {}
 
     all_students = list(User.objects(role="student").order_by("first_name", "last_name").all())
-    all_lessons = list(Lesson.objects().order_by("title").all())
+    all_lessons_q = Lesson.objects()
+    if allowed_subject_ids is not None:
+        allowed_sections = [s.id for s in Section.objects(subject_id__in=list(allowed_subject_ids)).only("id").all()]
+        all_lessons_q = all_lessons_q.filter(section_id__in=allowed_sections)
+    all_lessons = list(all_lessons_q.order_by("created_at").all())
 
     return render_template(
         "teacher/certificates_manage.html",
@@ -635,6 +814,8 @@ def download_certificate_teacher(certificate_id):
     cert = Certificate.objects(id=certificate_id).first() if ObjectId.is_valid(certificate_id) else None
     if not cert:
         raise NotFound()
+    if not _subject_allowed_for_current_user(_subject_id_for_lesson(cert.lesson_id)):
+        return _deny_permission()
     cert_url = (getattr(cert, "certificate_url", "") or "").strip()
     if not cert_url:
         flash("لا يوجد رابط شهادة لهذا السجل.", "error")
@@ -646,10 +827,14 @@ def download_certificate_teacher(certificate_id):
 @login_required
 @role_required("teacher")
 def certificates_verification():
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
+
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
         certificate_id = (request.form.get("certificate_id") or "").strip()
         cert = Certificate.objects(id=certificate_id).first() if ObjectId.is_valid(certificate_id) else None
+        if cert and not _subject_allowed_for_current_user(_subject_id_for_lesson(cert.lesson_id)):
+            return _deny_permission()
         if not cert:
             flash("الشهادة غير موجودة.", "error")
             return redirect(url_for("teacher.certificates_verification"))
@@ -678,6 +863,11 @@ def certificates_verification():
             return redirect(url_for("teacher.certificates_verification"))
 
     certificates = list(Certificate.objects().order_by("-issued_at").all())
+    if allowed_subject_ids is not None:
+        certificates = [
+            c for c in certificates
+            if _subject_id_for_lesson(c.lesson_id) in allowed_subject_ids
+        ]
     student_ids = [c.student_id.id for c in certificates if c.student_id]
     lesson_ids = [c.lesson_id.id for c in certificates if c.lesson_id]
     verifier_ids = [c.verified_by.id for c in certificates if getattr(c, "verified_by", None)]
@@ -699,6 +889,8 @@ def certificates_verification():
 @login_required
 @role_required("teacher")
 def assignments_manage():
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
+
     if request.method == "POST":
         action = (request.form.get("action") or "create").strip()
         if action == "create":
@@ -737,14 +929,20 @@ def assignments_manage():
             if subject_id and ObjectId.is_valid(subject_id):
                 subject = Subject.objects(id=subject_id).first()
                 if subject:
+                    if not _subject_allowed_for_current_user(subject.id):
+                        return _deny_permission()
                     assignment.subject_id = subject.id
             if section_id and ObjectId.is_valid(section_id):
                 section = Section.objects(id=section_id).first()
                 if section:
+                    if not _subject_allowed_for_current_user(_subject_id_for_section(section)):
+                        return _deny_permission()
                     assignment.section_id = section.id
             if lesson_id and ObjectId.is_valid(lesson_id):
                 lesson = Lesson.objects(id=lesson_id).first()
                 if lesson:
+                    if not _subject_allowed_for_current_user(_subject_id_for_lesson(lesson)):
+                        return _deny_permission()
                     assignment.lesson_id = lesson.id
 
             assignment.save()
@@ -813,6 +1011,12 @@ def assignments_manage():
             total_score = 0
             if question_ids:
                 total_score += len(question_ids)
+                first_question = Question.objects(id=ObjectId(str(question_ids[0]))).first()
+                if first_question and first_question.test_id:
+                    sid = _subject_id_for_test(first_question.test_id)
+                    if not _subject_allowed_for_current_user(sid):
+                        return _deny_permission()
+                    assignment.subject_id = sid
             total_score += sum(int(i.get("max_score", 0) or 0) for i in written_items)
             assignment.max_score = total_score
             assignment.save()
@@ -823,6 +1027,8 @@ def assignments_manage():
         if action == "toggle_active":
             assignment_id = request.form.get("assignment_id")
             assignment = Assignment.objects(id=assignment_id).first()
+            if assignment and not _subject_allowed_for_current_user(_subject_id_for_assignment(assignment)):
+                return _deny_permission()
             if assignment:
                 assignment.is_active = not assignment.is_active
                 assignment.save()
@@ -832,6 +1038,8 @@ def assignments_manage():
         if action == "delete":
             assignment_id = request.form.get("assignment_id")
             assignment = Assignment.objects(id=assignment_id).first()
+            if assignment and not _subject_allowed_for_current_user(_subject_id_for_assignment(assignment)):
+                return _deny_permission()
             if assignment:
                 AssignmentSubmission.objects(assignment_id=assignment.id).delete()
                 AssignmentAttempt.objects(assignment_id=assignment.id).delete()
@@ -840,6 +1048,11 @@ def assignments_manage():
             return redirect(url_for("teacher.assignments_manage"))
 
     assignments = list(Assignment.objects().order_by("-created_at").all())
+    if allowed_subject_ids is not None:
+        assignments = [
+            a for a in assignments
+            if _subject_id_for_assignment(a) in allowed_subject_ids
+        ]
     submissions = AssignmentSubmission.objects(assignment_id__in=[a.id for a in assignments]).all() if assignments else []
     attempts = AssignmentAttempt.objects(assignment_id__in=[a.id for a in assignments]).all() if assignments else []
     submissions_by_assignment = {}
@@ -857,9 +1070,18 @@ def assignments_manage():
         attempts_by_assignment.setdefault(aid, []).append(attempt)
 
     students = list(User.objects(role="student").order_by("username").all())
-    subjects = list(Subject.objects().order_by("name").all())
-    sections = list(Section.objects().order_by("title").all())
-    lessons = list(Lesson.objects().order_by("title").all())
+    subjects_q = Subject.objects()
+    sections_q = Section.objects()
+    lessons_q = Lesson.objects()
+    if allowed_subject_ids is not None:
+        subjects_q = subjects_q.filter(id__in=list(allowed_subject_ids))
+        sections_q = sections_q.filter(subject_id__in=list(allowed_subject_ids))
+        allowed_section_ids = [s.id for s in sections_q.only("id").all()]
+        lessons_q = lessons_q.filter(section_id__in=allowed_section_ids)
+
+    subjects = list(subjects_q.order_by("created_at").all())
+    sections = list(sections_q.order_by("created_at").all())
+    lessons = list(lessons_q.order_by("created_at").all())
 
     selected_custom_lesson_id = (request.args.get("custom_lesson_id") or "").strip()
     questions_page = max(1, int(request.args.get("questions_page", 1) or 1))
@@ -877,6 +1099,8 @@ def assignments_manage():
 
     if selected_custom_lesson_id and ObjectId.is_valid(selected_custom_lesson_id):
         selected_custom_lesson = Lesson.objects(id=selected_custom_lesson_id).first()
+        if selected_custom_lesson and not _subject_allowed_for_current_user(_subject_id_for_lesson(selected_custom_lesson)):
+            selected_custom_lesson = None
         if selected_custom_lesson:
             lesson_test_ids = [t.id for t in Test.objects(lesson_id=selected_custom_lesson.id).only("id").all()]
             if lesson_test_ids:
@@ -919,6 +1143,8 @@ def assignment_submissions(assignment_id):
     assignment = Assignment.objects(id=assignment_id).first()
     if not assignment:
         raise NotFound()
+    if not _subject_allowed_for_current_user(_subject_id_for_assignment(assignment)):
+        return _deny_permission()
 
     attempts = list(AssignmentAttempt.objects(assignment_id=assignment.id).order_by("-submitted_at").all())
     return render_template("teacher/assignment_submissions.html", assignment=assignment, attempts=attempts)
@@ -931,6 +1157,8 @@ def assignment_questions(assignment_id):
     assignment = Assignment.objects(id=assignment_id, assignment_mode="custom_test").first()
     if not assignment:
         raise NotFound()
+    if not _subject_allowed_for_current_user(_subject_id_for_assignment(assignment)):
+        return _deny_permission()
 
     question_ids = []
     if assignment.selected_question_ids_json:
@@ -970,6 +1198,8 @@ def grade_assignment_attempt(attempt_id):
     assignment = attempt.assignment_id
     if not assignment:
         raise NotFound()
+    if not _subject_allowed_for_current_user(_subject_id_for_assignment(assignment)):
+        return _deny_permission()
 
     question_ids = []
     if assignment.selected_question_ids_json:
@@ -1192,7 +1422,7 @@ def _collect_report_data(filter_student=None):
 
 @teacher_bp.route("/reports", methods=["GET"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def reports_dashboard():
     student_id = (request.args.get("student_id") or "").strip()
     students = list(User.objects(role="student").order_by("username").all())
@@ -1212,7 +1442,7 @@ def reports_dashboard():
 
 @teacher_bp.route("/reports/download", methods=["GET"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def reports_download_pdf():
     if FPDF is None:
         flash("مكتبة PDF غير متوفرة. ثبت fpdf2 أولاً.", "error")
@@ -1324,7 +1554,7 @@ def reports_download_pdf():
 
 @teacher_bp.route("/analytics", methods=["GET"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def analytics_dashboard():
     attempts = list(Attempt.objects().only("test_id", "student_id", "score", "total", "submitted_at").all())
     lessons_completed = LessonCompletion.objects.count()
@@ -1431,7 +1661,7 @@ def analytics_dashboard():
 
 @teacher_bp.route("/study-plans", methods=["GET", "POST"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def study_plans_manage():
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
@@ -1522,8 +1752,8 @@ def study_plans_manage():
             return redirect(url_for("teacher.study_plans_manage"))
 
     students = list(User.objects(role="student").order_by("username").all())
-    lessons = list(Lesson.objects().order_by("title").all())
-    tests = list(Test.objects().order_by("title").all())
+    lessons = list(Lesson.objects().order_by("created_at").all())
+    tests = list(Test.objects().order_by("created_at").all())
 
     plans = list(StudyPlan.objects().order_by("-created_at").all())
     items = StudyPlanItem.objects(plan_id__in=[p.id for p in plans]).all() if plans else []
@@ -1590,7 +1820,7 @@ def _apply_xp_delta(profile, delta, actor_label):
 
 @teacher_bp.route("/gamification", methods=["GET", "POST"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def gamification_admin():
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
@@ -1661,7 +1891,7 @@ def gamification_admin():
             return redirect(url_for("teacher.gamification_admin"))
 
     ranked_students = _rebuild_ranked_students()
-    lessons = list(Lesson.objects().order_by("-created_at").all())
+    lessons = list(Lesson.objects().order_by("created_at").all())
     return render_template(
         "teacher/gamification_manage.html",
         ranked_students=ranked_students,
@@ -1671,7 +1901,7 @@ def gamification_admin():
 
 @teacher_bp.route("/students/<user_id>/edit", methods=["GET", "POST"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def edit_student(user_id):
     student = User.objects(id=user_id).first()
     if not student:
@@ -1698,6 +1928,9 @@ def manage_subject_access(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:
         raise NotFound()
+    scope_response = _ensure_subject_scope(subject.id)
+    if scope_response:
+        return scope_response
     
     if request.method == "POST":
         action = request.form.get("action")
@@ -1801,6 +2034,9 @@ def manage_section_access(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
         raise NotFound()
+    scope_response = _ensure_scope_for_section(section)
+    if scope_response:
+        return scope_response
     
     if request.method == "POST":
         action = request.form.get("action")
@@ -1902,6 +2138,9 @@ def manage_lesson_access(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         raise NotFound()
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response:
+        return scope_response
     section = lesson.section_id
     
     if request.method == "POST":
@@ -1996,7 +2235,7 @@ def manage_lesson_access(lesson_id):
 
 @teacher_bp.route("/subjects/new", methods=["GET", "POST"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def new_subject():
     form = SubjectForm()
     if form.validate_on_submit():
@@ -2021,6 +2260,9 @@ def subject_detail(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:
         raise NotFound()
+    scope_response = _ensure_subject_scope(subject.id)
+    if scope_response:
+        return scope_response
     sections = Section.objects(subject_id=subject.id).all()
     return render_template("teacher/subject_detail.html", subject=subject, sections=sections)
 
@@ -2032,6 +2274,9 @@ def edit_subject(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:
         raise NotFound()
+    scope_response = _ensure_subject_scope(subject.id)
+    if scope_response:
+        return scope_response
     form = SubjectForm()
     if form.validate_on_submit():
         subject.name = form.name.data
@@ -2054,6 +2299,9 @@ def delete_subject(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:
         raise NotFound()
+    scope_response = _ensure_subject_scope(subject.id)
+    if scope_response:
+        return scope_response
     subject.delete()
     flash("تم حذف المادة بنجاح.", "success")
     return redirect(url_for("teacher.dashboard"))
@@ -2068,6 +2316,9 @@ def new_section(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:
         raise NotFound()
+    scope_response = _ensure_subject_scope(subject.id)
+    if scope_response:
+        return scope_response
     form = SectionForm()
     if form.validate_on_submit():
         section = Section(
@@ -2089,6 +2340,9 @@ def section_detail(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
         raise NotFound()
+    scope_response = _ensure_scope_for_section(section)
+    if scope_response:
+        return scope_response
     lessons = Lesson.objects(section_id=section.id).all()
     tests = Test.objects(section_id=section.id, lesson_id=None).all()  # section-wide tests
     return render_template("teacher/section_detail.html", section=section, lessons=lessons, tests=tests)
@@ -2101,6 +2355,9 @@ def edit_section(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
         raise NotFound()
+    scope_response = _ensure_scope_for_section(section)
+    if scope_response:
+        return scope_response
     subject = section.subject_id
     form = SectionForm()
     if form.validate_on_submit():
@@ -2124,6 +2381,9 @@ def delete_section(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
         raise NotFound()
+    scope_response = _ensure_scope_for_section(section)
+    if scope_response:
+        return scope_response
     subject_id = section.subject_id
     section.delete()
     flash("تم حذف القسم بنجاح.", "success")
@@ -2139,6 +2399,9 @@ def new_lesson(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
         raise NotFound()
+    scope_response = _ensure_scope_for_section(section)
+    if scope_response:
+        return scope_response
     form = LessonForm()
     if form.validate_on_submit():
         resource_labels = request.form.getlist("resource_label[]")
@@ -2186,6 +2449,9 @@ def lesson_detail(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         raise NotFound()
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response:
+        return scope_response
     return redirect(url_for("teacher.edit_lesson", lesson_id=lesson.id))
 
 
@@ -2196,6 +2462,9 @@ def edit_lesson(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         raise NotFound()
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response:
+        return scope_response
     form = LessonForm()
     if form.validate_on_submit():
         resource_labels = request.form.getlist("resource_label[]")
@@ -2247,6 +2516,9 @@ def delete_lesson(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         raise NotFound()
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response:
+        return scope_response
     section_id = lesson.section_id.id if lesson.section_id else None
     lesson.delete()
     flash("تم حذف الدرس بنجاح.", "success")
@@ -2260,6 +2532,9 @@ def new_lesson_resource(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         raise NotFound()
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response:
+        return scope_response
     
     if request.method == "POST":
         label = request.form.get("label")
@@ -2291,6 +2566,10 @@ def delete_lesson_resource(resource_id):
     resource = LessonResource.objects(id=resource_id).first()
     if not resource:
         raise NotFound()
+    lesson = resource.lesson_id
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response:
+        return scope_response
     lesson_id = resource.lesson_id
     resource.delete()
     flash("تم حذف المورد بنجاح.", "success")
@@ -2306,6 +2585,9 @@ def new_test(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
         raise NotFound()
+    scope_response = _ensure_scope_for_section(section)
+    if scope_response:
+        return scope_response
     form = TestForm()
     
     # Populate lesson choices for dropdown
@@ -2333,12 +2615,15 @@ def new_test(section_id):
 
 @teacher_bp.route("/tests/<test_id>")
 @login_required
-@role_required("teacher")
-@cache.cached(timeout=30, key_prefix=lambda: f"test_detail_{test_id}")
+@role_required("teacher", "question_editor")
+@cache.cached(timeout=30, key_prefix=lambda: f"test_detail_{request.view_args.get('test_id', '')}")
 def test_detail(test_id):
     test = Test.objects(id=test_id).first()
     if not test:
         raise NotFound()
+    scope_response = _ensure_scope_for_test(test)
+    if scope_response:
+        return scope_response
     questions = list(Question.objects(test_id=test.id).order_by('created_at').all())
     text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
     return render_template("teacher/test_detail.html", test=test, questions=questions, text_questions=text_questions)
@@ -2346,11 +2631,23 @@ def test_detail(test_id):
 
 @teacher_bp.route("/tests/<test_id>/edit", methods=["GET", "POST"])
 @login_required
-@role_required("teacher")
+@role_required("teacher", "question_editor")
 def edit_test(test_id):
     test = Test.objects(id=test_id).first()
     if not test:
         raise NotFound()
+    scope_response = _ensure_scope_for_test(test)
+    if scope_response:
+        return scope_response
+
+    question_editor_allowed_forms = {
+        "upsert_question",
+        "delete_question",
+        "batch_delete_questions",
+        "upsert_text_question",
+        "delete_text_question",
+        "import_json",
+    }
     
     section = test.section_id
     form = TestForm()
@@ -2362,6 +2659,10 @@ def edit_test(test_id):
     
     if request.method == "POST":
         form_name = request.form.get("form_name")
+
+        if is_question_editor(current_user) and form_name not in question_editor_allowed_forms:
+            flash("ليس لديك صلاحية لتنفيذ هذا الإجراء.", "error")
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
 
         if form_name == "update_test":
             if form.validate_on_submit():
@@ -2693,6 +2994,9 @@ def delete_test(test_id):
     test = Test.objects(id=test_id).first()
     if not test:
         raise NotFound()
+    scope_response = _ensure_scope_for_test(test)
+    if scope_response:
+        return scope_response
     section_id = test.section_id.id if test.section_id else None
     lesson_id = test.lesson_id.id if test.lesson_id else None
     test.delete()
@@ -2704,11 +3008,14 @@ def delete_test(test_id):
 
 @teacher_bp.route("/questions/<question_id>/delete", methods=["POST"])
 @login_required
-@role_required("teacher")
+@role_required("teacher", "question_editor")
 def delete_question(question_id):
     question = Question.objects(id=question_id).first()
     if not question:
         raise NotFound()
+    scope_response = _ensure_scope_for_test(question.test_id)
+    if scope_response:
+        return scope_response
     test_id = str(question.test_id.id)
     question.delete()
     cache.delete(f"test_detail_{test_id}")  # Clear test detail cache

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">لوحة محرر الأسئلة</h1>
+    <p class="mb-0">يمكنك تعديل أسئلة الاختبارات داخل المواد المخصصة لك فقط.</p>
+  </div>
+</div>
+
+{% if tests %}
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>الاختبار</th>
+              <th>القسم</th>
+              <th>الدرس</th>
+              <th class="text-end">الإجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for test in tests %}
+              <tr>
+                <td class="fw-semibold">{{ test.title }}</td>
+                <td>{{ test.section_id.title if test.section_id else '-' }}</td>
+                <td>{{ test.lesson_id.title if test.lesson_id else 'اختبار شامل' }}</td>
+                <td class="text-end">
+                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.edit_test', test_id=test.id) }}">تعديل الأسئلة</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-info mb-0">لا توجد اختبارات متاحة ضمن المواد المخصصة لك.</div>
+{% endif %}
+{% endblock %}
