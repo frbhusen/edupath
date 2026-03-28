@@ -20,12 +20,71 @@ _TARGET_ID_KEYS = (
     "attempt_id",
     "certificate_id",
 )
+_SENSITIVE_KEYS = {
+    "password",
+    "password_hash",
+    "current_session_token",
+    "csrf_token",
+}
+_IGNORED_KEYS = {
+    "action",
+    "submit",
+    "next",
+}
 
 
 def _safe_str(value, max_len: int = 300) -> str:
     if value is None:
         return ""
     return str(value)[:max_len]
+
+
+def _format_value(value: str) -> str:
+    compact = " ".join((value or "").split())
+    if len(compact) > 70:
+        compact = compact[:67] + "..."
+    return compact
+
+
+def _form_changes_summary() -> str:
+    if not request.form:
+        return ""
+
+    parts = []
+    for key in request.form.keys():
+        key_l = key.lower()
+        if key_l in _SENSITIVE_KEYS or key_l in _IGNORED_KEYS:
+            continue
+
+        values = [v for v in request.form.getlist(key) if v not in (None, "")]
+        if not values:
+            continue
+
+        if len(values) == 1:
+            parts.append(f"{key} -> {_format_value(values[0])}")
+        else:
+            compact_values = ", ".join(_format_value(v) for v in values[:4])
+            if len(values) > 4:
+                compact_values += f", +{len(values) - 4} more"
+            parts.append(f"{key} -> [{compact_values}]")
+
+    if not parts:
+        return ""
+    summary = " | ".join(parts)
+    return _safe_str(summary, 500)
+
+
+def _build_details(endpoint: str, target_type: str | None, target_id: str | None) -> str:
+    summary = _form_changes_summary()
+    if summary:
+        return summary
+
+    action_name = endpoint.split(".", 1)[-1] if "." in endpoint else endpoint
+    if "delete" in action_name and target_type and target_id:
+        return _safe_str(f"deleted {target_type} id={target_id}", 500)
+    if target_type and target_id:
+        return _safe_str(f"updated {target_type} id={target_id}", 500)
+    return "-"
 
 
 def _extract_target(view_args: dict | None) -> tuple[str | None, str | None]:
@@ -60,8 +119,7 @@ def log_staff_activity_from_request(response) -> None:
 
         target_type, target_id = _extract_target(getattr(request, "view_args", None))
         action_name = endpoint.split(".", 1)[-1] if "." in endpoint else endpoint
-        form_action = (request.form.get("action") or "").strip() if request.form else ""
-        details = form_action if form_action else "-"
+        details = _build_details(endpoint, target_type, target_id)
 
         StaffActivityLog(
             staff_user_id=current_user.id,

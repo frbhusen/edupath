@@ -35,10 +35,9 @@
             <tr>
               <th>الوقت</th>
               <th>الإجراء</th>
-              <th>الهدف</th>
+              <th>ما الذي تغيّر</th>
               <th>النتيجة</th>
               <th>المسار</th>
-              <th>تفاصيل</th>
             </tr>
           </thead>
           <tbody>
@@ -50,12 +49,7 @@
                 <div class="small text-muted">{{ row.http_method }} | {{ row.endpoint }}</div>
               </td>
               <td>
-                {% if row.target_type or row.target_id %}
-                  <span class="badge text-bg-light border">{{ row.target_type or 'target' }}</span>
-                  <div class="small text-muted">{{ row.target_id or '-' }}</div>
-                {% else %}
-                  <span class="text-muted">-</span>
-                {% endif %}
+                <span class="small">{{ row.details or '-' }}</span>
               </td>
               <td>
                 {% if row.success %}
@@ -65,7 +59,6 @@
                 {% endif %}
               </td>
               <td><span class="small">{{ row.path }}</span></td>
-              <td><span class="small">{{ row.details or '-' }}</span></td>
             </tr>
             {% endfor %}
           </tbody>
