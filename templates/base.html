@@ -34,6 +34,14 @@
         </ul>
         <ul class="navbar-nav align-items-center gap-2">
           {% if current_user.is_authenticated %}
+            <li class="nav-item">
+              <a class="btn btn-outline-light btn-sm" href="{{ url_for('notifications_inbox') }}">
+                الإشعارات
+                {% if unread_notifications_count and unread_notifications_count > 0 %}
+                  <span class="badge text-bg-danger">{{ unread_notifications_count }}</span>
+                {% endif %}
+              </a>
+            </li>
             {% if current_user.role|lower == 'student' %}
               {% if student_gamification_nav %}
                 <li class="nav-item">
@@ -80,6 +88,26 @@
         <div class="d-flex gap-2 justify-content-end">
           <button class="btn btn-outline-secondary btn-sm" type="button" onclick="hideDuelInviteToast()">لاحقاً</button>
           <a id="duelInviteToastOpen" href="#" class="btn btn-primary btn-sm">فتح</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="globalNotificationToast" class="position-fixed bottom-0 start-0 p-3" style="z-index: 1201; display: none; max-width: 420px;">
+    <div class="card shadow" id="globalNotificationCard">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h6 class="mb-0" id="globalNotificationTitle">إشعار</h6>
+            <div class="small text-muted" id="globalNotificationType">note</div>
+          </div>
+          <button type="button" class="btn-close" aria-label="Close" onclick="hideGlobalNotificationToast()"></button>
+        </div>
+        <div id="globalNotificationBody" class="small mb-3"></div>
+        <div class="d-flex gap-2 justify-content-end">
+          <button class="btn btn-outline-secondary btn-sm" type="button" onclick="hideGlobalNotificationToast()">لاحقاً</button>
+          <button class="btn btn-primary btn-sm" type="button" onclick="markGlobalNotificationRead()">تمت القراءة</button>
+          <a id="globalNotificationInboxLink" href="{{ url_for('notifications_inbox') }}" class="btn btn-light btn-sm">صندوق الإشعارات</a>
         </div>
       </div>
     </div>
@@ -273,6 +301,167 @@
 
       setTimeout(pollInvites, 1200);
       setInterval(pollInvites, 12000);
+    })();
+    {% endif %}
+
+    {% if current_user.is_authenticated %}
+    (function initGlobalNotificationsPopup() {
+      const toastEl = document.getElementById('globalNotificationToast');
+      const cardEl = document.getElementById('globalNotificationCard');
+      const titleEl = document.getElementById('globalNotificationTitle');
+      const typeEl = document.getElementById('globalNotificationType');
+      const bodyEl = document.getElementById('globalNotificationBody');
+      if (!toastEl || !cardEl || !titleEl || !typeEl || !bodyEl) return;
+
+      const seenKey = 'global_notification_seen_v1';
+      const pendingKey = 'global_notification_pending_v1';
+      let seenTokens = [];
+      let queue = [];
+      let currentItem = null;
+      let currentRecipientId = null;
+      let visible = false;
+      let autoHideTimer = null;
+      const adminAutoHide = {% if (current_user.role|lower) == 'admin' %}true{% else %}false{% endif %};
+
+      try {
+        seenTokens = JSON.parse(localStorage.getItem(seenKey) || '[]');
+      } catch (e) {
+        seenTokens = [];
+      }
+
+      try {
+        const pendingRaw = JSON.parse(localStorage.getItem(pendingKey) || '{}');
+        if (pendingRaw && Array.isArray(pendingRaw.queue)) {
+          queue = pendingRaw.queue;
+        }
+        if (pendingRaw && pendingRaw.current && typeof pendingRaw.current === 'object') {
+          currentItem = pendingRaw.current;
+        }
+      } catch (e) {
+        queue = [];
+        currentItem = null;
+      }
+
+      function persistPending() {
+        localStorage.setItem(
+          pendingKey,
+          JSON.stringify({
+            queue: queue,
+            current: currentItem,
+          })
+        );
+      }
+
+      function rememberSeen(token) {
+        if (!token) return;
+        if (!seenTokens.includes(token)) {
+          seenTokens.push(token);
+          if (seenTokens.length > 120) seenTokens = seenTokens.slice(seenTokens.length - 120);
+          localStorage.setItem(seenKey, JSON.stringify(seenTokens));
+        }
+      }
+
+      function shouldIgnoreToken(token) {
+        if (!token) return true;
+        if (seenTokens.includes(token)) return true;
+        if (currentItem && currentItem.token === token) return true;
+        if (queue.some((q) => q && q.token === token)) return true;
+        return false;
+      }
+
+      function styleByTemplate(templateType) {
+        cardEl.classList.remove('border-warning', 'border-success', 'border-danger', 'border-info', 'border-secondary');
+        if (templateType === 'warning') cardEl.classList.add('border-warning');
+        else if (templateType === 'success') cardEl.classList.add('border-success');
+        else if (templateType === 'urgent') cardEl.classList.add('border-danger');
+        else if (templateType === 'info') cardEl.classList.add('border-info');
+        else cardEl.classList.add('border-secondary');
+      }
+
+      function showItem(item) {
+        if (!item) return;
+        if (autoHideTimer) {
+          clearTimeout(autoHideTimer);
+          autoHideTimer = null;
+        }
+        currentItem = item;
+        currentRecipientId = item.recipient_id || null;
+        titleEl.textContent = item.title || 'إشعار';
+        typeEl.textContent = item.template_type || 'note';
+        bodyEl.textContent = item.body || '';
+        styleByTemplate(item.template_type || 'note');
+        toastEl.style.display = 'block';
+        visible = true;
+        persistPending();
+        if (adminAutoHide) {
+          autoHideTimer = setTimeout(() => {
+            hideGlobalNotificationToast();
+          }, 5000);
+        }
+      }
+
+      function showNext() {
+        if (visible || !queue.length) return;
+        const item = queue.shift();
+        showItem(item);
+      }
+
+      window.hideGlobalNotificationToast = function hideGlobalNotificationToast() {
+        if (autoHideTimer) {
+          clearTimeout(autoHideTimer);
+          autoHideTimer = null;
+        }
+        const token = currentItem ? currentItem.token : null;
+        rememberSeen(token);
+        toastEl.style.display = 'none';
+        visible = false;
+        currentItem = null;
+        currentRecipientId = null;
+        persistPending();
+        setTimeout(showNext, 100);
+      };
+
+      window.markGlobalNotificationRead = function markGlobalNotificationRead() {
+        if (autoHideTimer) {
+          clearTimeout(autoHideTimer);
+          autoHideTimer = null;
+        }
+        const token = currentItem ? currentItem.token : null;
+        rememberSeen(token);
+        if (!currentRecipientId) {
+          hideGlobalNotificationToast();
+          return;
+        }
+        fetch(`/notifications/${currentRecipientId}/read-ajax`, {
+          method: 'POST',
+          credentials: 'same-origin'
+        }).finally(() => {
+          hideGlobalNotificationToast();
+        });
+      };
+
+      function poll() {
+        fetch('{{ url_for("notifications_popup_feed") }}', { credentials: 'same-origin' })
+          .then((r) => r.json())
+          .then((payload) => {
+            const items = (payload && payload.items) ? payload.items : [];
+            items.forEach((item) => {
+              const token = item.token;
+              if (shouldIgnoreToken(token)) return;
+              queue.push(item);
+            });
+            persistPending();
+            showNext();
+          })
+          .catch(() => {});
+      }
+
+      if (currentItem) {
+        showItem(currentItem);
+      }
+
+      setTimeout(poll, 1500);
+      setInterval(poll, 12000);
     })();
     {% endif %}
   </script>

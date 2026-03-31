@@ -43,6 +43,7 @@
       <a class="action-card" href="{{ url_for('student.results') }}"><span class="icon">📊</span><span>النتائج</span></a>
 	<a class="action-card" href="{{ url_for('student.frequently_wrong') }}"><span class="icon">🔁</span><span>الأخطاء المتكررة</span></a>
       <a class="action-card" href="{{ url_for('student.leaderboard') }}"><span class="icon">🏆</span><span>لوحة الصدارة</span></a>
+			<a class="action-card" href="{{ url_for('notifications_inbox') }}"><span class="icon">🔔</span><span>الإشعارات</span></a>
 			<a class="action-card" href="{{ url_for('student.duels_home') }}"><span class="icon">⚔️</span><span>التحديات الودية</span></a>
       <a class="action-card" href="{{ url_for('student.study_plans') }}"><span class="icon">🗂️</span><span>خطتي الدراسية</span></a>
 			<a class="action-card" href="{{ url_for('student.certificates') }}"><span class="icon">🎓</span><span>شهاداتي</span></a>
@@ -54,17 +55,20 @@
 			<a class="action-card" href="{{ url_for('teacher.discussions_manage') }}"><span class="icon">💬</span><span>إدارة المناقشات</span></a>
 			<a class="action-card" href="{{ url_for('teacher.certificates_manage') }}"><span class="icon">🎓</span><span>إدارة الشهادات</span></a>
 			<a class="action-card" href="{{ url_for('teacher.certificates_verification') }}"><span class="icon">✅</span><span>التحقق من الشهادات</span></a>
+			<a class="action-card" href="{{ url_for('notifications_inbox') }}"><span class="icon">🔔</span><span>الإشعارات</span></a>
 			{% if current_user.role == 'admin' %}
 			  <a class="action-card" href="{{ url_for('teacher.analytics_dashboard') }}"><span class="icon">📈</span><span>التحليلات</span></a>
 			  <a class="action-card" href="{{ url_for('teacher.study_plans_manage') }}"><span class="icon">🗓️</span><span>إدارة الخطط</span></a>
 			  <a class="action-card" href="{{ url_for('teacher.reports_dashboard') }}"><span class="icon">📄</span><span>التقارير</span></a>
 			  <a class="action-card" href="{{ url_for('teacher.gamification_admin') }}"><span class="icon">🎮</span><span>إدارة XP</span></a>
+			  <a class="action-card" href="{{ url_for('admin.notifications_manage') }}"><span class="icon">📣</span><span>إرسال إشعار</span></a>
 			{% endif %}
       {% if current_user.role == 'admin' %}
         <a class="action-card" href="{{ url_for('admin.dashboard') }}"><span class="icon">⚙️</span><span>الإدارة</span></a>
       {% endif %}
 	{% elif current_user.role == 'question_editor' %}
 	  <a class="action-card" href="{{ url_for('teacher.question_editor_dashboard') }}"><span class="icon">🧩</span><span>لوحة محرر الأسئلة</span></a>
+			<a class="action-card" href="{{ url_for('notifications_inbox') }}"><span class="icon">🔔</span><span>الإشعارات</span></a>
     {% endif %}
   </div>
 </div>

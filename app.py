@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, request, redirect, url_for, flash, send_from_directory, g
+from flask import Flask, render_template, session, request, redirect, url_for, flash, send_from_directory, g, jsonify
 from pathlib import Path
 from werkzeug.exceptions import NotFound
 import time
@@ -10,7 +10,8 @@ except Exception:  # pragma: no cover - optional dependency in some environments
 
 from .config import Config
 from .extensions import login_manager, init_mongo, cache
-from flask_login import current_user, logout_user
+from flask_login import current_user, logout_user, login_required
+from bson import ObjectId
 
 from .auth import auth_bp
 from .admin import admin_bp
@@ -102,6 +103,18 @@ def create_app():
         except Exception:
             return {"student_gamification_nav": None}
 
+    @app.context_processor
+    def inject_notifications_counter():
+        if not current_user.is_authenticated:
+            return {"unread_notifications_count": 0}
+        try:
+            from .models import NotificationRecipient
+
+            unread = NotificationRecipient.objects(user_id=current_user.id, is_read=False).count()
+            return {"unread_notifications_count": int(unread or 0)}
+        except Exception:
+            return {"unread_notifications_count": 0}
+
     @app.route("/")
     def index():
         return render_template("index.html")
@@ -109,6 +122,91 @@ def create_app():
     @app.route("/latex-cheatsheet")
     def latex_cheatsheet():
         return render_template("latex_cheatsheet.html")
+
+    @app.route("/notifications")
+    @login_required
+    def notifications_inbox():
+        from .models import NotificationRecipient
+
+        items = list(
+            NotificationRecipient.objects(user_id=current_user.id)
+            .order_by("-created_at")
+            .limit(200)
+            .all()
+        )
+        return render_template("notifications/inbox.html", items=items)
+
+    @app.route("/notifications/<recipient_id>/read", methods=["POST"])
+    @login_required
+    def notifications_mark_read(recipient_id):
+        from datetime import datetime
+        from .models import NotificationRecipient
+
+        row = NotificationRecipient.objects(id=recipient_id).first() if ObjectId.is_valid(recipient_id) else None
+        if row and row.user_id and str(row.user_id.id) == str(current_user.id):
+            if not row.is_read:
+                row.is_read = True
+                row.read_at = datetime.utcnow()
+                row.save()
+        return redirect(url_for("notifications_inbox"))
+
+    @app.route("/notifications/read-all", methods=["POST"])
+    @login_required
+    def notifications_mark_all_read():
+        from datetime import datetime
+        from .models import NotificationRecipient
+
+        NotificationRecipient.objects(user_id=current_user.id, is_read=False).update(
+            set__is_read=True,
+            set__read_at=datetime.utcnow(),
+        )
+        return redirect(url_for("notifications_inbox"))
+
+    @app.route("/notifications/popup-feed", methods=["GET"])
+    @login_required
+    def notifications_popup_feed():
+        from .models import NotificationRecipient
+
+        unread_rows = list(
+            NotificationRecipient.objects(user_id=current_user.id, is_read=False)
+            .order_by("-created_at")
+            .limit(10)
+            .all()
+        )
+
+        payload = []
+        for row in unread_rows:
+            notif = row.notification_id
+            if not notif:
+                continue
+            payload.append(
+                {
+                    "recipient_id": str(row.id),
+                    "title": notif.title,
+                    "body": notif.body,
+                    "template_type": getattr(notif, "template_type", "note") or "note",
+                    "created_at": notif.created_at.isoformat() if notif.created_at else None,
+                    "token": f"{row.id}:{getattr(notif, 'created_at', None)}",
+                }
+            )
+
+        return jsonify({"items": payload})
+
+    @app.route("/notifications/<recipient_id>/read-ajax", methods=["POST"])
+    @login_required
+    def notifications_mark_read_ajax(recipient_id):
+        from datetime import datetime
+        from .models import NotificationRecipient
+
+        row = NotificationRecipient.objects(id=recipient_id).first() if ObjectId.is_valid(recipient_id) else None
+        if row and row.user_id and str(row.user_id.id) == str(current_user.id):
+            if not row.is_read:
+                row.is_read = True
+                row.read_at = datetime.utcnow()
+                row.save()
+            return jsonify({"ok": True})
+
+        return jsonify({"ok": False}), 404
 
     @app.route("/pages/<path:filename>")
     @app.route("/study_platform/pages/<path:filename>")

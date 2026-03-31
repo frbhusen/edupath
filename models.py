@@ -138,6 +138,45 @@ class StaffActivityLog(Document):
     }
 
 
+class Notification(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    title = StringField(required=True, max_length=180)
+    body = StringField(required=True, max_length=3000)
+    template_type = StringField(required=True, default='note', choices=['note', 'info', 'success', 'warning', 'urgent'])
+    audience = StringField(required=True, choices=['all', 'students', 'staff', 'specific'])
+    created_by = ReferenceField(User, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'notifications',
+        'indexes': [
+            'audience',
+            'created_by',
+            'created_at',
+        ]
+    }
+
+
+class NotificationRecipient(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    notification_id = ReferenceField(Notification, required=True)
+    user_id = ReferenceField(User, required=True)
+    is_read = BooleanField(default=False, required=True)
+    read_at = DateTimeField(null=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'notification_recipients',
+        'indexes': [
+            'notification_id',
+            'user_id',
+            'is_read',
+            'created_at',
+            ('notification_id', 'user_id'),
+        ]
+    }
+
+
 class Section(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     subject_id = ReferenceField(Subject, required=True)

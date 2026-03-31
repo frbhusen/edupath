@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-3">إدارة الإشعارات</h2>
+<p class="text-muted">إرسال إشعار مخصص: للجميع / للطلاب / للطاقم / لمستخدمين محددين.</p>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-3">إرسال إشعار جديد</h5>
+    <form method="post" class="row g-3" id="notification-form">
+      <div class="col-12 col-lg-6">
+        <label class="form-label">العنوان</label>
+        <input class="form-control" name="title" id="title-input" maxlength="180" value="ملاحظة" required>
+      </div>
+      <div class="col-12 col-lg-6">
+        <label class="form-label">الاستهداف</label>
+        <select class="form-select" name="audience" id="audience-select" required>
+          <option value="all">كل الأعضاء (طلاب + طاقم)</option>
+          <option value="students">الطلاب فقط</option>
+          <option value="staff">الطاقم فقط</option>
+          <option value="specific">مستخدمون محددون</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-6">
+        <label class="form-label">قالب الإشعار</label>
+        <select class="form-select" name="template_type" id="template-type-select" required>
+          <option value="note">ملاحظة</option>
+          <option value="info">معلومة</option>
+          <option value="success">نجاح</option>
+          <option value="warning">تحذير</option>
+          <option value="urgent">عاجل</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label">نص الإشعار</label>
+        <textarea class="form-control" rows="4" name="body" maxlength="3000" required></textarea>
+      </div>
+      <div class="col-12 d-none" id="specific-users-box">
+        <label class="form-label">اختر المستخدمين المحددين</label>
+        <select class="form-select" name="specific_user_ids" multiple size="8">
+          {% for u in users %}
+            <option value="{{ u.id }}">{{ u.full_name }} - {{ u.username }} ({{ u.role }})</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">يمكنك اختيار أكثر من مستخدم.</div>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-cta" type="submit">إرسال الإشعار</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <h5 class="card-title mb-0">آخر الإشعارات المرسلة</h5>
+      <form method="post" action="{{ url_for('admin.notifications_delete_old') }}" class="d-flex align-items-center gap-2" onsubmit="return confirm('حذف الإشعارات القديمة؟');">
+        <label class="small text-muted mb-0">حذف الأقدم من</label>
+        <input class="form-control form-control-sm" style="width: 90px;" type="number" name="days" min="1" value="30" required>
+        <label class="small text-muted mb-0">يوم</label>
+        <button class="btn btn-outline-danger btn-sm" type="submit">حذف القديم</button>
+      </form>
+    </div>
+    {% if recent_notifications %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>الوقت</th>
+              <th>العنوان</th>
+              <th>القالب</th>
+              <th>الاستهداف</th>
+              <th>المستلمون</th>
+              <th class="text-end">إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for n in recent_notifications %}
+              <tr>
+                <td class="small text-muted">{{ n.created_at.strftime('%Y-%m-%d %H:%M:%S') if n.created_at else '-' }}</td>
+                <td>
+                  <div class="fw-semibold">{{ n.title }}</div>
+                  <div class="small text-muted">{{ n.body[:120] ~ ('...' if n.body|length > 120 else '') }}</div>
+                </td>
+                <td>{{ n.template_type|default('note') }}</td>
+                <td>{{ n.audience }}</td>
+                <td>{{ recipient_counts.get(n.id, 0) }}</td>
+                <td class="text-end">
+                  <form method="post" action="{{ url_for('admin.notifications_delete', notification_id=n.id) }}" onsubmit="return confirm('حذف هذا الإشعار؟');">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد إشعارات بعد.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const audienceSelect = document.getElementById('audience-select');
+    const specificBox = document.getElementById('specific-users-box');
+    const templateSelect = document.getElementById('template-type-select');
+    const titleInput = document.getElementById('title-input');
+    if (!audienceSelect || !specificBox) return;
+
+    function syncAudienceUi() {
+      const isSpecific = (audienceSelect.value || '') === 'specific';
+      specificBox.classList.toggle('d-none', !isSpecific);
+    }
+
+    const templateTitles = {
+      note: 'ملاحظة',
+      info: 'معلومة',
+      success: 'نجاح',
+      warning: 'تحذير',
+      urgent: 'عاجل'
+    };
+
+    function syncTitleWithTemplate(force) {
+      if (!templateSelect || !titleInput) return;
+      const selected = (templateSelect.value || 'note').toLowerCase();
+      const defaultTitle = templateTitles[selected] || templateTitles.note;
+      const previousDefault = titleInput.dataset.defaultTitle || templateTitles.note;
+      const currentValue = (titleInput.value || '').trim();
+      if (force || !currentValue || currentValue === previousDefault) {
+        titleInput.value = defaultTitle;
+      }
+      titleInput.dataset.defaultTitle = defaultTitle;
+    }
+
+    audienceSelect.addEventListener('change', syncAudienceUi);
+    if (templateSelect) {
+      templateSelect.addEventListener('change', function () {
+        syncTitleWithTemplate(false);
+      });
+    }
+    syncAudienceUi();
+    syncTitleWithTemplate(true);
+  })();
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
 from mongoengine.errors import DoesNotExist
 
@@ -29,11 +29,21 @@ from .models import (
     StaffSubjectAccess,
     StaffSubjectAccessAudit,
     StaffActivityLog,
+    Notification,
+    NotificationRecipient,
 )
 from .permissions import is_admin
 from .account_cleanup import delete_user_with_related_data
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")
+
+TEMPLATE_TITLES = {
+    "note": "ملاحظة",
+    "info": "معلومة",
+    "success": "نجاح",
+    "warning": "تحذير",
+    "urgent": "عاجل",
+}
 
 
 ALLOWED_MODELS = {
@@ -118,6 +128,139 @@ def dashboard():
         except Exception:
             counts[name] = "?"
     return render_template("admin/dashboard.html", counts=counts)
+
+
+@admin_bp.route("/notifications", methods=["GET", "POST"])
+@login_required
+def notifications_manage():
+    admin_required()
+
+    if request.method == "POST":
+        title = (request.form.get("title") or "").strip()
+        body = (request.form.get("body") or "").strip()
+        template_type = (request.form.get("template_type") or "note").strip().lower()
+        audience = (request.form.get("audience") or "").strip().lower()
+
+        if audience not in {"all", "students", "staff", "specific"}:
+            flash("فئة الاستهداف غير صالحة.", "error")
+            return redirect(url_for("admin.notifications_manage"))
+        if template_type not in {"note", "info", "success", "warning", "urgent"}:
+            flash("قالب الإشعار غير صالح.", "error")
+            return redirect(url_for("admin.notifications_manage"))
+        if not title:
+            title = TEMPLATE_TITLES.get(template_type, TEMPLATE_TITLES["note"])
+        if not body:
+            flash("نص الإشعار مطلوب.", "error")
+            return redirect(url_for("admin.notifications_manage"))
+
+        if audience == "all":
+            recipients = list(User.objects().only("id").all())
+        elif audience == "students":
+            recipients = list(User.objects(role="student").only("id").all())
+        elif audience == "staff":
+            recipients = list(User.objects(role__in=["admin", "teacher", "question_editor"]).only("id").all())
+        else:
+            selected_ids = [sid for sid in request.form.getlist("specific_user_ids") if ObjectId.is_valid(sid)]
+            if not selected_ids:
+                flash("اختر مستخدماً واحداً على الأقل عند الاستهداف المحدد.", "error")
+                return redirect(url_for("admin.notifications_manage"))
+            recipients = list(User.objects(id__in=[ObjectId(sid) for sid in selected_ids]).only("id").all())
+
+        unique_recipient_ids = list({u.id for u in recipients})
+        if not unique_recipient_ids:
+            flash("لا يوجد مستلمون لهذه الرسالة.", "warning")
+            return redirect(url_for("admin.notifications_manage"))
+
+        notification = Notification(
+            title=title,
+            body=body,
+            template_type=template_type,
+            audience=audience,
+            created_by=current_user.id,
+        )
+        notification.save()
+
+        for uid in unique_recipient_ids:
+            NotificationRecipient(
+                notification_id=notification.id,
+                user_id=uid,
+                is_read=False,
+            ).save()
+
+        flash(f"تم إرسال الإشعار إلى {len(unique_recipient_ids)} مستخدم.", "success")
+        return redirect(url_for("admin.notifications_manage"))
+
+    users = list(User.objects().order_by("first_name", "last_name", "username").all())
+    recent_notifications = list(Notification.objects().order_by("-created_at").limit(50).all())
+    recipient_counts = {}
+    if recent_notifications:
+        nids = [n.id for n in recent_notifications]
+        for row in NotificationRecipient.objects(notification_id__in=nids).only("notification_id").all():
+            nid = row.notification_id.id if row.notification_id else None
+            if nid:
+                recipient_counts[nid] = recipient_counts.get(nid, 0) + 1
+
+    return render_template(
+        "admin/notifications_manage.html",
+        users=users,
+        recent_notifications=recent_notifications,
+        recipient_counts=recipient_counts,
+    )
+
+
+@admin_bp.route("/notifications/<notification_id>/delete", methods=["POST"])
+@login_required
+def notifications_delete(notification_id):
+    admin_required()
+
+    row = Notification.objects(id=notification_id).first() if ObjectId.is_valid(notification_id) else None
+    if not row:
+        flash("الإشعار غير موجود.", "error")
+        return redirect(url_for("admin.notifications_manage"))
+
+    NotificationRecipient.objects(notification_id=row.id).delete()
+    row.delete()
+    flash("تم حذف الإشعار.", "success")
+    return redirect(url_for("admin.notifications_manage"))
+
+
+@admin_bp.route("/notifications/delete-old", methods=["POST"])
+@login_required
+def notifications_delete_old():
+    admin_required()
+
+    days_raw = (request.form.get("days") or "30").strip()
+    try:
+        days = max(1, int(days_raw))
+    except Exception:
+        flash("عدد الأيام غير صالح.", "error")
+        return redirect(url_for("admin.notifications_manage"))
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    def _effective_created_at(notification_row):
+        # Backward compatibility: legacy rows may miss created_at.
+        dt = notification_row.created_at
+        if not dt and notification_row.id:
+            dt = notification_row.id.generation_time
+        if dt and getattr(dt, "tzinfo", None) is not None:
+            dt = dt.replace(tzinfo=None)
+        return dt
+
+    old_ids = []
+    for row in Notification.objects().only("id", "created_at").all():
+        created_at = _effective_created_at(row)
+        if created_at and created_at < cutoff:
+            old_ids.append(row.id)
+
+    if not old_ids:
+        flash("لا توجد إشعارات قديمة ضمن المدة المحددة.", "info")
+        return redirect(url_for("admin.notifications_manage"))
+
+    NotificationRecipient.objects(notification_id__in=old_ids).delete()
+    deleted_count = Notification.objects(id__in=old_ids).delete()
+    flash(f"تم حذف {deleted_count} إشعار قديم.", "success")
+    return redirect(url_for("admin.notifications_manage"))
 
 
 @admin_bp.route("/staff", methods=["GET"])

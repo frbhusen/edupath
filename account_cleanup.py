@@ -36,6 +36,8 @@ from .models import (
     CourseQuestion,
     CourseAttempt,
     CourseAnswer,
+    Notification,
+    NotificationRecipient,
 )
 
 
@@ -142,7 +144,14 @@ def delete_user_with_related_data(user: User) -> dict:
     StaffSubjectAccessAudit.objects(changed_by=uid).delete()
     StaffActivityLog.objects(staff_user_id=uid).delete()
 
-    # 10) Finally delete the user.
+    # 10) Notifications where user is recipient or sender.
+    NotificationRecipient.objects(user_id=uid).delete()
+    created_notification_ids = [n.id for n in Notification.objects(created_by=uid).only("id").all()]
+    if created_notification_ids:
+        NotificationRecipient.objects(notification_id__in=created_notification_ids).delete()
+        Notification.objects(id__in=created_notification_ids).delete()
+
+    # 11) Finally delete the user.
     user.delete()
     summary["deleted_user"] = True
     return summary
