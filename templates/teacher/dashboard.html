@@ -152,6 +152,7 @@
               {% if subject.requires_code %}تعطيل التفعيل{% else %}تفعيل بكود{% endif %}
             </button>
           </form>
+          <a class="btn btn-sm btn-outline-dark" href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">الدورات التفاعلية</a>
           <a class="btn btn-sm btn-outline-info" href="{{ url_for('teacher.manage_subject_access', subject_id=subject.id) }}">الوصول</a>
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('teacher.new_section', subject_id=subject.id) }}">إضافة قسم</a>
           <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('teacher.edit_subject', subject_id=subject.id) }}">تعديل</a>

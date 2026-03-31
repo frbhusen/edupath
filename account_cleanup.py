@@ -32,6 +32,10 @@ from .models import (
     StaffSubjectAccess,
     StaffSubjectAccessAudit,
     StaffActivityLog,
+    CourseSet,
+    CourseQuestion,
+    CourseAttempt,
+    CourseAnswer,
 )
 
 
@@ -116,14 +120,29 @@ def delete_user_with_related_data(user: User) -> dict:
         summary["duels"] = len(duel_ids)
     DuelStats.objects(student_id=uid).delete()
 
-    # 8) Staff assignment / audit references.
+    # 8) Courses (image true/false sets) and attempts.
+    course_attempt_ids = [a.id for a in CourseAttempt.objects(student_id=uid).only("id").all()]
+    if course_attempt_ids:
+        CourseAnswer.objects(attempt_id__in=course_attempt_ids).delete()
+        CourseAttempt.objects(id__in=course_attempt_ids).delete()
+
+    created_course_set_ids = [c.id for c in CourseSet.objects(created_by=uid).only("id").all()]
+    if created_course_set_ids:
+        created_attempt_ids = [a.id for a in CourseAttempt.objects(course_set_id__in=created_course_set_ids).only("id").all()]
+        if created_attempt_ids:
+            CourseAnswer.objects(attempt_id__in=created_attempt_ids).delete()
+            CourseAttempt.objects(id__in=created_attempt_ids).delete()
+        CourseQuestion.objects(course_set_id__in=created_course_set_ids).delete()
+        CourseSet.objects(id__in=created_course_set_ids).delete()
+
+    # 9) Staff assignment / audit references.
     StaffSubjectAccess.objects(staff_user_id=uid).delete()
     StaffSubjectAccess.objects(assigned_by=uid).delete()
     StaffSubjectAccessAudit.objects(staff_user_id=uid).delete()
     StaffSubjectAccessAudit.objects(changed_by=uid).delete()
     StaffActivityLog.objects(staff_user_id=uid).delete()
 
-    # 9) Finally delete the user.
+    # 10) Finally delete the user.
     user.delete()
     summary["deleted_user"] = True
     return summary

@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">الدورات التفاعلية - {{ subject.name }}</h1>
+    <p class="mb-0">إنشاء مجموعات أسئلة بصيغة صحيح/خطأ مع صور السؤال والإجابة.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.subject_detail', subject_id=subject.id) }}">رجوع للمادة</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-3">إنشاء دورة جديدة</h5>
+    <form method="post" action="{{ url_for('teacher.course_set_new', subject_id=subject.id) }}" class="row g-2">
+      <div class="col-12 col-md-6">
+        <label class="form-label">اسم الدورة</label>
+        <input class="form-control" name="title" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">الوصف (اختياري)</label>
+        <input class="form-control" name="description">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">XP لكل سؤال</label>
+        <input class="form-control" type="number" name="xp_per_question" min="1" value="1" required>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">القسم (اختياري)</label>
+        <select class="form-select" name="section_id">
+          <option value="">بدون قسم محدد</option>
+          {% for section in sections %}
+            <option value="{{ section.id }}">{{ section.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">الدرس (اختياري)</label>
+        <select class="form-select" name="lesson_id">
+          <option value="">بدون درس محدد</option>
+          {% for lesson in lessons %}
+            <option value="{{ lesson.id }}">{{ lesson.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="course-active" name="is_active" checked>
+          <label class="form-check-label" for="course-active">نشطة للطلاب</label>
+        </div>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-cta" type="submit">إنشاء الدورة</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">الدورات التفاعلية الحالية</h5>
+    {% if sets %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>الاسم</th>
+              <th>النطاق</th>
+              <th>عدد الأسئلة</th>
+              <th>الحالة</th>
+              <th class="text-end">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in sets %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ item.title }}</div>
+                  {% if item.description %}
+                    <div class="small text-muted">{{ item.description }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="small">القسم: {{ item.section_id.title if item.section_id else '-' }}</div>
+                  <div class="small">الدرس: {{ item.lesson_id.title if item.lesson_id else '-' }}</div>
+                  <div class="small">XP لكل سؤال: {{ item.xp_per_question|default(1) }}</div>
+                </td>
+                <td>{{ question_counts.get(item.id, 0) }}</td>
+                <td>
+                  <span class="badge {% if item.is_active %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+                    {{ 'نشطة' if item.is_active else 'مغلقة' }}
+                  </span>
+                </td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2">
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.course_set_edit', course_set_id=item.id) }}">تعديل</a>
+                    <form method="post" action="{{ url_for('teacher.course_set_delete', course_set_id=item.id) }}" onsubmit="return confirm('حذف الدورة؟');">
+                      <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد دورات بعد.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

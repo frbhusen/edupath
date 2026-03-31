@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .course-edit-shell .panel-card {
+    border: 1px solid #dbe2ea;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .course-edit-shell .question-item {
+    border: 1px solid #dbe2ea;
+    border-radius: 12px;
+    background: #ffffff;
+  }
+
+  .course-edit-shell .question-item-head {
+    border-bottom: 1px solid #e5edf5;
+    background: #f8fafc;
+    border-radius: 12px 12px 0 0;
+    padding: 0.65rem 0.9rem;
+  }
+
+  .course-edit-shell .preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .course-edit-shell .preview-box {
+    border: 1px solid #dbe2ea;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 0.45rem;
+  }
+
+  .course-edit-shell .preview-box .label {
+    font-size: 0.75rem;
+    color: #475569;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    display: block;
+  }
+
+  .course-edit-shell .preview-frame {
+    width: 100%;
+    height: 130px;
+    border: 1px solid #dbe2ea;
+    border-radius: 8px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .course-edit-shell .preview-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .course-edit-shell .preview-empty {
+    color: #94a3b8;
+    font-size: 0.78rem;
+  }
+</style>
+
+<div class="course-edit-shell">
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">تعديل الدورة</h1>
+    <p class="mb-0">{{ course_set.title }}</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">رجوع</a>
+</div>
+
+<div class="card panel-card mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-3">إعدادات الدورة</h5>
+    <form method="post" class="row g-2">
+      <input type="hidden" name="action" value="update_set">
+      <div class="col-12 col-md-6">
+        <label class="form-label">اسم الدورة</label>
+        <input class="form-control" name="title" value="{{ course_set.title }}" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">الوصف (اختياري)</label>
+        <input class="form-control" name="description" value="{{ course_set.description or '' }}">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">XP لكل سؤال</label>
+        <input class="form-control" type="number" name="xp_per_question" min="1" value="{{ course_set.xp_per_question|default(1) }}" required>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">القسم</label>
+        <select class="form-select" name="section_id">
+          <option value="">بدون قسم محدد</option>
+          {% for section in sections %}
+            <option value="{{ section.id }}" {% if course_set.section_id and section.id == course_set.section_id.id %}selected{% endif %}>{{ section.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">الدرس</label>
+        <select class="form-select" name="lesson_id">
+          <option value="">بدون درس محدد</option>
+          {% for lesson in lessons %}
+            <option value="{{ lesson.id }}" {% if course_set.lesson_id and lesson.id == course_set.lesson_id.id %}selected{% endif %}>{{ lesson.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="set-active" name="is_active" {% if course_set.is_active %}checked{% endif %}>
+          <label class="form-check-label" for="set-active">نشطة للطلاب</label>
+        </div>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-cta" type="submit">حفظ الإعدادات</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card panel-card mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-3">إضافة سؤال جديد</h5>
+    <form method="post" class="row g-2">
+      <input type="hidden" name="action" value="add_question">
+      <div class="col-12 col-lg-5">
+        <label class="form-label">رابط صورة السؤال</label>
+        <input class="form-control" name="question_image_url" data-preview-target="new-question-preview" placeholder="https://drive.google.com/..." required>
+      </div>
+      <div class="col-12 col-lg-5">
+        <label class="form-label">رابط صورة الإجابة</label>
+        <input class="form-control" name="answer_image_url" data-preview-target="new-answer-preview" placeholder="https://drive.google.com/..." required>
+      </div>
+      <div class="col-12 col-lg-2">
+        <label class="form-label">القيمة الصحيحة</label>
+        <select class="form-select" name="correct_value" required>
+          <option value="true">صحيح</option>
+          <option value="false">خطأ</option>
+        </select>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-outline-primary" type="submit">إضافة السؤال</button>
+      </div>
+      <div class="col-12">
+        <div class="preview-grid">
+          <div class="preview-box">
+            <span class="label">معاينة صورة السؤال</span>
+            <div class="preview-frame">
+              <img id="new-question-preview" src="" alt="معاينة السؤال" class="d-none">
+              <span class="preview-empty" id="new-question-preview-empty">لا توجد صورة بعد</span>
+            </div>
+          </div>
+          <div class="preview-box">
+            <span class="label">معاينة صورة الإجابة</span>
+            <div class="preview-frame">
+              <img id="new-answer-preview" src="" alt="معاينة الإجابة" class="d-none">
+              <span class="preview-empty" id="new-answer-preview-empty">لا توجد صورة بعد</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card panel-card">
+  <div class="card-body">
+    <h5 class="card-title">أسئلة الدورة ({{ questions|length }})</h5>
+    {% if questions %}
+      <div class="d-flex flex-column gap-3">
+        {% for q in questions %}
+          <div class="question-item">
+            <div class="question-item-head d-flex justify-content-between align-items-center">
+              <span class="fw-semibold">السؤال {{ loop.index }}</span>
+              <span class="badge text-bg-light border">{{ 'صحيح' if q.correct_value else 'خطأ' }}</span>
+            </div>
+            <div class="p-3">
+            <form method="post" class="row g-2">
+              <input type="hidden" name="action" value="update_question">
+              <input type="hidden" name="question_id" value="{{ q.id }}">
+              <div class="col-12 col-lg-5">
+                <label class="form-label">صورة السؤال</label>
+                <input class="form-control" name="question_image_url" value="{{ q.question_image_url }}" data-preview-target="q-preview-{{ q.id }}" required>
+              </div>
+              <div class="col-12 col-lg-5">
+                <label class="form-label">صورة الإجابة</label>
+                <input class="form-control" name="answer_image_url" value="{{ q.answer_image_url }}" data-preview-target="a-preview-{{ q.id }}" required>
+              </div>
+              <div class="col-12 col-lg-2">
+                <label class="form-label">القيمة الصحيحة</label>
+                <select class="form-select" name="correct_value" required>
+                  <option value="true" {% if q.correct_value %}selected{% endif %}>صحيح</option>
+                  <option value="false" {% if not q.correct_value %}selected{% endif %}>خطأ</option>
+                </select>
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-outline-primary btn-sm" type="submit">حفظ</button>
+              </div>
+              <div class="col-12">
+                <div class="preview-grid">
+                  <div class="preview-box">
+                    <span class="label">معاينة السؤال</span>
+                    <div class="preview-frame">
+                      <img id="q-preview-{{ q.id }}" src="{{ q.question_image_url }}" alt="معاينة السؤال">
+                    </div>
+                  </div>
+                  <div class="preview-box">
+                    <span class="label">معاينة الإجابة</span>
+                    <div class="preview-frame">
+                      <img id="a-preview-{{ q.id }}" src="{{ q.answer_image_url }}" alt="معاينة الإجابة">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </form>
+            <form method="post" class="mt-2 d-flex justify-content-end" onsubmit="return confirm('حذف السؤال؟');">
+              <input type="hidden" name="action" value="delete_question">
+              <input type="hidden" name="question_id" value="{{ q.id }}">
+              <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+            </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد أسئلة بعد.</div>
+    {% endif %}
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const inputs = document.querySelectorAll('[data-preview-target]');
+    inputs.forEach((input) => {
+      const targetId = input.getAttribute('data-preview-target');
+      if (!targetId) return;
+      const img = document.getElementById(targetId);
+      if (!img) return;
+      const empty = document.getElementById(targetId + '-empty');
+
+      function updatePreview() {
+        const value = (input.value || '').trim();
+        if (!value) {
+          img.classList.add('d-none');
+          img.removeAttribute('src');
+          if (empty) empty.classList.remove('d-none');
+          return;
+        }
+        img.src = value;
+        img.classList.remove('d-none');
+        if (empty) empty.classList.add('d-none');
+      }
+
+      input.addEventListener('input', updatePreview);
+      updatePreview();
+    });
+  })();
+</script>
+{% endblock %}

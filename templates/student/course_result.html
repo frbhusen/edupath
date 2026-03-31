@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">نتيجة الدورة</h1>
+    <p class="mb-0">{{ course_set.title if course_set else '' }}</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.subject_courses', subject_id=course_set.subject_id.id) }}">العودة للدورات التفاعلية</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body text-center">
+    <div class="display-6 fw-bold">{{ attempt.score }} / {{ attempt.total }}</div>
+    <div class="d-flex justify-content-center gap-2 mt-2 flex-wrap">
+      <span class="badge text-bg-info">+{{ attempt.xp_earned|default(0) }} XP</span>
+      {% if gamification %}
+        <span class="badge text-bg-secondary">المستوى {{ gamification.level }}</span>
+        <span class="badge text-bg-dark">إجمالي XP: {{ gamification.xp_total }}</span>
+      {% endif %}
+    </div>
+    {% set pct = (attempt.score / attempt.total * 100) if attempt.total else 0 %}
+    <div class="progress my-3" style="height: 18px;">
+      <div class="progress-bar bg-success" role="progressbar" data-pct="{{ pct|round(0) }}">{{ pct|round(0) }}%</div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">مراجعة</h5>
+    {% if review %}
+      <div class="d-flex flex-column gap-3">
+        {% for item in review %}
+          {% set q = item.question %}
+          {% set a = item.answer %}
+          <div class="border rounded p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="fw-semibold">س{{ loop.index }}</div>
+              {% if a and a.is_correct %}
+                <span class="badge text-bg-success">تم احتساب درجة</span>
+              {% else %}
+                <span class="badge text-bg-secondary">بدون درجة</span>
+              {% endif %}
+            </div>
+            <div class="row g-2">
+              <div class="col-12 col-lg-6">
+                <div class="small text-muted mb-1">صورة السؤال</div>
+                <img src="{{ q.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 280px;">
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="small text-muted mb-1">صورة الإجابة</div>
+                <img src="{{ q.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 280px;">
+              </div>
+            </div>
+            <div class="mt-2 small">
+              <span class="text-muted">تقييمك بعد إظهار الإجابة:</span>
+              <span class="fw-semibold">{{ 'حلّي صحيح' if a and a.selected_value else 'حلّي غير صحيح' }}</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد بيانات للمراجعة.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const bar = document.querySelector('.progress-bar[data-pct]');
+    if (!bar) return;
+    const pct = Math.max(0, Math.min(100, parseInt(bar.dataset.pct || '0', 10)));
+    bar.style.width = `${pct}%`;
+  })();
+</script>
+{% endblock %}

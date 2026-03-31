@@ -18,7 +18,8 @@ from .models import (
     SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt, CustomTestAnswer,
     StudentGamification, XPEvent, Assignment, AssignmentSubmission, LessonCompletion,
     StudyPlan, StudyPlanItem, AssignmentAttempt, TestTextQuestion, AttemptTextAnswer,
-    DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats
+    DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats,
+    CourseSet, CourseQuestion
 )
 from .activation_utils import (
     cascade_subject_activation, cascade_section_activation, cascade_lesson_activation,
@@ -155,6 +156,12 @@ def _subject_id_for_test(test):
     if not test or not test.section_id or not test.section_id.subject_id:
         return None
     return test.section_id.subject_id.id
+
+
+def _subject_id_for_course_set(course_set):
+    if not course_set or not course_set.subject_id:
+        return None
+    return course_set.subject_id.id
 
 
 def _subject_id_for_assignment(assignment):
@@ -2219,6 +2226,261 @@ def subject_detail(subject_id):
         return scope_response
     sections = Section.objects(subject_id=subject.id).all()
     return render_template("teacher/subject_detail.html", subject=subject, sections=sections)
+
+
+@teacher_bp.route("/subjects/<subject_id>/courses", methods=["GET"])
+@login_required
+@role_required("teacher", "question_editor")
+def courses_manage(subject_id):
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        raise NotFound()
+
+    scope_response = _ensure_subject_scope(subject.id)
+    if scope_response:
+        return scope_response
+
+    sets = list(CourseSet.objects(subject_id=subject.id).order_by("created_at").all())
+    set_ids = [s.id for s in sets]
+    question_counts = {}
+    if set_ids:
+        for row in CourseQuestion.objects(course_set_id__in=set_ids).only("course_set_id").all():
+            sid = row.course_set_id.id if row.course_set_id else None
+            if sid:
+                question_counts[sid] = question_counts.get(sid, 0) + 1
+
+    sections = list(Section.objects(subject_id=subject.id).order_by("created_at").all())
+    section_ids = [s.id for s in sections]
+    lessons = list(Lesson.objects(section_id__in=section_ids).order_by("created_at").all()) if section_ids else []
+
+    return render_template(
+        "teacher/course_sets_manage.html",
+        subject=subject,
+        sets=sets,
+        question_counts=question_counts,
+        sections=sections,
+        lessons=lessons,
+    )
+
+
+@teacher_bp.route("/subjects/<subject_id>/courses/new", methods=["POST"])
+@login_required
+@role_required("teacher", "question_editor")
+def course_set_new(subject_id):
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        raise NotFound()
+
+    scope_response = _ensure_subject_scope(subject.id)
+    if scope_response:
+        return scope_response
+
+    title = (request.form.get("title") or "").strip()
+    description = (request.form.get("description") or "").strip() or None
+    xp_per_question_raw = (request.form.get("xp_per_question") or "").strip()
+    section_id = (request.form.get("section_id") or "").strip()
+    lesson_id = (request.form.get("lesson_id") or "").strip()
+    is_active = (request.form.get("is_active") or "").strip().lower() == "on"
+
+    if not title:
+        flash("عنوان الدورة مطلوب.", "error")
+        return redirect(url_for("teacher.courses_manage", subject_id=subject.id))
+
+    try:
+        xp_per_question = max(1, int(xp_per_question_raw or "1"))
+    except Exception:
+        flash("قيمة XP لكل سؤال غير صالحة.", "error")
+        return redirect(url_for("teacher.courses_manage", subject_id=subject.id))
+
+    section = None
+    if section_id and ObjectId.is_valid(section_id):
+        section = Section.objects(id=section_id, subject_id=subject.id).first()
+    if section_id and not section:
+        flash("القسم المحدد غير صالح.", "error")
+        return redirect(url_for("teacher.courses_manage", subject_id=subject.id))
+
+    lesson = None
+    if lesson_id and ObjectId.is_valid(lesson_id):
+        if section:
+            lesson = Lesson.objects(id=lesson_id, section_id=section.id).first()
+        else:
+            lesson = Lesson.objects(id=lesson_id).first()
+            if lesson and lesson.section_id and lesson.section_id.subject_id != subject:
+                lesson = None
+    if lesson_id and not lesson:
+        flash("الدرس المحدد غير صالح.", "error")
+        return redirect(url_for("teacher.courses_manage", subject_id=subject.id))
+
+    if lesson and not section:
+        section = lesson.section_id
+
+    row = CourseSet(
+        subject_id=subject.id,
+        section_id=section.id if section else None,
+        lesson_id=lesson.id if lesson else None,
+        title=title,
+        description=description,
+        xp_per_question=xp_per_question,
+        created_by=current_user.id,
+        is_active=is_active,
+    )
+    row.save()
+
+    flash("تم إنشاء الدورة. أضف الأسئلة الآن.", "success")
+    return redirect(url_for("teacher.course_set_edit", course_set_id=row.id))
+
+
+@teacher_bp.route("/courses/<course_set_id>/edit", methods=["GET", "POST"])
+@login_required
+@role_required("teacher", "question_editor")
+def course_set_edit(course_set_id):
+    course_set = CourseSet.objects(id=course_set_id).first()
+    if not course_set:
+        raise NotFound()
+
+    scope_response = _ensure_subject_scope(_subject_id_for_course_set(course_set))
+    if scope_response:
+        return scope_response
+
+    subject = course_set.subject_id
+    sections = list(Section.objects(subject_id=subject.id).order_by("created_at").all())
+    section_ids = [s.id for s in sections]
+    lessons = list(Lesson.objects(section_id__in=section_ids).order_by("created_at").all()) if section_ids else []
+
+    if request.method == "POST":
+        action = (request.form.get("action") or "").strip()
+
+        if action == "update_set":
+            title = (request.form.get("title") or "").strip()
+            description = (request.form.get("description") or "").strip() or None
+            xp_per_question_raw = (request.form.get("xp_per_question") or "").strip()
+            section_id = (request.form.get("section_id") or "").strip()
+            lesson_id = (request.form.get("lesson_id") or "").strip()
+            is_active = (request.form.get("is_active") or "").strip().lower() == "on"
+
+            if not title:
+                flash("عنوان الدورة مطلوب.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+            try:
+                xp_per_question = max(1, int(xp_per_question_raw or "1"))
+            except Exception:
+                flash("قيمة XP لكل سؤال غير صالحة.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+            section = None
+            if section_id and ObjectId.is_valid(section_id):
+                section = Section.objects(id=section_id, subject_id=subject.id).first()
+            if section_id and not section:
+                flash("القسم المحدد غير صالح.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+            lesson = None
+            if lesson_id and ObjectId.is_valid(lesson_id):
+                if section:
+                    lesson = Lesson.objects(id=lesson_id, section_id=section.id).first()
+                else:
+                    lesson = Lesson.objects(id=lesson_id).first()
+                    if lesson and lesson.section_id and lesson.section_id.subject_id != subject:
+                        lesson = None
+            if lesson_id and not lesson:
+                flash("الدرس المحدد غير صالح.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+            if lesson and not section:
+                section = lesson.section_id
+
+            course_set.title = title
+            course_set.description = description
+            course_set.xp_per_question = xp_per_question
+            course_set.section_id = section.id if section else None
+            course_set.lesson_id = lesson.id if lesson else None
+            course_set.is_active = is_active
+            course_set.save()
+            flash("تم تحديث بيانات الدورة.", "success")
+            return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+        if action == "add_question":
+            q_img = (request.form.get("question_image_url") or "").strip()
+            a_img = (request.form.get("answer_image_url") or "").strip()
+            correct_raw = (request.form.get("correct_value") or "").strip().lower()
+            correct_value = correct_raw == "true"
+
+            if not q_img or not a_img:
+                flash("أدخل رابط صورة السؤال ورابط صورة الإجابة.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+            CourseQuestion(
+                course_set_id=course_set.id,
+                question_image_url=q_img,
+                answer_image_url=a_img,
+                correct_value=correct_value,
+            ).save()
+            flash("تمت إضافة سؤال جديد.", "success")
+            return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+        if action == "update_question":
+            qid = (request.form.get("question_id") or "").strip()
+            q = CourseQuestion.objects(id=qid, course_set_id=course_set.id).first() if ObjectId.is_valid(qid) else None
+            if not q:
+                flash("السؤال غير موجود.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+            q_img = (request.form.get("question_image_url") or "").strip()
+            a_img = (request.form.get("answer_image_url") or "").strip()
+            correct_raw = (request.form.get("correct_value") or "").strip().lower()
+            correct_value = correct_raw == "true"
+
+            if not q_img or not a_img:
+                flash("أدخل رابط صورة السؤال ورابط صورة الإجابة.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+            q.question_image_url = q_img
+            q.answer_image_url = a_img
+            q.correct_value = correct_value
+            q.save()
+            flash("تم تحديث السؤال.", "success")
+            return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+        if action == "delete_question":
+            qid = (request.form.get("question_id") or "").strip()
+            q = CourseQuestion.objects(id=qid, course_set_id=course_set.id).first() if ObjectId.is_valid(qid) else None
+            if not q:
+                flash("السؤال غير موجود.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+            q.delete()
+            flash("تم حذف السؤال.", "success")
+            return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+
+    questions = list(CourseQuestion.objects(course_set_id=course_set.id).order_by("created_at").all())
+
+    return render_template(
+        "teacher/course_set_edit.html",
+        subject=subject,
+        course_set=course_set,
+        questions=questions,
+        sections=sections,
+        lessons=lessons,
+    )
+
+
+@teacher_bp.route("/courses/<course_set_id>/delete", methods=["POST"])
+@login_required
+@role_required("teacher", "question_editor")
+def course_set_delete(course_set_id):
+    course_set = CourseSet.objects(id=course_set_id).first()
+    if not course_set:
+        raise NotFound()
+
+    scope_response = _ensure_subject_scope(_subject_id_for_course_set(course_set))
+    if scope_response:
+        return scope_response
+
+    subject_id = course_set.subject_id.id if course_set.subject_id else None
+    CourseQuestion.objects(course_set_id=course_set.id).delete()
+    course_set.delete()
+    flash("تم حذف الدورة.", "success")
+    return redirect(url_for("teacher.courses_manage", subject_id=subject_id))
 
 
 @teacher_bp.route("/subjects/<subject_id>/edit", methods=["GET", "POST"])

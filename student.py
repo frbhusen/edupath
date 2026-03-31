@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from bson import ObjectId
 from mongoengine.errors import DoesNotExist
 
-from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, AttemptTextAnswer, TestTextQuestion, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats
+from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, AttemptTextAnswer, TestTextQuestion, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
 from .forms import ActivationForm, LessonActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
 from .extensions import cache
@@ -1278,6 +1278,183 @@ def subject_detail(subject_id):
         subject_open=subject_open,
         sections_data=sections_data,
     )
+
+
+def _course_set_open_for_student(course_set, student_id):
+    """Check if a student can access a course set based on subject/section/lesson access."""
+    if not course_set:
+        return False
+    if not course_set.is_active:
+        return False
+
+    subject_requires_code = bool(getattr(course_set.subject_id, "requires_code", False)) if course_set.subject_id else False
+    subject_active = bool(
+        SubjectActivation.objects(subject_id=course_set.subject_id.id, student_id=student_id, active=True).first()
+    ) if course_set.subject_id else False
+    if (not subject_active) and subject_requires_code:
+        return False
+
+    if course_set.lesson_id:
+        lesson = course_set.lesson_id
+        if not lesson or not lesson.section_id:
+            return False
+        access = AccessContext(lesson.section_id, student_id)
+        return access.lesson_open(lesson)
+
+    if course_set.section_id:
+        section = course_set.section_id
+        access = AccessContext(section, student_id)
+        return access.section_open
+
+    return True
+
+
+@student_bp.route("/subjects/<subject_id>/courses")
+@login_required
+def subject_courses(subject_id):
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        return "404", 404
+
+    all_sets = list(CourseSet.objects(subject_id=subject.id).order_by("created_at").all())
+
+    sets_data = []
+    for item in all_sets:
+        if current_user.role == "student":
+            is_open = _course_set_open_for_student(item, current_user.id)
+            if not is_open:
+                continue
+        else:
+            is_open = True
+
+        q_count = CourseQuestion.objects(course_set_id=item.id).count()
+        sets_data.append(
+            {
+                "course_set": item,
+                "question_count": q_count,
+                "is_open": is_open,
+            }
+        )
+
+    return render_template(
+        "student/course_sets.html",
+        subject=subject,
+        sets_data=sets_data,
+    )
+
+
+@student_bp.route("/courses/<course_set_id>/take", methods=["GET"])
+@login_required
+def course_take(course_set_id):
+    course_set = CourseSet.objects(id=course_set_id).first()
+    if not course_set:
+        return "404", 404
+
+    if current_user.role == "student":
+        if not _course_set_open_for_student(course_set, current_user.id):
+            flash("غير مسموح.", "error")
+            return redirect(url_for("student.subject_courses", subject_id=course_set.subject_id.id))
+
+    questions = list(CourseQuestion.objects(course_set_id=course_set.id).order_by("created_at").all())
+    if not questions:
+        flash("لا توجد أسئلة في هذه الدورة حالياً.", "warning")
+        return redirect(url_for("student.subject_courses", subject_id=course_set.subject_id.id))
+
+    return render_template("student/course_take.html", course_set=course_set, questions=questions)
+
+
+@student_bp.route("/courses/<course_set_id>/submit", methods=["POST"])
+@login_required
+def course_submit(course_set_id):
+    course_set = CourseSet.objects(id=course_set_id).first()
+    if not course_set:
+        return "404", 404
+
+    if current_user.role == "student":
+        if not _course_set_open_for_student(course_set, current_user.id):
+            flash("غير مسموح.", "error")
+            return redirect(url_for("student.subject_courses", subject_id=course_set.subject_id.id))
+
+    questions = list(CourseQuestion.objects(course_set_id=course_set.id).order_by("created_at").all())
+    if not questions:
+        flash("لا توجد أسئلة في هذه الدورة.", "error")
+        return redirect(url_for("student.subject_courses", subject_id=course_set.subject_id.id))
+
+    score = 0
+    total = len(questions)
+
+    attempt = CourseAttempt(
+        course_set_id=course_set.id,
+        student_id=current_user.id,
+        status="submitted",
+        total=total,
+        score=0,
+        xp_earned=0,
+    )
+    attempt.save()
+
+    for q in questions:
+        raw = (request.form.get(f"question_{q.id}") or "").strip().lower()
+        selected_value = raw == "true"
+        # Self-evaluation mode: student marks if their own solution was correct.
+        is_correct = bool(selected_value)
+        if is_correct:
+            score += 1
+
+        CourseAnswer(
+            attempt_id=attempt.id,
+            question_id=q.id,
+            selected_value=selected_value,
+            is_correct=is_correct,
+        ).save()
+
+    attempt.score = score
+    attempt.total = total
+    xp_per_question = max(1, int(getattr(course_set, "xp_per_question", 1) or 1))
+    earned_xp = score * xp_per_question
+    if total > 0 and score == total:
+        earned_xp *= 2
+    attempt.xp_earned = earned_xp
+    attempt.save()
+
+    _award_flat_xp_once(
+        student_id=current_user.id,
+        event_type="interactive_course_submit",
+        source_id=str(attempt.id),
+        amount=earned_xp,
+    )
+
+    return redirect(url_for("student.course_result", attempt_id=attempt.id))
+
+
+@student_bp.route("/courses/attempts/<attempt_id>/result", methods=["GET"])
+@login_required
+def course_result(attempt_id):
+    attempt = CourseAttempt.objects(id=attempt_id).first()
+    if not attempt:
+        return "404", 404
+
+    if str(attempt.student_id.id) != str(current_user.id) and (current_user.role or "").lower() not in {"teacher", "admin", "question_editor"}:
+        flash("غير مسموح.", "error")
+        return redirect(url_for("student.subjects"))
+
+    course_set = attempt.course_set_id
+    answers = list(CourseAnswer.objects(attempt_id=attempt.id).all())
+    answer_by_qid = {str(a.question_id.id): a for a in answers if a.question_id}
+    questions = list(CourseQuestion.objects(course_set_id=course_set.id).order_by("created_at").all()) if course_set else []
+
+    review = []
+    for q in questions:
+        ans = answer_by_qid.get(str(q.id))
+        review.append(
+            {
+                "question": q,
+                "answer": ans,
+            }
+        )
+    gamification = StudentGamification.objects(student_id=attempt.student_id.id).first()
+
+    return render_template("student/course_result.html", attempt=attempt, course_set=course_set, review=review, gamification=gamification)
 
 @student_bp.route("/sections/<section_id>")
 @login_required

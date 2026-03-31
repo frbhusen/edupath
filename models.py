@@ -418,6 +418,86 @@ class CustomTestAnswer(Document):
     }
 
 
+class CourseSet(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    subject_id = ReferenceField(Subject, required=True)
+    section_id = ReferenceField(Section, null=True)
+    lesson_id = ReferenceField(Lesson, null=True)
+    title = StringField(required=True, max_length=200)
+    description = StringField(null=True)
+    created_by = ReferenceField(User, required=True)
+    xp_per_question = IntField(default=1, required=True)
+    is_active = BooleanField(default=True, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'course_sets',
+        'indexes': [
+            'subject_id',
+            'section_id',
+            'lesson_id',
+            'created_by',
+            'is_active',
+            'created_at',
+        ]
+    }
+
+
+class CourseQuestion(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    course_set_id = ReferenceField(CourseSet, required=True)
+    question_image_url = StringField(required=True, max_length=500)
+    answer_image_url = StringField(required=True, max_length=500)
+    correct_value = BooleanField(required=True, default=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'course_questions',
+        'indexes': [
+            'course_set_id',
+            'created_at',
+        ]
+    }
+
+
+class CourseAttempt(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    course_set_id = ReferenceField(CourseSet, required=True)
+    student_id = ReferenceField(User, required=True)
+    status = StringField(default='submitted', max_length=20, required=True)
+    total = IntField(default=0, required=True)
+    score = IntField(default=0, required=True)
+    xp_earned = IntField(default=0, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'course_attempts',
+        'indexes': [
+            'course_set_id',
+            'student_id',
+            ('student_id', 'course_set_id'),
+            'created_at',
+        ]
+    }
+
+
+class CourseAnswer(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    attempt_id = ReferenceField(CourseAttempt, required=True)
+    question_id = ReferenceField(CourseQuestion, required=True)
+    selected_value = BooleanField(required=True, default=False)
+    is_correct = BooleanField(required=True, default=False)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'course_answers',
+        'indexes': [
+            'attempt_id',
+            'question_id',
+        ]
+    }
+
+
 class StudentGamification(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     student_id = ReferenceField(User, required=True, unique=True)

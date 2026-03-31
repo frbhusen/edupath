@@ -13,11 +13,13 @@ _TARGET_ID_KEYS = (
     "subject_id",
     "section_id",
     "lesson_id",
+    "course_set_id",
+    "course_id",
     "resource_id",
     "test_id",
     "question_id",
-    "assignment_id",
     "attempt_id",
+    "assignment_id",
     "certificate_id",
 )
 _SENSITIVE_KEYS = {

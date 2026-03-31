@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .interactive-course-shell .qa-card {
+    border: 1px solid #dbe2ea;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .interactive-course-shell .qa-grid {
+    direction: ltr;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+  }
+
+  .interactive-course-shell .img-panel {
+    border: 1px solid #dbe2ea;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0.6rem;
+  }
+
+  .interactive-course-shell .img-panel .panel-title {
+    direction: rtl;
+    text-align: center;
+    color: #334155;
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .interactive-course-shell .img-frame {
+    width: 100%;
+    height: 320px;
+    border: 1px solid #dbe2ea;
+    border-radius: 10px;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .interactive-course-shell .img-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .interactive-course-shell .answer-hidden-note {
+    direction: rtl;
+    color: #64748b;
+    font-size: 0.9rem;
+  }
+
+  .interactive-course-shell .center-actions {
+    direction: rtl;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .interactive-course-shell .eval-btns {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 991px) {
+    .interactive-course-shell .qa-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .interactive-course-shell .img-frame {
+      height: 260px;
+    }
+  }
+</style>
+
+<div class="interactive-course-shell">
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">{{ course_set.title }}</h1>
+    <p class="mb-0">اختر صحيح أو خطأ لكل سؤال، ويمكنك إظهار صورة الإجابة.</p>
+    <div class="small text-muted">XP لكل سؤال: {{ course_set.xp_per_question|default(1) }} | الدرجة الكاملة = مضاعفة XP</div>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.subject_courses', subject_id=course_set.subject_id.id) }}">رجوع</a>
+</div>
+
+<form method="post" action="{{ url_for('student.course_submit', course_set_id=course_set.id) }}">
+  {% for q in questions %}
+    <div class="card qa-card mb-3">
+      <div class="card-body">
+        <div class="fw-semibold text-center mb-3">السؤال {{ loop.index }}</div>
+
+        <div class="qa-grid">
+          <div class="img-panel">
+            <div class="panel-title">صورة السؤال</div>
+            <div class="img-frame">
+              <img src="{{ q.question_image_url }}" alt="صورة السؤال">
+            </div>
+          </div>
+
+          <div class="img-panel">
+            <div class="panel-title">صورة الإجابة</div>
+            <div class="img-frame" id="answer-{{ q.id }}">
+              <img src="{{ q.answer_image_url }}" alt="صورة الإجابة" class="d-none answer-image">
+              <div class="answer-hidden-note" id="answer-note-{{ q.id }}">اضغط "إظهار الإجابة" لعرض الصورة</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="center-actions mt-3">
+          <button class="btn btn-outline-secondary btn-sm reveal-answer-btn" type="button" data-answer-id="answer-{{ q.id }}" data-answer-note-id="answer-note-{{ q.id }}" aria-expanded="false" aria-controls="answer-{{ q.id }}">إظهار الإجابة</button>
+
+          <div class="eval-btns">
+            <input class="btn-check course-eval-input" type="radio" name="question_{{ q.id }}" id="q{{ q.id }}-true" value="true" required disabled>
+            <label class="btn btn-outline-success" for="q{{ q.id }}-true">حلّي صحيح</label>
+
+            <input class="btn-check course-eval-input" type="radio" name="question_{{ q.id }}" id="q{{ q.id }}-false" value="false" required disabled>
+            <label class="btn btn-outline-danger" for="q{{ q.id }}-false">حلّي غير صحيح</label>
+          </div>
+          <div class="small text-muted">بعد إظهار الإجابة، اختر تقييمك الذاتي.</div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="d-grid">
+    <button class="btn btn-cta btn-lg" type="submit">إرسال</button>
+  </div>
+</form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const revealButtons = document.querySelectorAll('.reveal-answer-btn');
+    revealButtons.forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const targetId = btn.getAttribute('data-answer-id');
+        const noteId = btn.getAttribute('data-answer-note-id');
+        if (!targetId) return;
+        const answerBox = document.getElementById(targetId);
+        if (!answerBox) return;
+        const answerImage = answerBox.querySelector('.answer-image');
+        const note = noteId ? document.getElementById(noteId) : null;
+        if (!answerImage) return;
+
+        const nowVisible = answerImage.classList.contains('d-none');
+        answerImage.classList.toggle('d-none');
+        if (note) {
+          note.classList.toggle('d-none', nowVisible);
+        }
+        btn.textContent = nowVisible ? 'إخفاء الإجابة' : 'إظهار الإجابة';
+        btn.setAttribute('aria-expanded', nowVisible ? 'true' : 'false');
+
+        const box = btn.closest('.card-body');
+        if (!box) return;
+        const radios = box.querySelectorAll('.course-eval-input');
+        radios.forEach((r) => {
+          r.disabled = false;
+        });
+      });
+    });
+  })();
+</script>
+{% endblock %}
