@@ -49,6 +49,42 @@
   <div class="alert alert-light">لا توجد دروس بعد.</div>
 {% endif %}
 
+{% if current_user.role == 'admin' and lessons %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h3 class="h6 mb-3">إنشاء اختبارات متعددة بنفس الأسماء على عدة دروس</h3>
+      <form method="post" action="{{ url_for('teacher.bulk_create_tests', section_id=section.id) }}" class="row g-3">
+        <div class="col-12 col-lg-6">
+          <label class="form-label">اختر الدروس</label>
+          <select class="form-select" name="lesson_ids" multiple size="6" required>
+            {% for lesson in lessons %}
+              <option value="{{ lesson.id }}">{{ lesson.title }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">يمكنك اختيار أكثر من درس.</div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <label class="form-label">أسماء الاختبارات (اسم في كل سطر)</label>
+          <textarea class="form-control" name="test_titles" rows="6" placeholder="TEST1&#10;TEST2" required></textarea>
+        </div>
+        <div class="col-12 col-lg-8">
+          <label class="form-label">وصف موحّد (اختياري)</label>
+          <input class="form-control" name="description" placeholder="وصف الاختبار">
+        </div>
+        <div class="col-12 col-lg-4 d-flex align-items-end">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="bulk-requires-code" name="requires_code">
+            <label class="form-check-label" for="bulk-requires-code">يتطلب رمز تفعيل</label>
+          </div>
+        </div>
+        <div class="col-12 d-flex justify-content-end">
+          <button class="btn btn-cta" type="submit">إنشاء الاختبارات</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="h6 mb-0">اختبارات القسم (بدون درس)</h3>
   <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.new_test', section_id=section.id) }}">إضافة اختبار</a>

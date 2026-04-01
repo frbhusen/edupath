@@ -78,7 +78,34 @@
     <a class="action-card" href="{{ url_for('student.certificates') }}"
       ><span class="icon">🎓</span><span>شهاداتي</span></a
     >
-    {% elif current_user.role in ['teacher', 'admin'] %}
+    {% elif current_user.role == 'teacher' %}
+    <a class="action-card" href="{{ url_for('teacher.my_students') }}"
+      ><span class="icon">👥</span><span>Students</span></a
+    >
+    {% if teacher_home_subject %}
+    <a
+      class="action-card"
+      href="{{ url_for('teacher.subject_detail', subject_id=teacher_home_subject.id) }}"
+      ><span class="icon">📚</span><span>My Subject</span></a
+    >
+    {% else %}
+    <a class="action-card" href="{{ url_for('teacher.dashboard') }}"
+      ><span class="icon">📚</span><span>My Subject</span></a
+    >
+    {% endif %}
+    <a class="action-card" href="{{ url_for('teacher.discussions_manage', pinned='1') }}"
+      ><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a
+    >
+    <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}"
+      ><span class="icon">✅</span><span>إدارة الواجبات</span></a
+    >
+    <a class="action-card" href="{{ url_for('teacher.discussions_manage') }}"
+      ><span class="icon">💬</span><span>إدارة المناقشات</span></a
+    >
+    <a class="action-card" href="{{ url_for('notifications_inbox') }}"
+      ><span class="icon">🔔</span><span>الإشعارات</span></a
+    >
+    {% elif current_user.role == 'admin' %}
     <a class="action-card" href="{{ url_for('teacher.dashboard') }}"
       ><span class="icon">🧭</span><span>لوحة المعلم</span></a
     >
@@ -105,7 +132,6 @@
     <a class="action-card" href="{{ url_for('notifications_inbox') }}"
       ><span class="icon">🔔</span><span>الإشعارات</span></a
     >
-    {% if current_user.role == 'admin' %}
     <a class="action-card" href="{{ url_for('teacher.analytics_dashboard') }}"
       ><span class="icon">📈</span><span>التحليلات</span></a
     >
@@ -121,11 +147,10 @@
     <a class="action-card" href="{{ url_for('admin.notifications_manage') }}"
       ><span class="icon">📣</span><span>إرسال إشعار</span></a
     >
-    {% endif %} {% if current_user.role == 'admin' %}
     <a class="action-card" href="{{ url_for('admin.dashboard') }}"
       ><span class="icon">⚙️</span><span>الإدارة</span></a
     >
-    {% endif %} {% elif current_user.role == 'question_editor' %}
+    {% elif current_user.role == 'question_editor' %}
     <a
       class="action-card"
       href="{{ url_for('teacher.question_editor_dashboard') }}"

@@ -285,9 +285,12 @@ def dashboard():
     has_prev = page > 1
     has_next = page < total_pages
     
+    primary_subject = subjects[0] if subjects else None
+
     return render_template(
         "teacher/dashboard.html", 
         subjects=subjects,
+        primary_subject=primary_subject,
         page=page,
         total_pages=total_pages,
         has_prev=has_prev,
@@ -543,12 +546,58 @@ def delete_custom_attempt(attempt_id):
     return redirect(url_for("teacher.results_overview"))
 
 
+@teacher_bp.route("/my-students", methods=["GET"])
+@login_required
+@role_required("teacher")
+def my_students():
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
+    selected_subject = None
+    if allowed_subject_ids is None:
+        return redirect(url_for("teacher.students"))
+    scoped_subjects = list(Subject.objects(id__in=list(allowed_subject_ids)).order_by("created_at").all())
+    selected_subject_id = (request.args.get("subject_id") or "").strip()
+    if selected_subject_id and ObjectId.is_valid(selected_subject_id):
+        candidate = Subject.objects(id=selected_subject_id).first()
+        if candidate and candidate.id in allowed_subject_ids:
+            selected_subject = candidate
+    if not selected_subject:
+        selected_subject = scoped_subjects[0] if scoped_subjects else None
+
+    if not selected_subject:
+        return render_template("teacher/students.html", students=[], selected_subject=None)
+
+    section_ids = [s.id for s in Section.objects(subject_id=selected_subject.id).only("id").all()]
+    lesson_ids = [l.id for l in Lesson.objects(section_id__in=section_ids).only("id").all()] if section_ids else []
+    test_ids = [t.id for t in Test.objects(section_id__in=section_ids).only("id").all()] if section_ids else []
+
+    student_ids = set()
+    for row in SubjectActivation.objects(subject_id=selected_subject.id).only("student_id").all():
+        if row.student_id:
+            student_ids.add(row.student_id.id)
+    for row in SectionActivation.objects(section_id__in=section_ids).only("student_id").all():
+        if row.student_id:
+            student_ids.add(row.student_id.id)
+    for row in LessonActivation.objects(lesson_id__in=lesson_ids).only("student_id").all():
+        if row.student_id:
+            student_ids.add(row.student_id.id)
+    for row in Attempt.objects(test_id__in=test_ids).only("student_id").all():
+        if row.student_id:
+            student_ids.add(row.student_id.id)
+
+    if student_ids:
+        students = User.objects(role="student", id__in=list(student_ids)).order_by('-created_at').all()
+    else:
+        students = []
+
+    return render_template("teacher/students.html", students=students, selected_subject=selected_subject)
+
+
 @teacher_bp.route("/students", methods=["GET"])
 @login_required
 @role_required("admin")
 def students():
     students = User.objects(role="student").order_by('-created_at').all()
-    return render_template("teacher/students.html", students=students)
+    return render_template("teacher/students.html", students=students, selected_subject=None)
 
 
 @teacher_bp.route("/students/<student_id>/delete", methods=["POST"])
@@ -636,7 +685,10 @@ def discussions_manage():
             return redirect(url_for("teacher.discussions_manage"))
 
     lesson_id = (request.args.get("lesson_id") or "").strip()
+    pinned_only = (request.args.get("pinned") or "").strip().lower() in {"1", "true", "yes", "on"}
     questions_q = DiscussionQuestion.objects()
+    if pinned_only:
+        questions_q = questions_q.filter(is_pinned=True)
     if allowed_subject_ids is not None:
         allowed_sections = [s.id for s in Section.objects(subject_id__in=list(allowed_subject_ids)).only("id").all()]
         allowed_lessons = [l.id for l in Lesson.objects(section_id__in=allowed_sections).only("id").all()] if allowed_sections else []
@@ -684,6 +736,7 @@ def discussions_manage():
         lessons_by_id=lessons_by_id,
         all_lessons=all_lessons,
         selected_lesson_id=lesson_id,
+        pinned_only=pinned_only,
     )
 
 
@@ -2827,6 +2880,66 @@ def new_test(section_id):
         flash("تم إنشاء الاختبار بنجاح.", "success")
         return redirect(url_for("teacher.test_detail", test_id=test.id))
     return render_template("teacher/test_form.html", form=form, section=section)
+
+
+@teacher_bp.route("/sections/<section_id>/tests/bulk-create", methods=["POST"])
+@login_required
+@role_required("teacher")
+def bulk_create_tests(section_id):
+    section = Section.objects(id=section_id).first()
+    if not section:
+        raise NotFound()
+    scope_response = _ensure_scope_for_section(section)
+    if scope_response:
+        return scope_response
+
+    if not is_admin(current_user):
+        flash("هذه الخاصية متاحة للمشرف فقط.", "error")
+        return redirect(url_for("teacher.section_detail", section_id=section.id))
+
+    raw_titles = (request.form.get("test_titles") or "").strip()
+    lesson_ids_raw = [lid.strip() for lid in request.form.getlist("lesson_ids") if ObjectId.is_valid(lid.strip())]
+    description = (request.form.get("description") or "").strip() or None
+    requires_code = (request.form.get("requires_code") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+    titles = []
+    seen_titles = set()
+    for line in raw_titles.splitlines():
+        title = line.strip()
+        if not title:
+            continue
+        if title in seen_titles:
+            continue
+        seen_titles.add(title)
+        titles.append(title)
+
+    if not lesson_ids_raw:
+        flash("اختر درساً واحداً على الأقل.", "error")
+        return redirect(url_for("teacher.section_detail", section_id=section.id))
+    if not titles:
+        flash("أدخل اسم اختبار واحد على الأقل (اسم في كل سطر).", "error")
+        return redirect(url_for("teacher.section_detail", section_id=section.id))
+
+    lessons = list(Lesson.objects(id__in=[ObjectId(lid) for lid in lesson_ids_raw], section_id=section.id).all())
+    if not lessons:
+        flash("لم يتم العثور على دروس صالحة في هذا القسم.", "error")
+        return redirect(url_for("teacher.section_detail", section_id=section.id))
+
+    created = 0
+    for lesson in lessons:
+        for title in titles:
+            Test(
+                section_id=section.id,
+                lesson_id=lesson.id,
+                title=title,
+                description=description,
+                created_by=current_user.id,
+                requires_code=requires_code,
+            ).save()
+            created += 1
+
+    flash(f"تم إنشاء {created} اختباراً عبر {len(lessons)} درس.", "success")
+    return redirect(url_for("teacher.section_detail", section_id=section.id))
 
 
 @teacher_bp.route("/tests/<test_id>")
