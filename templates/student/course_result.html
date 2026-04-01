@@ -44,12 +44,26 @@
             </div>
             <div class="row g-2">
               <div class="col-12 col-lg-6">
-                <div class="small text-muted mb-1">صورة السؤال</div>
-                <img src="{{ q.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 280px;">
+                <div class="small text-muted mb-1">السؤال</div>
+                {% if q.question_text %}
+                  <div class="border rounded p-2 mb-2 math-content preserve-format">{{ q.question_text }}</div>
+                {% endif %}
+                {% if q.question_image_url %}
+                  <img src="{{ q.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 280px;">
+                {% else %}
+                  <div class="small text-muted">لا توجد صورة سؤال.</div>
+                {% endif %}
               </div>
               <div class="col-12 col-lg-6">
-                <div class="small text-muted mb-1">صورة الإجابة</div>
-                <img src="{{ q.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 280px;">
+                <div class="small text-muted mb-1">الإجابة</div>
+                {% if q.answer_text %}
+                  <div class="border rounded p-2 mb-2 math-content preserve-format">{{ q.answer_text }}</div>
+                {% endif %}
+                {% if q.answer_image_url %}
+                  <img src="{{ q.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 280px;">
+                {% else %}
+                  <div class="small text-muted">لا توجد صورة إجابة.</div>
+                {% endif %}
               </div>
             </div>
             <div class="mt-2 small">

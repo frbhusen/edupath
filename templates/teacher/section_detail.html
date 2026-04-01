@@ -7,7 +7,7 @@
       <h2 class="h5 mb-0">{{ section.title }}</h2>
     </div>
     <div class="d-flex gap-2">
-      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.edit_section', section_id=section.id) }}">تعديل</a>
+      <a class="btn btn-outline-primary btn-sm" href="#section-edit-form">تعديل</a>
       <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.manage_section_access', section_id=section.id) }}">إدارة الوصول</a>
       <form method="post" action="{{ url_for('teacher.delete_section', section_id=section.id) }}" onsubmit="return confirm('حذف القسم؟');">
         <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
@@ -19,6 +19,58 @@
       <p>{{ section.description }}</p>
     {% endif %}
     <div class="text-muted small">يتطلب كود: {{ 'نعم' if section.requires_code else 'لا' }}</div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4" id="section-edit-form">
+  <div class="card-header">
+    <h3 class="h6 mb-0">تعديل بيانات القسم</h3>
+  </div>
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      {{ form.hidden_tag() }}
+      <input type="hidden" name="form_name" value="update_section">
+      <div class="col-12 col-lg-6">
+        <label class="form-label">{{ form.title.label.text }}</label>
+        {{ form.title(class="form-control", placeholder="عنوان القسم") }}
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ form.description.label.text }}</label>
+        {{ form.description(class="form-control", rows=3, placeholder="وصف اختياري") }}
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          {{ form.requires_code(class="form-check-input", id="section_requires_code") }}
+          <label class="form-check-label" for="section_requires_code">{{ form.requires_code.label.text }}</label>
+        </div>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-cta" type="submit">حفظ التعديلات</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4" id="section-batch-lessons-form">
+  <div class="card-header">
+    <h3 class="h6 mb-0">إضافة دروس دفعة واحدة</h3>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      {{ form.csrf_token }}
+      <input type="hidden" name="form_name" value="batch_add_lessons">
+      <div class="mb-3">
+        <label class="form-label">أسماء الدروس (اسم في كل سطر)</label>
+        <textarea class="form-control" name="lesson_titles" rows="6" placeholder="الدرس الأول&#10;الدرس الثاني&#10;الدرس الثالث" required></textarea>
+      </div>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="lessons_requires_code" name="lessons_requires_code">
+        <label class="form-check-label" for="lessons_requires_code">جعل جميع الدروس الجديدة تتطلب رمز تفعيل</label>
+      </div>
+      <div class="d-flex justify-content-end">
+        <button class="btn btn-cta" type="submit">إضافة جميع الدروس</button>
+      </div>
+    </form>
   </div>
 </div>
 

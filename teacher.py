@@ -17,7 +17,7 @@ from .models import (
     ActivationCode, SectionActivation, LessonActivation, LessonActivationCode,
     SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt, CustomTestAnswer,
     StudentGamification, XPEvent, Assignment, AssignmentSubmission, LessonCompletion,
-    StudyPlan, StudyPlanItem, AssignmentAttempt, TestTextQuestion, AttemptTextAnswer,
+    StudyPlan, StudyPlanItem, AssignmentAttempt,
     DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats,
     CourseSet, CourseQuestion, TestInteractiveQuestion
 )
@@ -231,19 +231,19 @@ def dashboard():
         lessons = list(Lesson.objects(section_id__in=section_ids).all())
         tests = list(Test.objects(section_id__in=section_ids).all())
 
-        # Bulk count questions per test (MCQ + text) to avoid per-row queries.
+        # Bulk count questions per test (MCQ + interactive) to avoid per-row queries.
         test_ids = [t.id for t in tests]
         mcq_counts = {}
-        text_counts = {}
+        interactive_counts = {}
         if test_ids:
             for q in Question.objects(test_id__in=test_ids).only("test_id").all():
                 tid = q.test_id.id if q.test_id else None
                 if tid:
                     mcq_counts[tid] = mcq_counts.get(tid, 0) + 1
-            for tq in TestTextQuestion.objects(test_id__in=test_ids).only("test_id").all():
-                tid = tq.test_id.id if tq.test_id else None
+            for iq in TestInteractiveQuestion.objects(test_id__in=test_ids).only("test_id").all():
+                tid = iq.test_id.id if iq.test_id else None
                 if tid:
-                    text_counts[tid] = text_counts.get(tid, 0) + 1
+                    interactive_counts[tid] = interactive_counts.get(tid, 0) + 1
         
         # Group by section
         lessons_by_section = {}
@@ -261,7 +261,7 @@ def dashboard():
             if section_id not in tests_by_section:
                 tests_by_section[section_id] = []
             tests_by_section[section_id].append(test)
-            test._cached_question_count = mcq_counts.get(test.id, 0) + text_counts.get(test.id, 0)
+            test._cached_question_count = mcq_counts.get(test.id, 0) + interactive_counts.get(test.id, 0)
             
             # Also group by lesson if test is linked to lesson
             if test.lesson_id:
@@ -450,14 +450,12 @@ def manage_attempt(attempt_id):
     student = attempt.student_id
     test = attempt.test_id
     questions = Question.objects(test_id=test.id).all()
-    text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
 
     if request.method == "POST":
         action = request.form.get("action")
         if action == "delete":
             # Delete answers then attempt
             AttemptAnswer.objects(attempt_id=attempt.id).delete()
-            AttemptTextAnswer.objects(attempt_id=attempt.id).delete()
             attempt.delete()
             flash("تم حذف محاولة الاختبار بنجاح.", "success")
             return_student_id = (request.form.get("return_student_id") or "").strip()
@@ -479,40 +477,15 @@ def manage_attempt(attempt_id):
                 ans.is_correct = choice.is_correct if choice else False
                 ans.save()
 
-            # Grade text answers (manual by teacher/admin)
-            text_total = 0
-            text_score = 0
-            for tq in text_questions:
-                ta = AttemptTextAnswer.objects(attempt_id=attempt.id, text_question_id=tq.id).first()
-                if not ta:
-                    continue
-                max_score = max(1, int(getattr(tq, 'max_score', 5) or 5))
-                text_total += max_score
-                ta.max_score = max_score
-
-                raw_val = request.form.get(f"text_score_{tq.id}")
-                if raw_val is not None and str(raw_val).strip() != "":
-                    try:
-                        awarded = int(raw_val)
-                    except Exception:
-                        awarded = 0
-                    awarded = max(0, min(awarded, max_score))
-                    ta.score_awarded = awarded
-                # Keep None when still not graded for this answer
-                ta.save()
-                if ta.score_awarded is not None:
-                    text_score += int(ta.score_awarded or 0)
-
             mcq_score = sum(1 for aa in AttemptAnswer.objects(attempt_id=attempt.id) if aa.is_correct)
             mcq_total = len(questions)
-            attempt.score = mcq_score + text_score
-            attempt.total = mcq_total + text_total
+            attempt.score = mcq_score
+            attempt.total = mcq_total
             attempt.save()
             flash("تم حفظ الدرجات بنجاح.", "success")
             return redirect(url_for("teacher.student_results", student_id=student.id))
 
     answers = {aa.question_id: aa for aa in AttemptAnswer.objects(attempt_id=attempt.id).all()}
-    text_answers = {ta.text_question_id.id: ta for ta in AttemptTextAnswer.objects(attempt_id=attempt.id).all() if ta.text_question_id}
     return render_template(
         "teacher/attempt_manage.html",
         attempt=attempt,
@@ -520,8 +493,6 @@ def manage_attempt(attempt_id):
         test=test,
         questions=questions,
         answers=answers,
-        text_questions=text_questions,
-        text_answers=text_answers,
     )
 
 
@@ -1579,7 +1550,7 @@ def analytics_dashboard():
     sections_count = Section.objects.count()
     lessons_count = Lesson.objects.count()
     tests_count = Test.objects.count()
-    questions_count = int(Question.objects.count() + TestTextQuestion.objects.count())
+    questions_count = int(Question.objects.count() + TestInteractiveQuestion.objects.count())
 
     overall_avg = 0
     scored = [((a.score / a.total) * 100) for a in attempts if a.total]
@@ -2454,20 +2425,25 @@ def course_set_edit(course_set_id):
             return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
 
         if action == "add_question":
+            q_text = (request.form.get("question_text") or "").strip() or None
             q_img = (request.form.get("question_image_url") or "").strip()
+            a_text = (request.form.get("answer_text") or "").strip() or None
             a_img = (request.form.get("answer_image_url") or "").strip()
-            correct_raw = (request.form.get("correct_value") or "").strip().lower()
-            correct_value = correct_raw == "true"
 
-            if not q_img or not a_img:
-                flash("أدخل رابط صورة السؤال ورابط صورة الإجابة.", "error")
+            if not q_text and not q_img:
+                flash("أدخل نص السؤال أو رابط صورة السؤال على الأقل.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+            if not a_text and not a_img:
+                flash("أدخل نص الإجابة أو رابط صورة الإجابة على الأقل.", "error")
                 return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
 
             CourseQuestion(
                 course_set_id=course_set.id,
-                question_image_url=q_img,
-                answer_image_url=a_img,
-                correct_value=correct_value,
+                question_text=q_text,
+                question_image_url=q_img or None,
+                answer_text=a_text,
+                answer_image_url=a_img or None,
+                correct_value=True,
             ).save()
             flash("تمت إضافة سؤال جديد.", "success")
             return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
@@ -2479,18 +2455,23 @@ def course_set_edit(course_set_id):
                 flash("السؤال غير موجود.", "error")
                 return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
 
+            q_text = (request.form.get("question_text") or "").strip() or None
             q_img = (request.form.get("question_image_url") or "").strip()
+            a_text = (request.form.get("answer_text") or "").strip() or None
             a_img = (request.form.get("answer_image_url") or "").strip()
-            correct_raw = (request.form.get("correct_value") or "").strip().lower()
-            correct_value = correct_raw == "true"
 
-            if not q_img or not a_img:
-                flash("أدخل رابط صورة السؤال ورابط صورة الإجابة.", "error")
+            if not q_text and not q_img:
+                flash("أدخل نص السؤال أو رابط صورة السؤال على الأقل.", "error")
+                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+            if not a_text and not a_img:
+                flash("أدخل نص الإجابة أو رابط صورة الإجابة على الأقل.", "error")
                 return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
 
+            q.question_text = q_text
             q.question_image_url = q_img
+            q.answer_text = a_text
             q.answer_image_url = a_img
-            q.correct_value = correct_value
+            q.correct_value = True
             q.save()
             flash("تم تحديث السؤال.", "success")
             return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
@@ -2602,7 +2583,7 @@ def new_section(subject_id):
     return render_template("teacher/section_form.html", form=form, subject=subject)
 
 
-@teacher_bp.route("/sections/<section_id>")
+@teacher_bp.route("/sections/<section_id>", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def section_detail(section_id):
@@ -2612,35 +2593,142 @@ def section_detail(section_id):
     scope_response = _ensure_scope_for_section(section)
     if scope_response:
         return scope_response
+
+    form = SectionForm()
+    if request.method == "POST":
+        form_name = (request.form.get("form_name") or "").strip()
+        if form_name == "update_section" and form.validate_on_submit():
+            section.title = form.title.data
+            section.description = form.description.data
+            section.requires_code = form.requires_code.data
+            section.save()
+            flash("تم تحديث القسم بنجاح.", "success")
+            return redirect(url_for("teacher.section_detail", section_id=section.id))
+        elif form_name == "batch_add_lessons":
+            raw_titles = (request.form.get("lesson_titles") or "").strip()
+            requires_code = (request.form.get("lessons_requires_code") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+            titles = []
+            seen = set()
+            for line in raw_titles.splitlines():
+                title = line.strip()
+                if not title:
+                    continue
+                if title in seen:
+                    continue
+                seen.add(title)
+                titles.append(title)
+
+            if not titles:
+                flash("أدخل اسم درس واحد على الأقل (اسم في كل سطر).", "error")
+                return redirect(url_for("teacher.section_detail", section_id=section.id))
+
+            created = 0
+            for title in titles:
+                Lesson(
+                    section_id=section.id,
+                    title=title,
+                    content="",
+                    requires_code=requires_code,
+                ).save()
+                created += 1
+
+            flash(f"تم إنشاء {created} درس بنجاح.", "success")
+            return redirect(url_for("teacher.section_detail", section_id=section.id))
+
+    if request.method == "GET":
+        form.title.data = section.title
+        form.description.data = section.description
+        form.requires_code.data = section.requires_code
+
     lessons = Lesson.objects(section_id=section.id).all()
     tests = Test.objects(section_id=section.id, lesson_id=None).all()  # section-wide tests
-    return render_template("teacher/section_detail.html", section=section, lessons=lessons, tests=tests)
+    return render_template("teacher/section_detail.html", section=section, lessons=lessons, tests=tests, form=form)
 
 
 @teacher_bp.route("/sections/<section_id>/edit", methods=["GET", "POST"])
 @login_required
 @role_required("teacher")
 def edit_section(section_id):
-    section = Section.objects(id=section_id).first()
-    if not section:
-        raise NotFound()
-    scope_response = _ensure_scope_for_section(section)
-    if scope_response:
-        return scope_response
-    subject = section.subject_id
-    form = SectionForm()
-    if form.validate_on_submit():
-        section.title = form.title.data
-        section.description = form.description.data
-        section.requires_code = form.requires_code.data
-        section.save()
-        flash("تم تحديث القسم بنجاح.", "success")
-        return redirect(url_for("teacher.section_detail", section_id=section.id))
-    elif request.method == "GET":
-        form.title.data = section.title
-        form.description.data = section.description
-        form.requires_code.data = section.requires_code
-    return render_template("teacher/section_form.html", form=form, section=section, subject=subject)
+    return redirect(url_for("teacher.section_detail", section_id=section_id))
+
+
+@teacher_bp.route("/lessons/batch-new", methods=["GET", "POST"])
+@login_required
+@role_required("teacher")
+def batch_new_lessons():
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
+
+    subjects_q = Subject.objects()
+    if allowed_subject_ids is not None:
+        subjects_q = subjects_q.filter(id__in=list(allowed_subject_ids))
+    subjects = list(subjects_q.order_by("created_at").all())
+
+    sections_q = Section.objects()
+    if allowed_subject_ids is not None:
+        sections_q = sections_q.filter(subject_id__in=list(allowed_subject_ids))
+    sections = list(sections_q.order_by("created_at").all())
+
+    if request.method == "POST":
+        subject_ids = request.form.getlist("subject_id[]")
+        section_ids = request.form.getlist("section_id[]")
+        titles = request.form.getlist("title[]")
+        requires_code = (request.form.get("requires_code") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+        rows_count = max(len(subject_ids), len(section_ids), len(titles))
+        created = 0
+        created_section_ids = set()
+        invalid_rows = 0
+
+        for idx in range(rows_count):
+            sid = (subject_ids[idx] if idx < len(subject_ids) else "").strip()
+            sec_id = (section_ids[idx] if idx < len(section_ids) else "").strip()
+            title = (titles[idx] if idx < len(titles) else "").strip()
+
+            if not sid and not sec_id and not title:
+                continue
+            if not sid or not sec_id or not title:
+                invalid_rows += 1
+                continue
+            if not ObjectId.is_valid(sid) or not ObjectId.is_valid(sec_id):
+                invalid_rows += 1
+                continue
+
+            subject = Subject.objects(id=sid).first()
+            section = Section.objects(id=sec_id).first()
+            if not subject or not section:
+                invalid_rows += 1
+                continue
+            if not section.subject_id or str(section.subject_id.id) != str(subject.id):
+                invalid_rows += 1
+                continue
+            if not _subject_allowed_for_current_user(subject.id):
+                invalid_rows += 1
+                continue
+
+            Lesson(
+                section_id=section.id,
+                title=title,
+                content="",
+                requires_code=requires_code,
+            ).save()
+            created += 1
+            created_section_ids.add(str(section.id))
+
+        if created == 0:
+            flash("لم يتم إنشاء أي درس. تحقق من البيانات.", "error")
+            return render_template("teacher/lessons_batch_form.html", subjects=subjects, sections=sections)
+
+        if invalid_rows:
+            flash(f"تم إنشاء {created} درس، مع تجاهل {invalid_rows} صف غير صالح.", "warning")
+        else:
+            flash(f"تم إنشاء {created} درس بنجاح.", "success")
+
+        if len(created_section_ids) == 1:
+            return redirect(url_for("teacher.section_detail", section_id=list(created_section_ids)[0]))
+        return redirect(url_for("teacher.dashboard"))
+
+    return render_template("teacher/lessons_batch_form.html", subjects=subjects, sections=sections)
 
 
 @teacher_bp.route("/sections/<section_id>/delete", methods=["POST"])
@@ -2706,8 +2794,8 @@ def new_lesson(section_id):
                     position=idx,
                 )
                 res.save()
-        flash("تم إنشاء الدرس بنجاح.", "success")
-        return redirect(url_for("teacher.lesson_detail", lesson_id=lesson.id))
+            flash("تم إنشاء الدرس بنجاح.", "success")
+            return redirect(url_for("teacher.section_detail", section_id=section.id))
     return render_template("teacher/lesson_form.html", form=form, section=section)
 
 
@@ -2954,13 +3042,11 @@ def test_detail(test_id):
     if scope_response:
         return scope_response
     questions = list(Question.objects(test_id=test.id).order_by('created_at').all())
-    text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
     interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
     return render_template(
         "teacher/test_detail.html",
         test=test,
         questions=questions,
-        text_questions=text_questions,
         interactive_questions=interactive_questions,
     )
 
@@ -2980,8 +3066,6 @@ def edit_test(test_id):
         "upsert_question",
         "delete_question",
         "batch_delete_questions",
-        "upsert_text_question",
-        "delete_text_question",
         "upsert_interactive_question",
         "delete_interactive_question",
         "import_json",
@@ -3104,58 +3188,21 @@ def edit_test(test_id):
                 flash("لم يتم اختيار أي سؤال.", "warning")
             return redirect(url_for("teacher.edit_test", test_id=test.id))
 
-        elif form_name == "upsert_text_question":
-            text_question_id = request.form.get("text_question_id")
-            text = (request.form.get("text_question_text") or "").strip()
-            hint = (request.form.get("text_question_hint") or "").strip() or None
-            try:
-                max_score = max(1, int(request.form.get("text_question_max_score") or 5))
-            except Exception:
-                max_score = 5
-
-            if not text:
-                flash("نص السؤال النصي مطلوب.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
-
-            text_question = None
-            if text_question_id:
-                text_question = TestTextQuestion.objects(id=text_question_id, test_id=test.id).first()
-
-            if text_question:
-                text_question.text = text
-                text_question.hint = hint
-                text_question.max_score = max_score
-                text_question.save()
-                flash("تم تحديث السؤال النصي.", "success")
-            else:
-                TestTextQuestion(
-                    test_id=test.id,
-                    text=text,
-                    hint=hint,
-                    max_score=max_score,
-                ).save()
-                flash("تمت إضافة السؤال النصي.", "success")
-
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
-
-        elif form_name == "delete_text_question":
-            text_question_id = request.form.get("text_question_id")
-            if text_question_id:
-                tq = TestTextQuestion.objects(id=text_question_id, test_id=test.id).first()
-                if tq:
-                    tq.delete()
-                    flash("تم حذف السؤال النصي.", "success")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
-
         elif form_name == "upsert_interactive_question":
             interactive_question_id = request.form.get("interactive_question_id")
+            q_text = (request.form.get("interactive_question_text") or "").strip() or None
             q_img = (request.form.get("interactive_question_image_url") or "").strip()
+            a_text = (request.form.get("interactive_answer_text") or "").strip() or None
             a_img = (request.form.get("interactive_answer_image_url") or "").strip()
-            correct_raw = (request.form.get("interactive_correct_value") or "").strip().lower()
-            correct_value = correct_raw == "true"
+            difficulty = (request.form.get("interactive_difficulty") or "medium").strip().lower()
+            if difficulty not in {"easy", "medium", "hard"}:
+                difficulty = "medium"
 
-            if not q_img or not a_img:
-                flash("أدخل رابط صورة السؤال ورابط صورة الإجابة للسؤال التفاعلي.", "error")
+            if not q_text and not q_img:
+                flash("أدخل نص السؤال التفاعلي أو رابط صورته على الأقل.", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+            if not a_text and not a_img:
+                flash("أدخل نص الإجابة التفاعلية أو رابط صورتها على الأقل.", "error")
                 return redirect(url_for("teacher.edit_test", test_id=test.id))
 
             row = None
@@ -3163,17 +3210,23 @@ def edit_test(test_id):
                 row = TestInteractiveQuestion.objects(id=interactive_question_id, test_id=test.id).first()
 
             if row:
+                row.question_text = q_text
                 row.question_image_url = q_img
+                row.answer_text = a_text
                 row.answer_image_url = a_img
-                row.correct_value = correct_value
+                row.difficulty = difficulty
+                row.correct_value = True
                 row.save()
                 flash("تم تحديث السؤال التفاعلي.", "success")
             else:
                 TestInteractiveQuestion(
                     test_id=test.id,
-                    question_image_url=q_img,
-                    answer_image_url=a_img,
-                    correct_value=correct_value,
+                    question_text=q_text,
+                    question_image_url=q_img or None,
+                    answer_text=a_text,
+                    answer_image_url=a_img or None,
+                    difficulty=difficulty,
+                    correct_value=True,
                 ).save()
                 flash("تمت إضافة سؤال تفاعلي.", "success")
 
@@ -3362,14 +3415,12 @@ def edit_test(test_id):
                 q.correct_choice_id = correct_choice.choice_id
                 q.save()
 
-    text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
     interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
     return render_template(
         "teacher/test_edit.html",
         form=form,
         meta_form=form,
         test=test,
-        text_questions=text_questions,
         interactive_questions=interactive_questions,
     )
 

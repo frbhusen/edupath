@@ -100,22 +100,34 @@
         <div class="qa-grid">
           <div class="img-panel">
             <div class="panel-title">صورة السؤال</div>
+            {% if q.question_text %}
+              <div class="border rounded p-2 mb-2 math-content preserve-format">{{ q.question_text }}</div>
+            {% endif %}
             <div class="img-frame">
-              <img src="{{ q.question_image_url }}" alt="صورة السؤال">
+              {% if q.question_image_url %}
+                <img src="{{ q.question_image_url }}" alt="صورة السؤال">
+              {% else %}
+                <div class="answer-hidden-note">لا توجد صورة لهذا السؤال</div>
+              {% endif %}
             </div>
           </div>
 
           <div class="img-panel">
             <div class="panel-title">صورة الإجابة</div>
+            {% if q.answer_text %}
+              <div class="border rounded p-2 mb-2 math-content preserve-format d-none answer-text" id="answer-text-{{ q.id }}">{{ q.answer_text }}</div>
+            {% endif %}
             <div class="img-frame" id="answer-{{ q.id }}">
-              <img src="{{ q.answer_image_url }}" alt="صورة الإجابة" class="d-none answer-image">
+              {% if q.answer_image_url %}
+                <img src="{{ q.answer_image_url }}" alt="صورة الإجابة" class="d-none answer-image">
+              {% endif %}
               <div class="answer-hidden-note" id="answer-note-{{ q.id }}">اضغط "إظهار الإجابة" لعرض الصورة</div>
             </div>
           </div>
         </div>
 
         <div class="center-actions mt-3">
-          <button class="btn btn-outline-secondary btn-sm reveal-answer-btn" type="button" data-answer-id="answer-{{ q.id }}" data-answer-note-id="answer-note-{{ q.id }}" aria-expanded="false" aria-controls="answer-{{ q.id }}">إظهار الإجابة</button>
+          <button class="btn btn-outline-secondary btn-sm reveal-answer-btn" type="button" data-answer-id="answer-{{ q.id }}" data-answer-note-id="answer-note-{{ q.id }}" data-answer-text-id="answer-text-{{ q.id }}" aria-expanded="false" aria-controls="answer-{{ q.id }}">إظهار الإجابة</button>
 
           <div class="eval-btns">
             <input class="btn-check course-eval-input" type="radio" name="question_{{ q.id }}" id="q{{ q.id }}-true" value="true" required disabled>
@@ -145,17 +157,32 @@
       btn.addEventListener('click', function () {
         const targetId = btn.getAttribute('data-answer-id');
         const noteId = btn.getAttribute('data-answer-note-id');
+        const answerTextId = btn.getAttribute('data-answer-text-id');
         if (!targetId) return;
         const answerBox = document.getElementById(targetId);
         if (!answerBox) return;
         const answerImage = answerBox.querySelector('.answer-image');
         const note = noteId ? document.getElementById(noteId) : null;
-        if (!answerImage) return;
+        const answerText = answerTextId ? document.getElementById(answerTextId) : null;
+        if (!answerImage && !answerText) return;
 
-        const nowVisible = answerImage.classList.contains('d-none');
-        answerImage.classList.toggle('d-none');
+        const imageHidden = answerImage ? answerImage.classList.contains('d-none') : true;
+        const textHidden = answerText ? answerText.classList.contains('d-none') : true;
+        const nowVisible = imageHidden && textHidden;
+        if (answerImage) {
+          answerImage.classList.toggle('d-none');
+        }
+        if (answerText) {
+          answerText.classList.toggle('d-none');
+          if (window.renderMath) {
+            window.renderMath(answerText);
+          }
+        }
         if (note) {
           note.classList.toggle('d-none', nowVisible);
+          if (!answerImage && !answerText) {
+            note.textContent = 'لا توجد إجابة معروضة';
+          }
         }
         btn.textContent = nowVisible ? 'إخفاء الإجابة' : 'إظهار الإجابة';
         btn.setAttribute('aria-expanded', nowVisible ? 'true' : 'false');

@@ -128,20 +128,21 @@
     <h5 class="card-title mb-3">إضافة سؤال جديد</h5>
     <form method="post" class="row g-2">
       <input type="hidden" name="action" value="add_question">
+      <div class="col-12 col-lg-6">
+        <label class="form-label">نص السؤال (يدعم LaTeX)</label>
+        <textarea class="form-control" name="question_text" rows="2" placeholder="اكتب السؤال نصيًا إن رغبت"></textarea>
+      </div>
+      <div class="col-12 col-lg-6">
+        <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
+        <textarea class="form-control" name="answer_text" rows="2" placeholder="اكتب الإجابة نصيًا إن رغبت"></textarea>
+      </div>
       <div class="col-12 col-lg-5">
         <label class="form-label">رابط صورة السؤال</label>
-        <input class="form-control" name="question_image_url" data-preview-target="new-question-preview" placeholder="https://drive.google.com/..." required>
+        <input class="form-control" name="question_image_url" data-preview-target="new-question-preview" placeholder="https://drive.google.com/...">
       </div>
       <div class="col-12 col-lg-5">
         <label class="form-label">رابط صورة الإجابة</label>
-        <input class="form-control" name="answer_image_url" data-preview-target="new-answer-preview" placeholder="https://drive.google.com/..." required>
-      </div>
-      <div class="col-12 col-lg-2">
-        <label class="form-label">القيمة الصحيحة</label>
-        <select class="form-select" name="correct_value" required>
-          <option value="true">صحيح</option>
-          <option value="false">خطأ</option>
-        </select>
+        <input class="form-control" name="answer_image_url" data-preview-target="new-answer-preview" placeholder="https://drive.google.com/...">
       </div>
       <div class="col-12 d-flex justify-content-end">
         <button class="btn btn-outline-primary" type="submit">إضافة السؤال</button>
@@ -177,42 +178,56 @@
           <div class="question-item">
             <div class="question-item-head d-flex justify-content-between align-items-center">
               <span class="fw-semibold">السؤال {{ loop.index }}</span>
-              <span class="badge text-bg-light border">{{ 'صحيح' if q.correct_value else 'خطأ' }}</span>
             </div>
             <div class="p-3">
             <form method="post" class="row g-2">
               <input type="hidden" name="action" value="update_question">
               <input type="hidden" name="question_id" value="{{ q.id }}">
+              <div class="col-12 col-lg-6">
+                <label class="form-label">نص السؤال (يدعم LaTeX)</label>
+                <textarea class="form-control" name="question_text" rows="2">{{ q.question_text or '' }}</textarea>
+              </div>
+              <div class="col-12 col-lg-6">
+                <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
+                <textarea class="form-control" name="answer_text" rows="2">{{ q.answer_text or '' }}</textarea>
+              </div>
               <div class="col-12 col-lg-5">
                 <label class="form-label">صورة السؤال</label>
-                <input class="form-control" name="question_image_url" value="{{ q.question_image_url }}" data-preview-target="q-preview-{{ q.id }}" required>
+                <input class="form-control" name="question_image_url" value="{{ q.question_image_url or '' }}" data-preview-target="q-preview-{{ q.id }}">
               </div>
               <div class="col-12 col-lg-5">
                 <label class="form-label">صورة الإجابة</label>
-                <input class="form-control" name="answer_image_url" value="{{ q.answer_image_url }}" data-preview-target="a-preview-{{ q.id }}" required>
-              </div>
-              <div class="col-12 col-lg-2">
-                <label class="form-label">القيمة الصحيحة</label>
-                <select class="form-select" name="correct_value" required>
-                  <option value="true" {% if q.correct_value %}selected{% endif %}>صحيح</option>
-                  <option value="false" {% if not q.correct_value %}selected{% endif %}>خطأ</option>
-                </select>
+                <input class="form-control" name="answer_image_url" value="{{ q.answer_image_url or '' }}" data-preview-target="a-preview-{{ q.id }}">
               </div>
               <div class="col-12 d-flex justify-content-end">
                 <button class="btn btn-outline-primary btn-sm" type="submit">حفظ</button>
               </div>
               <div class="col-12">
+                {% if q.question_text %}
+                  <div class="mb-2">
+                    <span class="label">نص السؤال</span>
+                    <div class="border rounded p-2 math-content preserve-format">{{ q.question_text }}</div>
+                  </div>
+                {% endif %}
+                {% if q.answer_text %}
+                  <div class="mb-2">
+                    <span class="label">نص الإجابة</span>
+                    <div class="border rounded p-2 math-content preserve-format">{{ q.answer_text }}</div>
+                  </div>
+                {% endif %}
                 <div class="preview-grid">
                   <div class="preview-box">
                     <span class="label">معاينة السؤال</span>
                     <div class="preview-frame">
-                      <img id="q-preview-{{ q.id }}" src="{{ q.question_image_url }}" alt="معاينة السؤال">
+                      <img id="q-preview-{{ q.id }}" src="{{ q.question_image_url or '' }}" alt="معاينة السؤال" {% if not q.question_image_url %}class="d-none"{% endif %}>
+                      <span class="preview-empty {% if q.question_image_url %}d-none{% endif %}" id="q-preview-{{ q.id }}-empty">لا توجد صورة</span>
                     </div>
                   </div>
                   <div class="preview-box">
                     <span class="label">معاينة الإجابة</span>
                     <div class="preview-frame">
-                      <img id="a-preview-{{ q.id }}" src="{{ q.answer_image_url }}" alt="معاينة الإجابة">
+                      <img id="a-preview-{{ q.id }}" src="{{ q.answer_image_url or '' }}" alt="معاينة الإجابة" {% if not q.answer_image_url %}class="d-none"{% endif %}>
+                      <span class="preview-empty {% if q.answer_image_url %}d-none{% endif %}" id="a-preview-{{ q.id }}-empty">لا توجد صورة</span>
                     </div>
                   </div>
                 </div>

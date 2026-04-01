@@ -197,60 +197,11 @@
                     <h6 class="card-title mb-0">المعاينة الحية</h6>
                     <span class="badge text-bg-light">MathJax</span>
                   </div>
-                  <div class="mb-2"><strong>السؤال:</strong> <span id="previewQuestion"></span></div>
-                  <div class="mb-2"><strong>التلميح:</strong> <span id="previewHint"></span></div>
+                  <div class="mb-2"><strong>السؤال:</strong> <span id="previewQuestion" class="preserve-format"></span></div>
+                  <div class="mb-2"><strong>التلميح:</strong> <span id="previewHint" class="preserve-format"></span></div>
                   <div><strong>الخيارات:</strong>
                     <ol class="mb-0" id="previewChoices"></ol>
                   </div>
-                </div>
-              </div>
-
-              <div class="card border-0 shadow-sm mb-4">
-                <div class="card-body">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="card-title mb-0">الأسئلة غير الاختيارية (نصية)</h6>
-                    <span class="badge text-bg-secondary">{{ text_questions|length if text_questions else 0 }}</span>
-                  </div>
-
-                  <form method="post" class="mb-3">
-                    <input type="hidden" name="form_name" value="upsert_text_question" />
-                    <div class="mb-2">
-                      <label class="form-label">نص السؤال النصي</label>
-                      <textarea class="form-control" name="text_question_text" rows="2" required></textarea>
-                    </div>
-                    <div class="row g-2 mb-2">
-                      <div class="col-12 col-md-8">
-                      <label class="form-label">تلميح (اختياري)</label>
-                      <input class="form-control" name="text_question_hint" />
-                      </div>
-                      <div class="col-12 col-md-4">
-                        <label class="form-label">الدرجة القصوى</label>
-                        <input type="number" min="1" class="form-control" name="text_question_max_score" value="5" required />
-                      </div>
-                    </div>
-                    <button type="submit" class="btn btn-outline-primary btn-sm">إضافة سؤال نصي</button>
-                  </form>
-
-                  {% if text_questions %}
-                    <div class="list-group list-group-flush">
-                      {% for tq in text_questions %}
-                        <div class="list-group-item px-0">
-                          <div class="fw-semibold">{{ tq.text }}</div>
-                          {% if tq.hint %}
-                            <div class="small text-muted">التلميح: {{ tq.hint }}</div>
-                          {% endif %}
-                          <div class="small text-muted">الدرجة القصوى: {{ tq.max_score|default(5) }}</div>
-                          <form method="post" class="mt-2" onsubmit="return confirm('حذف السؤال النصي؟');">
-                            <input type="hidden" name="form_name" value="delete_text_question" />
-                            <input type="hidden" name="text_question_id" value="{{ tq.id }}" />
-                            <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
-                          </form>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  {% else %}
-                    <div class="text-muted small">لا توجد أسئلة نصية بعد.</div>
-                  {% endif %}
                 </div>
               </div>
 
@@ -264,19 +215,28 @@
                   <form method="post" class="mb-3">
                     <input type="hidden" name="form_name" value="upsert_interactive_question" />
                     <div class="row g-2">
+                      <div class="col-12">
+                        <label class="form-label">نص السؤال (يدعم LaTeX)</label>
+                        <textarea class="form-control" name="interactive_question_text" rows="2" placeholder="اختياري"></textarea>
+                      </div>
                       <div class="col-12 col-md-5">
                         <label class="form-label">رابط صورة السؤال</label>
-                        <input class="form-control" name="interactive_question_image_url" required>
+                        <input class="form-control" name="interactive_question_image_url">
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
+                        <textarea class="form-control" name="interactive_answer_text" rows="2" placeholder="اختياري"></textarea>
                       </div>
                       <div class="col-12 col-md-5">
                         <label class="form-label">رابط صورة الإجابة</label>
-                        <input class="form-control" name="interactive_answer_image_url" required>
+                        <input class="form-control" name="interactive_answer_image_url">
                       </div>
                       <div class="col-12 col-md-2">
-                        <label class="form-label">القيمة الصحيحة</label>
-                        <select class="form-select" name="interactive_correct_value" required>
-                          <option value="true">صحيح</option>
-                          <option value="false">خطأ</option>
+                        <label class="form-label">المستوى</label>
+                        <select class="form-select form-select-lg" name="interactive_difficulty" required>
+                          <option value="easy">سهل</option>
+                          <option value="medium" selected>متوسط</option>
+                          <option value="hard">صعب</option>
                         </select>
                       </div>
                     </div>
@@ -289,24 +249,37 @@
                         <div class="list-group-item px-0">
                           <div class="d-flex justify-content-between align-items-center mb-2">
                             <div class="fw-semibold">سؤال تفاعلي {{ loop.index }}</div>
-                            <span class="badge text-bg-light border">{{ 'صحيح' if iq.correct_value else 'خطأ' }}</span>
+                            <div class="d-flex gap-1">
+                              <span class="badge text-bg-secondary">
+                                {% if iq.difficulty == 'easy' %}سهل{% elif iq.difficulty == 'hard' %}صعب{% else %}متوسط{% endif %}
+                              </span>
+                            </div>
                           </div>
                           <form method="post" class="row g-2">
                             <input type="hidden" name="form_name" value="upsert_interactive_question" />
                             <input type="hidden" name="interactive_question_id" value="{{ iq.id }}" />
+                            <div class="col-12">
+                              <label class="form-label">نص السؤال (يدعم LaTeX)</label>
+                              <textarea class="form-control" name="interactive_question_text" rows="2">{{ iq.question_text or '' }}</textarea>
+                            </div>
                             <div class="col-12 col-md-5">
                               <label class="form-label">صورة السؤال</label>
-                              <input class="form-control" name="interactive_question_image_url" value="{{ iq.question_image_url }}" required>
+                              <input class="form-control" name="interactive_question_image_url" value="{{ iq.question_image_url or '' }}">
+                            </div>
+                            <div class="col-12">
+                              <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
+                              <textarea class="form-control" name="interactive_answer_text" rows="2">{{ iq.answer_text or '' }}</textarea>
                             </div>
                             <div class="col-12 col-md-5">
                               <label class="form-label">صورة الإجابة</label>
-                              <input class="form-control" name="interactive_answer_image_url" value="{{ iq.answer_image_url }}" required>
+                              <input class="form-control" name="interactive_answer_image_url" value="{{ iq.answer_image_url or '' }}">
                             </div>
                             <div class="col-12 col-md-2">
-                              <label class="form-label">القيمة الصحيحة</label>
-                              <select class="form-select" name="interactive_correct_value" required>
-                                <option value="true" {% if iq.correct_value %}selected{% endif %}>صحيح</option>
-                                <option value="false" {% if not iq.correct_value %}selected{% endif %}>خطأ</option>
+                              <label class="form-label">المستوى</label>
+                              <select class="form-select form-select-lg" name="interactive_difficulty" required>
+                                <option value="easy" {% if iq.difficulty == 'easy' %}selected{% endif %}>سهل</option>
+                                <option value="medium" {% if iq.difficulty != 'easy' and iq.difficulty != 'hard' %}selected{% endif %}>متوسط</option>
+                                <option value="hard" {% if iq.difficulty == 'hard' %}selected{% endif %}>صعب</option>
                               </select>
                             </div>
                             <div class="col-12 d-flex justify-content-end">
@@ -314,12 +287,32 @@
                             </div>
                           </form>
                           <div class="row g-2 mt-1">
+                            {% if iq.question_text %}
+                              <div class="col-12">
+                                <div class="small text-muted mb-1">نص السؤال</div>
+                                <div class="border rounded p-2 math-content preserve-format">{{ iq.question_text }}</div>
+                              </div>
+                            {% endif %}
                             <div class="col-12 col-md-6">
-                              <img src="{{ iq.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 180px;">
+                              {% if iq.question_image_url %}
+                                <img src="{{ iq.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 180px;">
+                              {% else %}
+                                <div class="small text-muted">لا توجد صورة سؤال.</div>
+                              {% endif %}
                             </div>
                             <div class="col-12 col-md-6">
-                              <img src="{{ iq.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                              {% if iq.answer_image_url %}
+                                <img src="{{ iq.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                              {% else %}
+                                <div class="small text-muted">لا توجد صورة إجابة.</div>
+                              {% endif %}
                             </div>
+                            {% if iq.answer_text %}
+                            <div class="col-12">
+                              <div class="small text-muted mb-1">نص الإجابة</div>
+                              <div class="border rounded p-2 math-content preserve-format">{{ iq.answer_text }}</div>
+                            </div>
+                            {% endif %}
                           </div>
                           <form method="post" class="mt-2" onsubmit="return confirm('حذف السؤال التفاعلي؟');">
                             <input type="hidden" name="form_name" value="delete_interactive_question" />
@@ -364,7 +357,7 @@
                                 <div class="me-2">
                                   <div class="fw-semibold">س{{ loop.index }}. {{ q.text }}</div>
                                   {% if q.hint %}
-                                    <div class="small text-muted">التلميح: {{ q.hint }}</div>
+                                    <div class="small text-muted preserve-format">التلميح: {{ q.hint }}</div>
                                   {% endif %}
                                   <div class="small text-muted">صحيح: {{ choices[correct_idx.value-1].text if correct_idx.value > 0 else 'غير محدد' }}</div>
                                 </div>

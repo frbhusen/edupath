@@ -34,7 +34,7 @@
       <div class="list-group-item">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
-            <div class="fw-semibold">{{ question.text }}</div>
+            <div class="fw-semibold preserve-format">{{ question.text }}</div>
             {% if question.question_images %}
               <div class="d-flex flex-wrap gap-2 my-2">
                 {% for img in question.question_images %}
@@ -43,7 +43,7 @@
               </div>
             {% endif %}
             {% if question.hint %}
-              <div class="text-muted small">{{ question.hint }}</div>
+              <div class="text-muted small preserve-format">{{ question.hint }}</div>
             {% endif %}
           </div>
           <div class="d-flex gap-2">
@@ -57,7 +57,7 @@
           <ul class="mt-2">
             {% for choice in question.choices %}
               <li class="{{ 'text-success fw-semibold' if choice.is_correct else '' }}">
-                {{ choice.text }}
+                <span class="preserve-format">{{ choice.text }}</span>
                 {% if choice.image_url %}
                   <div class="mt-1">
                     <img src="{{ choice.image_url }}" alt="صورة الخيار" class="img-fluid rounded border" style="max-height: 140px;">
@@ -73,25 +73,6 @@
   </div>
 {% else %}
   <div class="alert alert-light">لا توجد أسئلة بعد.</div>
-{% endif %}
-
-<div class="mt-4 d-flex justify-content-between align-items-center mb-3">
-  <h3 class="h6 mb-0">الأسئلة النصية</h3>
-</div>
-
-{% if text_questions %}
-  <div class="list-group">
-    {% for question in text_questions %}
-      <div class="list-group-item">
-        <div class="fw-semibold">{{ question.text }}</div>
-        {% if question.hint %}
-          <div class="text-muted small mt-1">{{ question.hint }}</div>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </div>
-{% else %}
-  <div class="alert alert-light">لا توجد أسئلة نصية بعد.</div>
 {% endif %}
 
 <div class="mt-4 d-flex justify-content-between align-items-center mb-3">

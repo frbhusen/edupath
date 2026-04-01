@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">إضافة دروس دفعة واحدة</h1>
+    <p class="mb-0">اختر المادة والقسم لكل صف، ثم أدخل اسم الدرس واحفظ الجميع مرة واحدة.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">رجوع</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" id="batch-lessons-form">
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="requires_code" name="requires_code">
+        <label class="form-check-label" for="requires_code">تفعيل الدروس برمز (ينطبق على جميع الصفوف)</label>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle" id="batch-lessons-table">
+          <thead>
+            <tr>
+              <th style="min-width: 180px;">المادة</th>
+              <th style="min-width: 220px;">القسم</th>
+              <th>اسم الدرس</th>
+              <th class="text-end">إجراء</th>
+            </tr>
+          </thead>
+          <tbody id="batch-rows">
+            <tr>
+              <td>
+                <select class="form-select subject-select" name="subject_id[]" required>
+                  <option value="">اختر المادة</option>
+                  {% for subject in subjects %}
+                    <option value="{{ subject.id }}">{{ subject.name }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select class="form-select section-select" name="section_id[]" required>
+                  <option value="">اختر القسم</option>
+                  {% for section in sections %}
+                    <option value="{{ section.id }}" data-subject-id="{{ section.subject_id.id if section.subject_id else '' }}">{{ section.title }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <input class="form-control" name="title[]" placeholder="اسم الدرس" required>
+              </td>
+              <td class="text-end">
+                <button class="btn btn-outline-danger btn-sm remove-row" type="button">حذف</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 justify-content-between">
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="add-row-btn">إضافة صف</button>
+        <button class="btn btn-cta" type="submit">حفظ جميع الدروس</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const rows = document.getElementById('batch-rows');
+    const addBtn = document.getElementById('add-row-btn');
+    if (!rows || !addBtn) return;
+
+    function wireRow(row) {
+      const subjectSelect = row.querySelector('.subject-select');
+      const sectionSelect = row.querySelector('.section-select');
+      const removeBtn = row.querySelector('.remove-row');
+      if (!subjectSelect || !sectionSelect) return;
+
+      function filterSections() {
+        const sid = (subjectSelect.value || '').trim();
+        const options = sectionSelect.querySelectorAll('option');
+        options.forEach((opt) => {
+          if (!opt.value) {
+            opt.hidden = false;
+            return;
+          }
+          const belongs = (opt.getAttribute('data-subject-id') || '') === sid;
+          opt.hidden = !belongs;
+        });
+        if (sectionSelect.selectedOptions.length && sectionSelect.selectedOptions[0].hidden) {
+          sectionSelect.value = '';
+        }
+      }
+
+      subjectSelect.addEventListener('change', filterSections);
+      filterSections();
+
+      if (removeBtn) {
+        removeBtn.addEventListener('click', function () {
+          if (rows.querySelectorAll('tr').length <= 1) return;
+          row.remove();
+        });
+      }
+    }
+
+    addBtn.addEventListener('click', function () {
+      const firstRow = rows.querySelector('tr');
+      if (!firstRow) return;
+      const clone = firstRow.cloneNode(true);
+      clone.querySelectorAll('input, select').forEach((el) => {
+        el.value = '';
+      });
+      rows.appendChild(clone);
+      wireRow(clone);
+    });
+
+    rows.querySelectorAll('tr').forEach(wireRow);
+  })();
+</script>
+{% endblock %}

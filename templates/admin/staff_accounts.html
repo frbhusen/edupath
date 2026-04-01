@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2 class="mb-3">إدارة حسابات الطاقم</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">إدارة حسابات الطاقم</h2>
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin.dashboard') }}">العودة للوحة الأدمن</a>
+</div>
 <p class="text-muted">إنشاء حسابات admin/teacher/question_editor وتخصيص المواد للمستخدمين المقيدين بالمادة.</p>
 
 <div class="row g-3 mb-3">

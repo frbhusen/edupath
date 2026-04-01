@@ -338,8 +338,11 @@ class TestTextQuestion(Document):
 class TestInteractiveQuestion(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     test_id = ReferenceField(Test, required=True)
-    question_image_url = StringField(required=True, max_length=500)
-    answer_image_url = StringField(required=True, max_length=500)
+    question_text = StringField(null=True)
+    question_image_url = StringField(max_length=500, null=True)
+    answer_text = StringField(null=True)
+    answer_image_url = StringField(max_length=500, null=True)
+    difficulty = StringField(default="medium", choices=["easy", "medium", "hard"])
     correct_value = BooleanField(required=True, default=True)
     created_at = DateTimeField(default=datetime.utcnow)
 
@@ -479,15 +482,18 @@ class CustomTestAttempt(Document):
 class CustomTestAnswer(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     attempt_id = ReferenceField(CustomTestAttempt, required=True)
-    question_id = ReferenceField(Question, required=True)
+    question_id = ReferenceField(Question, null=True)
+    interactive_question_id = ReferenceField(TestInteractiveQuestion, null=True)
     choice_id = ObjectIdField(null=True)
+    selected_value = BooleanField(null=True)
     is_correct = BooleanField(default=False, required=True)
     
     meta = {
         'collection': 'custom_test_answers',
         'indexes': [
             'attempt_id',
-            'question_id'
+            'question_id',
+            'interactive_question_id'
         ]
     }
 
@@ -520,8 +526,10 @@ class CourseSet(Document):
 class CourseQuestion(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     course_set_id = ReferenceField(CourseSet, required=True)
-    question_image_url = StringField(required=True, max_length=500)
-    answer_image_url = StringField(required=True, max_length=500)
+    question_text = StringField(null=True)
+    question_image_url = StringField(max_length=500, null=True)
+    answer_text = StringField(null=True)
+    answer_image_url = StringField(max_length=500, null=True)
     correct_value = BooleanField(required=True, default=True)
     created_at = DateTimeField(default=datetime.utcnow)
 

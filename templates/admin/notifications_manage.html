@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2 class="mb-3">إدارة الإشعارات</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">إدارة الإشعارات</h2>
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin.dashboard') }}">العودة للوحة الأدمن</a>
+</div>
 <p class="text-muted">إرسال إشعار مخصص: للجميع / للطلاب / للطاقم / لمستخدمين محددين.</p>
 
 <div class="card shadow-sm mb-4">

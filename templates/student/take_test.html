@@ -1,18 +1,124 @@
 {% extends 'base.html' %}
 {% block content %}
+<style>
+  .floating-test-timer {
+    position: fixed;
+    top: 76px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1055;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid #dbe2ea;
+    border-radius: 999px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+    padding: 0.35rem 0.65rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .floating-test-timer .label {
+    font-size: 0.78rem;
+    color: #475569;
+    font-weight: 700;
+  }
+
+  .interactive-test-card {
+    border: 1px solid #dbe2ea;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    padding: 0.9rem;
+  }
+
+  .interactive-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .interactive-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+  }
+
+  .interactive-panel {
+    border: 1px solid #dbe2ea;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0.65rem;
+  }
+
+  .interactive-panel-title {
+    font-size: 0.86rem;
+    color: #475569;
+    font-weight: 700;
+    margin-bottom: 0.45rem;
+  }
+
+  .interactive-image-frame {
+    border: 1px solid #dbe2ea;
+    border-radius: 10px;
+    background: #f8fafc;
+    min-height: 230px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .interactive-image-frame img {
+    width: 100%;
+    max-height: 260px;
+    object-fit: contain;
+  }
+
+  .interactive-actions {
+    border-top: 1px dashed #d9e3ee;
+    margin-top: 0.8rem;
+    padding-top: 0.8rem;
+  }
+
+  .interactive-eval-wrap {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .interactive-eval-wrap .btn {
+    min-width: 150px;
+  }
+
+  @media (max-width: 991px) {
+    .floating-test-timer {
+      top: 68px;
+      padding: 0.3rem 0.55rem;
+    }
+
+    .interactive-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .interactive-image-frame {
+      min-height: 190px;
+    }
+  }
+</style>
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
     <h1 class="h4 mb-1">{{ test.title }}</h1>
     <p class="mb-0">{{ test.description or 'أجب عن جميع الأسئلة أدناه.' }}</p>
   </div>
-  {% if selected_count is not none %}
-    <div class="text-end">
-      <div class="small text-muted">الوقت المتبقي</div>
-      <div id="test-timer" class="badge text-bg-warning fs-6" data-duration="{{ time_limit_seconds }}">--:--</div>
-    </div>
-  {% endif %}
   <a class="btn btn-light btn-sm" href="{{ url_for('student.section_detail', section_id=test.section.id) }}">رجوع</a>
 </div>
+
+{% if selected_count is not none %}
+  <div class="floating-test-timer" role="status" aria-live="polite">
+    <span class="label">الوقت المتبقي</span>
+    <div id="test-timer" class="badge text-bg-warning fs-6" data-duration="{{ time_limit_seconds }}">--:--</div>
+  </div>
+{% endif %}
 
 {% if selected_count is none %}
   <form method="get" class="card shadow-sm">
@@ -80,7 +186,6 @@
 {% else %}
   <form method="post" id="test-form">
     <input type="hidden" name="question_ids" value="{{ question_ids_str }}" />
-    <input type="hidden" name="text_question_ids" value="{{ text_question_ids_str|default('') }}" />
     <input type="hidden" name="interactive_question_ids" value="{{ interactive_question_ids_str|default('') }}" />
     <input type="hidden" name="time_expired" id="time-expired" value="0" />
     <input type="hidden" name="count" value="{{ selected_count or 0 }}" />
@@ -96,40 +201,59 @@
       {% set choices = item.choices %}
       <div class="card shadow-sm mb-3">
         <div class="card-body">
-          {% if item.question_type == 'text' %}
-            {% set tq = item.text_question %}
-            <p class="fw-semibold">س{{ loop.index }} (سؤال نصي). {{ tq.text }}</p>
-            {% if tq.hint %}
-              <div class="small text-muted mb-2">تلميح: {{ tq.hint }}</div>
-            {% endif %}
-            <textarea class="form-control" name="text_question_{{ tq.id }}" rows="4" placeholder="اكتب إجابتك هنا" required></textarea>
-          {% elif item.question_type == 'interactive' %}
+          {% if item.question_type == 'interactive' %}
             {% set iq = item.interactive_question %}
-            <p class="fw-semibold">س{{ loop.index }} (سؤال تفاعلي)</p>
-            <div class="row g-2 mb-3">
-              <div class="col-12 col-lg-6">
-                <div class="small text-muted mb-1">صورة السؤال</div>
-                <img src="{{ iq.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 260px;">
+            <div class="interactive-test-card">
+              <div class="interactive-head">
+                <p class="fw-semibold preserve-format mb-0">س{{ loop.index }}.</p>
               </div>
-              <div class="col-12 col-lg-6">
-                <div class="small text-muted mb-1">صورة الإجابة</div>
-                <div class="border rounded p-2 d-flex align-items-center justify-content-center" style="min-height: 180px;">
-                  <img src="{{ iq.answer_image_url }}" alt="صورة الإجابة" class="img-fluid d-none interactive-answer-image" style="max-height: 240px;">
-                  <div class="small text-muted interactive-answer-note">اضغط إظهار الإجابة لعرض الصورة</div>
+
+              <div class="interactive-grid mb-2">
+                <div class="interactive-panel">
+                  <div class="interactive-panel-title">السؤال</div>
+                  {% if iq.question_image_url %}
+                    <div class="interactive-image-frame">
+                      <img src="{{ iq.question_image_url }}" alt="صورة السؤال">
+                    </div>
+                  {% elif iq.question_text %}
+                    <div class="border rounded p-2 math-content preserve-format">{{ iq.question_text }}</div>
+                  {% endif %}
+                </div>
+
+                <div class="interactive-panel">
+                  <div class="interactive-panel-title">الإجابة</div>
+                  {% if iq.answer_text %}
+                    <div class="border rounded p-2 mb-2 math-content preserve-format d-none interactive-answer-text">{{ iq.answer_text }}</div>
+                  {% endif %}
+                  {% if iq.answer_image_url %}
+                    <div class="interactive-image-frame">
+                      <img src="{{ iq.answer_image_url }}" alt="صورة الإجابة" class="img-fluid d-none interactive-answer-image" style="max-height: 240px;">
+                      <div class="small text-muted interactive-answer-note">اضغط إظهار الإجابة لعرض المحتوى</div>
+                    </div>
+                  {% elif iq.answer_text %}
+                    <div class="small text-muted interactive-answer-note">اضغط إظهار الإجابة لعرض المحتوى</div>
+                  {% else %}
+                    <div class="small text-muted">لا توجد إجابة متاحة.</div>
+                    {% endif %}
                 </div>
               </div>
-            </div>
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-              <button class="btn btn-outline-secondary btn-sm reveal-interactive-answer" type="button">إظهار الإجابة</button>
-              <input class="btn-check interactive-eval-input" type="radio" name="interactive_question_{{ iq.id }}" id="iq{{ iq.id }}-true" value="true" required disabled>
-              <label class="btn btn-outline-success btn-sm" for="iq{{ iq.id }}-true">حلّي صحيح</label>
 
-              <input class="btn-check interactive-eval-input" type="radio" name="interactive_question_{{ iq.id }}" id="iq{{ iq.id }}-false" value="false" required disabled>
-              <label class="btn btn-outline-danger btn-sm" for="iq{{ iq.id }}-false">حلّي غير صحيح</label>
+              <div class="interactive-actions">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                  <button class="btn btn-outline-secondary reveal-interactive-answer" type="button">إظهار الإجابة</button>
+                </div>
+                <div class="interactive-eval-wrap">
+                  <input class="btn-check interactive-eval-input" type="radio" name="interactive_question_{{ iq.id }}" id="iq{{ iq.id }}-true" value="true" required disabled>
+                  <label class="btn btn-outline-success" for="iq{{ iq.id }}-true">حلّي صحيح</label>
+
+                  <input class="btn-check interactive-eval-input" type="radio" name="interactive_question_{{ iq.id }}" id="iq{{ iq.id }}-false" value="false" required disabled>
+                  <label class="btn btn-outline-danger" for="iq{{ iq.id }}-false">حلّي غير صحيح</label>
+                </div>
+                <div class="small text-muted mt-2">بعد إظهار الإجابة، اختر تقييمك.</div>
+              </div>
             </div>
-            <div class="small text-muted mt-2">بعد إظهار الإجابة، اختر تقييمك الذاتي.</div>
           {% else %}
-            <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
+            <p class="fw-semibold preserve-format">س{{ loop.index }}. {{ q.text }}</p>
             {% if q.question_images %}
               <div class="d-flex flex-wrap gap-2 mb-2">
                 {% for img in q.question_images %}
@@ -142,7 +266,7 @@
                 <label class="list-group-item">
                   <div class="d-flex align-items-center gap-2 flex-wrap">
                     <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.choice_id }}" required>
-                    <span>{{ c.text }}</span>
+                    <span class="preserve-format">{{ c.text }}</span>
                     {% if c.image_url %}
                       <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;" required>
                     {% endif %}
@@ -316,24 +440,84 @@
 
     window.applyTemplate = function (level) {
       const total = parseInt(rangeInput?.value || '{{ max_select }}', 10);
-      let easy = 0, medium = 0, hard = 0;
-      if (level === 'easy') {
-        easy = Math.round(total * 0.7);
-        medium = Math.round(total * 0.2);
-        hard = total - easy - medium;
-      } else if (level === 'medium') {
-        easy = Math.round(total * 0.4);
-        medium = Math.round(total * 0.4);
-        hard = total - easy - medium;
-      } else {
-        easy = Math.round(total * 0.2);
-        medium = Math.round(total * 0.3);
-        hard = total - easy - medium;
+      const ratiosByLevel = {
+        easy: { easy: 0.6, medium: 0.2, hard: 0.2 },
+        medium: { easy: 0.3, medium: 0.4, hard: 0.3 },
+        hard: { easy: 0.2, medium: 0.2, hard: 0.6 }
+      };
+      const ratios = ratiosByLevel[level] || ratiosByLevel.medium;
+
+      const keys = ['easy', 'medium', 'hard'];
+      const rawTargets = {
+        easy: total * ratios.easy,
+        medium: total * ratios.medium,
+        hard: total * ratios.hard
+      };
+      const targets = {
+        easy: Math.floor(rawTargets.easy),
+        medium: Math.floor(rawTargets.medium),
+        hard: Math.floor(rawTargets.hard)
+      };
+
+      let remainder = total - (targets.easy + targets.medium + targets.hard);
+      const byFraction = keys
+        .map((k) => ({ key: k, frac: rawTargets[k] - Math.floor(rawTargets[k]) }))
+        .sort((a, b) => b.frac - a.frac);
+      for (const item of byFraction) {
+        if (remainder <= 0) break;
+        targets[item.key] += 1;
+        remainder -= 1;
       }
 
-      inputs.easy.value = Math.max(0, Math.min(easy, maxes.easy));
-      inputs.medium.value = Math.max(0, Math.min(medium, maxes.medium));
-      inputs.hard.value = Math.max(0, Math.min(hard, maxes.hard));
+      const values = { easy: 0, medium: 0, hard: 0 };
+      const remaining = { easy: maxes.easy, medium: maxes.medium, hard: maxes.hard };
+      const borrowMap = {
+        easy: ['medium', 'hard'],
+        medium: ['easy', 'hard'],
+        hard: ['medium', 'easy']
+      };
+
+      for (const key of keys) {
+        let need = targets[key];
+        const direct = Math.min(need, remaining[key]);
+        values[key] += direct;
+        remaining[key] -= direct;
+        need -= direct;
+
+        if (need > 0) {
+          for (const prevKey of borrowMap[key]) {
+            if (need <= 0) break;
+            const take = Math.min(need, remaining[prevKey]);
+            values[prevKey] += take;
+            remaining[prevKey] -= take;
+            need -= take;
+          }
+        }
+      }
+
+      let assigned = values.easy + values.medium + values.hard;
+      const fillOrder = level === 'easy'
+        ? ['easy', 'medium', 'hard']
+        : level === 'hard'
+          ? ['hard', 'medium', 'easy']
+          : ['medium', 'easy', 'hard'];
+      while (assigned < total) {
+        let progressed = false;
+        for (const k of fillOrder) {
+          if (remaining[k] > 0) {
+            values[k] += 1;
+            remaining[k] -= 1;
+            assigned += 1;
+            progressed = true;
+            if (assigned >= total) break;
+          }
+        }
+        if (!progressed) break;
+      }
+
+      inputs.easy.value = values.easy;
+      inputs.medium.value = values.medium;
+      inputs.hard.value = values.hard;
       syncSliderFromInputs();
     };
 
@@ -348,11 +532,22 @@
         const cardBody = btn.closest('.card-body');
         if (!cardBody) return;
         const img = cardBody.querySelector('.interactive-answer-image');
+        const answerText = cardBody.querySelector('.interactive-answer-text');
         const note = cardBody.querySelector('.interactive-answer-note');
         const radios = cardBody.querySelectorAll('.interactive-eval-input');
-        if (!img) return;
-        const willShow = img.classList.contains('d-none');
-        img.classList.toggle('d-none');
+        if (!img && !answerText) return;
+        const imgHidden = img ? img.classList.contains('d-none') : true;
+        const textHidden = answerText ? answerText.classList.contains('d-none') : true;
+        const willShow = imgHidden && textHidden;
+        if (img) {
+          img.classList.toggle('d-none');
+        }
+        if (answerText) {
+          answerText.classList.toggle('d-none');
+          if (window.renderMath) {
+            window.renderMath(answerText);
+          }
+        }
         if (note) note.classList.toggle('d-none', willShow);
         btn.textContent = willShow ? 'إخفاء الإجابة' : 'إظهار الإجابة';
         radios.forEach((r) => {

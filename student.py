@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from bson import ObjectId
 from mongoengine.errors import DoesNotExist
 
-from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, AttemptTextAnswer, TestTextQuestion, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
+from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
 from .forms import ActivationForm, LessonActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
 from .extensions import cache
@@ -45,16 +45,10 @@ class AccessContext:
             SectionActivation.objects(section_id=section.id, student_id=student_id, active=True).first()
         )
         
-        # Section is "open" if:
-        # - Subject is activated OR
-        # - Subject is not locked and section doesn't require code OR is activated
-        # - Subject is locked but section is activated
-        if self.subject_active:
-            self.section_open = True
-        elif self.subject_requires_code:
-            self.section_open = self.section_active
-        else:
-            self.section_open = self.section_active or not self.section_requires_code
+        # Section unlock precedence:
+        # - If section is activated OR does not require code, it is open
+        #   regardless of subject lock state.
+        self.section_open = self.section_active or not self.section_requires_code
 
         # Precompute active lesson activations for faster access checks
         lesson_ids = [l.id for l in section.lessons]
@@ -79,22 +73,24 @@ class AccessContext:
 
     def lesson_open(self, lesson: Lesson) -> bool:
         """Check if student can access this lesson."""
-        # If subject is activated, everything is open
-        if self.subject_active:
+        # Lesson unlock precedence: explicit lesson activation always opens it.
+        if lesson.id in self.lesson_activation_ids:
             return True
 
-        # If subject is locked, allow only section-activated or lesson-activated
-        if self.subject_requires_code:
-            if self.section_active:
-                return True
-            return lesson.id in self.lesson_activation_ids
+        # If a lesson itself does not require code, it stays open regardless
+        # of subject/section lock state.
+        if not bool(getattr(lesson, "requires_code", True)):
+            return True
 
-        # Subject is open; section rules apply
+        # Open section should open all lessons in that section.
         if self.section_open:
             return True
 
-        # Section locked but lesson activated
-        return lesson.id in self.lesson_activation_ids
+        # Keep legacy behavior: subject activation opens all content.
+        if self.subject_active:
+            return True
+
+        return False
 
     def test_open(self, test: Test) -> bool:
         """Check if student can access this test.
@@ -105,20 +101,20 @@ class AccessContext:
         - Lesson activated → only tests linked to that lesson accessible
         - Section-wide tests: require section or subject activation
         """
-        # If subject is activated, all tests are accessible
-        if self.subject_active:
-            return True
-
         # Lesson-linked tests follow lesson access
         if test.lesson_id:
             lesson = test.lesson
             return bool(lesson and self.lesson_open(lesson))
 
-        # Section-wide tests
-        if self.subject_requires_code:
-            return self.section_active
+        # Section-wide tests follow section access first.
+        if self.section_open:
+            return True
 
-        return self.section_open
+        # Keep legacy behavior: subject activation opens all content.
+        if self.subject_active:
+            return True
+
+        return False
 
 
 def _to_int(value, default=0):
@@ -128,6 +124,60 @@ def _to_int(value, default=0):
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _rebalance_difficulty_request(requested_counts, available_counts):
+    levels = ("easy", "medium", "hard")
+    borrow_order = {
+        "easy": ("medium", "hard"),
+        "medium": ("easy", "hard"),
+        "hard": ("medium", "easy"),
+    }
+
+    requested = {lvl: max(0, _to_int(requested_counts.get(lvl), 0)) for lvl in levels}
+    remaining = {lvl: max(0, _to_int(available_counts.get(lvl), 0)) for lvl in levels}
+    allocated = {lvl: 0 for lvl in levels}
+
+    for lvl in levels:
+        need = requested[lvl]
+        direct = min(need, remaining[lvl])
+        allocated[lvl] += direct
+        remaining[lvl] -= direct
+        need -= direct
+
+        if need <= 0:
+            continue
+
+        for donor in borrow_order[lvl]:
+            if need <= 0:
+                break
+            take = min(need, remaining[donor])
+            allocated[donor] += take
+            remaining[donor] -= take
+            need -= take
+
+    return allocated
+
+
+def _pack_custom_item_token(item_type, item_id):
+    return f"{item_type}:{item_id}"
+
+
+def _unpack_custom_item_token(token):
+    raw = str(token or "").strip()
+    if not raw:
+        return None, None
+    if ":" in raw:
+        item_type, item_id = raw.split(":", 1)
+        item_type = item_type.strip().lower()
+        item_id = item_id.strip()
+        if item_type in {"mcq", "interactive"} and ObjectId.is_valid(item_id):
+            return item_type, item_id
+        return None, None
+    # Backward compatibility: old custom attempts stored only MCQ ids.
+    if ObjectId.is_valid(raw):
+        return "mcq", raw
+    return None, None
 
 
 def _load_attempt_settings(attempt):
@@ -1287,13 +1337,6 @@ def _course_set_open_for_student(course_set, student_id):
     if not course_set.is_active:
         return False
 
-    subject_requires_code = bool(getattr(course_set.subject_id, "requires_code", False)) if course_set.subject_id else False
-    subject_active = bool(
-        SubjectActivation.objects(subject_id=course_set.subject_id.id, student_id=student_id, active=True).first()
-    ) if course_set.subject_id else False
-    if (not subject_active) and subject_requires_code:
-        return False
-
     if course_set.lesson_id:
         lesson = course_set.lesson_id
         if not lesson or not lesson.section_id:
@@ -1305,6 +1348,14 @@ def _course_set_open_for_student(course_set, student_id):
         section = course_set.section_id
         access = AccessContext(section, student_id)
         return access.section_open
+
+    # Subject-wide sets (no lesson/section binding) follow subject lock state.
+    subject_requires_code = bool(getattr(course_set.subject_id, "requires_code", False)) if course_set.subject_id else False
+    subject_active = bool(
+        SubjectActivation.objects(subject_id=course_set.subject_id.id, student_id=student_id, active=True).first()
+    ) if course_set.subject_id else False
+    if (not subject_active) and subject_requires_code:
+        return False
 
     return True
 
@@ -1475,9 +1526,15 @@ def section_detail(section_id):
     if tests:
         test_ids = [t.id for t in tests]
         questions = list(Question.objects(test_id__in=test_ids).only('test_id').all())
+        interactive_questions = list(TestInteractiveQuestion.objects(test_id__in=test_ids).only('test_id').all())
         question_counts = {}
         for q in questions:
             test_id = q.test_id.id
+            question_counts[test_id] = question_counts.get(test_id, 0) + 1
+        for iq in interactive_questions:
+            if not iq.test_id:
+                continue
+            test_id = iq.test_id.id
             question_counts[test_id] = question_counts.get(test_id, 0) + 1
         
         # Attach counts to tests
@@ -1619,9 +1676,15 @@ def lesson_detail(lesson_id):
     if tests:
         test_ids = [t.id for t in tests]
         questions = list(Question.objects(test_id__in=test_ids).only('test_id').all())
+        interactive_questions = list(TestInteractiveQuestion.objects(test_id__in=test_ids).only('test_id').all())
         question_counts = {}
         for q in questions:
             test_id = q.test_id.id
+            question_counts[test_id] = question_counts.get(test_id, 0) + 1
+        for iq in interactive_questions:
+            if not iq.test_id:
+                continue
+            test_id = iq.test_id.id
             question_counts[test_id] = question_counts.get(test_id, 0) + 1
         
         for test in tests:
@@ -2607,9 +2670,8 @@ def take_test(test_id):
                 flash("قم بتفعيل القسم للوصول إلى هذا الاختبار.", "warning")
                 return redirect(url_for("student.activate_section", section_id=test.section_id))
 
-    total_questions_available = len(test.questions)
-    text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
     interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
+    total_questions_available = len(test.questions) + len(interactive_questions)
     min_select = 10 if total_questions_available >= 10 else total_questions_available
     max_select = min(50, total_questions_available)
 
@@ -2625,7 +2687,7 @@ def take_test(test_id):
     retake_source_id = request.values.get("retake_source_id")
     retake_mode = request.values.get("retake_mode")
 
-    if selected_count is None and total_questions_available == 0 and (text_questions or interactive_questions):
+    if selected_count is None and total_questions_available == 0 and interactive_questions:
         selected_count = 0
 
     if selected_count is None and preset_question_ids:
@@ -2638,7 +2700,6 @@ def take_test(test_id):
     if request.method == "POST":
         # Evaluate answers
         question_ids_raw = request.form.get("question_ids", "")
-        text_question_ids_raw = request.form.get("text_question_ids", "")
         interactive_question_ids_raw = request.form.get("interactive_question_ids", "")
         if question_ids_raw:
             question_ids = [qid.strip() for qid in question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
@@ -2647,12 +2708,6 @@ def take_test(test_id):
             ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
         else:
             ordered_questions = list(test.questions)
-
-        ordered_text_questions = list(text_questions)
-        if text_question_ids_raw:
-            text_question_ids = [qid.strip() for qid in text_question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
-            text_q_map = {str(tq.id): tq for tq in TestTextQuestion.objects(id__in=text_question_ids, test_id=test.id).all()}
-            ordered_text_questions = [text_q_map[qid] for qid in text_question_ids if qid in text_q_map]
 
         ordered_interactive_questions = list(interactive_questions)
         if interactive_question_ids_raw:
@@ -2664,7 +2719,7 @@ def take_test(test_id):
             ordered_interactive_questions = [interactive_q_map[qid] for qid in interactive_question_ids if qid in interactive_q_map]
 
         settings_payload = {
-            "count": _to_int(request.form.get("count"), len(ordered_questions)),
+            "count": _to_int(request.form.get("count"), len(ordered_questions) + len(ordered_interactive_questions)),
             "easy": _to_int(request.form.get("easy"), 0),
             "medium": _to_int(request.form.get("medium"), 0),
             "hard": _to_int(request.form.get("hard"), 0),
@@ -2676,9 +2731,8 @@ def take_test(test_id):
             is_retake = bool(source)
 
         question_order = [str(q.id) for q in ordered_questions]
-        text_total = sum(max(1, int(getattr(tq, "max_score", 5) or 5)) for tq in ordered_text_questions)
         interactive_total = len(ordered_interactive_questions)
-        total = len(ordered_questions) + text_total + interactive_total
+        total = len(ordered_questions) + interactive_total
         score = 0
         attempt = Attempt(
             test_id=test.id,
@@ -2713,17 +2767,6 @@ def take_test(test_id):
                 )
                 ans.save()
 
-        for tq in ordered_text_questions:
-            text_answer = (request.form.get(f"text_question_{tq.id}") or "").strip()
-            if text_answer:
-                AttemptTextAnswer(
-                    attempt_id=attempt.id,
-                    text_question_id=tq.id,
-                    answer_text=text_answer,
-                    max_score=max(1, int(getattr(tq, "max_score", 5) or 5)),
-                    score_awarded=None,
-                ).save()
-
         for iq in ordered_interactive_questions:
             raw = (request.form.get(f"interactive_question_{iq.id}") or "").strip().lower()
             selected_value = raw == "true"
@@ -2754,25 +2797,45 @@ def take_test(test_id):
     ordered_questions = []
     question_ids_str = ""
     time_limit_seconds = None
-    text_question_ids_str = ",".join(str(tq.id) for tq in text_questions)
-    interactive_question_ids_str = ",".join(str(iq.id) for iq in interactive_questions)
+    interactive_question_ids_str = ""
     if selected_count:
         questions = list(test.questions)
+        interactive_pool = list(interactive_questions)
+        combined_pool = [("mcq", q) for q in questions] + [("interactive", iq) for iq in interactive_pool]
+        selected_mcq = []
+        selected_interactive = []
         if preset_question_ids:
             questions_by_id = {str(q.id): q for q in Question.objects(id__in=preset_question_ids).all()}
             questions = [questions_by_id[qid] for qid in preset_question_ids if qid in questions_by_id]
             selected_count = len(questions)
+            selected_mcq = questions
         elif selected_by_level:
             level_map = {"easy": [], "medium": [], "hard": []}
-            for q in questions:
-                level = (getattr(q, "difficulty", "medium") or "medium").lower()
+            for q_type, q_obj in combined_pool:
+                level = (getattr(q_obj, "difficulty", "medium") or "medium").lower()
                 if level not in level_map:
                     level = "medium"
-                level_map[level].append(q)
+                level_map[level].append((q_type, q_obj))
 
-            if easy_count > len(level_map["easy"]) or medium_count > len(level_map["medium"]) or hard_count > len(level_map["hard"]):
-                flash("عدد الأسئلة المطلوب أعلى من المتاح لهذا المستوى.", "error")
+            available_by_level = {
+                "easy": len(level_map["easy"]),
+                "medium": len(level_map["medium"]),
+                "hard": len(level_map["hard"]),
+            }
+            requested_by_level = {
+                "easy": easy_count,
+                "medium": medium_count,
+                "hard": hard_count,
+            }
+            allocated_by_level = _rebalance_difficulty_request(requested_by_level, available_by_level)
+
+            if sum(allocated_by_level.values()) < (easy_count + medium_count + hard_count):
+                flash("عدد الأسئلة المطلوب أعلى من المتاح.", "error")
                 return redirect(url_for("student.take_test", test_id=test.id))
+
+            easy_count = allocated_by_level["easy"]
+            medium_count = allocated_by_level["medium"]
+            hard_count = allocated_by_level["hard"]
 
             if selected_count and (easy_count + medium_count + hard_count) != selected_count:
                 flash("مجموع المستويات يجب أن يساوي عدد الأسئلة المختار.", "error")
@@ -2785,39 +2848,44 @@ def take_test(test_id):
                 picked.extend(random.sample(level_map["medium"], medium_count))
             if hard_count:
                 picked.extend(random.sample(level_map["hard"], hard_count))
-            questions = picked
+            random.shuffle(picked)
+            selected_mcq = [obj for q_type, obj in picked if q_type == "mcq"]
+            selected_interactive = [obj for q_type, obj in picked if q_type == "interactive"]
         else:
-            if selected_count < len(questions):
-                questions = random.sample(questions, selected_count)
+            picked = combined_pool
+            if selected_count < len(combined_pool):
+                picked = random.sample(combined_pool, selected_count)
+            selected_mcq = [obj for q_type, obj in picked if q_type == "mcq"]
+            selected_interactive = [obj for q_type, obj in picked if q_type == "interactive"]
 
         if not preset_question_ids:
-            random.shuffle(questions)
-        question_ids = [q.id for q in questions]
+            random.shuffle(selected_mcq)
+            random.shuffle(selected_interactive)
+        question_ids = [q.id for q in selected_mcq]
+        interactive_ids = [iq.id for iq in selected_interactive]
         question_ids_str = ",".join(str(qid) for qid in question_ids)
-        for q in questions:
+        interactive_question_ids_str = ",".join(str(iid) for iid in interactive_ids)
+        for q in selected_mcq:
             choices = list(q.choices)
             random.shuffle(choices)
             ordered_questions.append({"question": q, "choices": choices, "question_type": "mcq"})
-        for tq in text_questions:
-            ordered_questions.append({"text_question": tq, "choices": [], "question_type": "text"})
+        for iq in selected_interactive:
+            ordered_questions.append({"interactive_question": iq, "choices": [], "question_type": "interactive"})
+        time_limit_seconds = ((len(question_ids) + len(interactive_ids)) * 75) + 15
+    elif selected_count is not None and total_questions_available == 0 and interactive_questions:
         for iq in interactive_questions:
             ordered_questions.append({"interactive_question": iq, "choices": [], "question_type": "interactive"})
-        time_limit_seconds = (len(question_ids) * 75) + 15
-    elif selected_count is not None and total_questions_available == 0 and (text_questions or interactive_questions):
-        for tq in text_questions:
-            ordered_questions.append({"text_question": tq, "choices": [], "question_type": "text"})
-        for iq in interactive_questions:
-            ordered_questions.append({"interactive_question": iq, "choices": [], "question_type": "interactive"})
-        time_limit_seconds = ((len(text_questions) + len(interactive_questions)) * 75) + 15
+        interactive_question_ids_str = ",".join(str(iq.id) for iq in interactive_questions)
+        time_limit_seconds = (len(interactive_questions) * 75) + 15
 
     # Available counts per difficulty for UI
     def _norm_level(q):
         level = (getattr(q, "difficulty", "medium") or "medium").lower()
         return level if level in {"easy", "medium", "hard"} else "medium"
 
-    available_easy = len([q for q in test.questions if _norm_level(q) == "easy"])
-    available_medium = len([q for q in test.questions if _norm_level(q) == "medium"])
-    available_hard = len([q for q in test.questions if _norm_level(q) == "hard"])
+    available_easy = len([q for q in test.questions if _norm_level(q) == "easy"]) + len([iq for iq in interactive_questions if _norm_level(iq) == "easy"])
+    available_medium = len([q for q in test.questions if _norm_level(q) == "medium"]) + len([iq for iq in interactive_questions if _norm_level(iq) == "medium"])
+    available_hard = len([q for q in test.questions if _norm_level(q) == "hard"]) + len([iq for iq in interactive_questions if _norm_level(iq) == "hard"])
 
     return render_template(
         "student/take_test.html",
@@ -2834,7 +2902,6 @@ def take_test(test_id):
         hard_count=hard_count,
         ordered_questions=ordered_questions,
         question_ids_str=question_ids_str,
-        text_question_ids_str=text_question_ids_str,
         interactive_question_ids_str=interactive_question_ids_str,
         time_limit_seconds=time_limit_seconds,
         retake_source_id=retake_source_id,
@@ -3283,18 +3350,8 @@ def results():
 
     all_attempts = own_attempts + other_attempts
     attempt_ids = [a.id for a in all_attempts if a.id]
-    text_answers = list(AttemptTextAnswer.objects(attempt_id__in=attempt_ids).all()) if attempt_ids else []
-    text_by_attempt = {}
-    for ta in text_answers:
-        if not ta.attempt_id:
-            continue
-        aid = ta.attempt_id.id
-        text_by_attempt.setdefault(aid, []).append(ta)
-
     for attempt in all_attempts:
-        tas = text_by_attempt.get(attempt.id, [])
-        pending = bool(tas) and any(getattr(ta, "score_awarded", None) is None for ta in tas)
-        attempt._pending_text_grading = pending
+        attempt._pending_text_grading = False
     return render_template(
         "student/results.html",
         own_attempts=own_attempts,
@@ -3456,25 +3513,6 @@ def test_result(attempt_id):
             "is_correct": ans.is_correct,
         })
 
-    text_answers = list(AttemptTextAnswer.objects(attempt_id=attempt.id).all())
-    text_question_ids = [ta.text_question_id.id for ta in text_answers if ta.text_question_id]
-    text_questions_map = {
-        str(tq.id): tq for tq in TestTextQuestion.objects(id__in=text_question_ids).all()
-    } if text_question_ids else {}
-    text_review = []
-    for ta in text_answers:
-        if not ta.text_question_id:
-            continue
-        tq = text_questions_map.get(str(ta.text_question_id.id))
-        if not tq:
-            continue
-        text_review.append(
-            {
-                "question": tq,
-                "answer_text": ta.answer_text,
-            }
-        )
-
     interactive_answers = list(AttemptInteractiveAnswer.objects(attempt_id=attempt.id).all())
     interactive_question_ids = [ia.interactive_question_id.id for ia in interactive_answers if ia.interactive_question_id]
     interactive_questions_map = {
@@ -3495,17 +3533,14 @@ def test_result(attempt_id):
             }
         )
 
-    pending_text_grading = bool(text_answers) and any(getattr(ta, "score_awarded", None) is None for ta in text_answers)
-
     gamification = StudentGamification.objects(student_id=attempt.student_id.id).first()
     return render_template(
         "student/test_result.html",
         attempt=attempt,
         review=review,
-        text_review=text_review,
         interactive_review=interactive_review,
         gamification=gamification,
-        pending_text_grading=pending_text_grading,
+        pending_text_grading=False,
     )
 
 
@@ -3587,41 +3622,67 @@ def custom_test_new():
                 if lesson.section and lesson.section.subject_id == subject_filter
             ]
 
-    # Bulk load tests and question counts for all unlocked lessons
     lesson_question_counts = {}
     lesson_difficulty_counts = {}
+    tests_data = []
+    tests_by_lesson = {}
+    test_question_counts = {}
+    test_difficulty_counts = {}
+
     if unlocked_lessons:
         lesson_ids = [l.id for l in unlocked_lessons]
-        tests = list(Test.objects(lesson_id__in=lesson_ids).all())
-        
-        # Group tests by lesson
-        tests_by_lesson = {}
+        tests = list(Test.objects(lesson_id__in=lesson_ids).order_by('created_at').all())
+        test_ids = [t.id for t in tests]
+
         for test in tests:
             lesson_id = test.lesson_id.id if test.lesson_id else None
-            if lesson_id:
-                if lesson_id not in tests_by_lesson:
-                    tests_by_lesson[lesson_id] = []
-                tests_by_lesson[lesson_id].append(test.id)
-        
-        # Bulk count questions for each lesson (total and by difficulty)
+            if not lesson_id:
+                continue
+            tests_by_lesson.setdefault(lesson_id, []).append(test)
+
+        mcq_pool = list(Question.objects(test_id__in=test_ids).only('id', 'test_id', 'difficulty').all()) if test_ids else []
+        interactive_pool = list(TestInteractiveQuestion.objects(test_id__in=test_ids).only('id', 'test_id', 'difficulty').all()) if test_ids else []
+
+        for test in tests:
+            test_question_counts[test.id] = 0
+            test_difficulty_counts[test.id] = {'easy': 0, 'medium': 0, 'hard': 0}
+
+        def _norm_diff(value):
+            level = (value or 'medium').lower()
+            return level if level in {'easy', 'medium', 'hard'} else 'medium'
+
+        for q in mcq_pool:
+            if not q.test_id:
+                continue
+            tid = q.test_id.id
+            test_question_counts[tid] = test_question_counts.get(tid, 0) + 1
+            test_difficulty_counts.setdefault(tid, {'easy': 0, 'medium': 0, 'hard': 0})[_norm_diff(getattr(q, 'difficulty', 'medium'))] += 1
+
+        for iq in interactive_pool:
+            if not iq.test_id:
+                continue
+            tid = iq.test_id.id
+            test_question_counts[tid] = test_question_counts.get(tid, 0) + 1
+            test_difficulty_counts.setdefault(tid, {'easy': 0, 'medium': 0, 'hard': 0})[_norm_diff(getattr(iq, 'difficulty', 'medium'))] += 1
+
         for lesson in unlocked_lessons:
-            test_ids = tests_by_lesson.get(lesson.id, [])
-            if test_ids:
-                lesson_questions = list(Question.objects(test_id__in=test_ids).all())
-                lesson_question_counts[lesson.id] = len(lesson_questions)
-                
-                # Count by difficulty
-                difficulty_count = {'easy': 0, 'medium': 0, 'hard': 0}
-                for q in lesson_questions:
-                    diff = (getattr(q, "difficulty", "medium") or "medium").lower()
-                    if diff not in difficulty_count:
-                        diff = "medium"
-                    difficulty_count[diff] += 1
-                lesson_difficulty_counts[lesson.id] = difficulty_count
-            else:
-                lesson_question_counts[lesson.id] = 0
-                lesson_difficulty_counts[lesson.id] = {'easy': 0, 'medium': 0, 'hard': 0}
-    
+            lesson_total = 0
+            lesson_diff = {'easy': 0, 'medium': 0, 'hard': 0}
+            for test in tests_by_lesson.get(lesson.id, []):
+                cnt = test_question_counts.get(test.id, 0)
+                lesson_total += cnt
+                diff_map = test_difficulty_counts.get(test.id, {'easy': 0, 'medium': 0, 'hard': 0})
+                lesson_diff['easy'] += diff_map.get('easy', 0)
+                lesson_diff['medium'] += diff_map.get('medium', 0)
+                lesson_diff['hard'] += diff_map.get('hard', 0)
+
+                test._question_count = cnt
+                test._difficulty_counts = diff_map
+                tests_data.append({'test': test, 'lesson': lesson})
+
+            lesson_question_counts[lesson.id] = lesson_total
+            lesson_difficulty_counts[lesson.id] = lesson_diff
+
     total_available_questions = sum(lesson_question_counts.values())
 
     if request.method == "POST":
@@ -3629,74 +3690,69 @@ def custom_test_new():
             flash("اختر مادة قبل إنشاء اختبار مخصص.", "error")
             return redirect(url_for("student.custom_test_new"))
 
+        selection_mode = (request.form.get('selection_mode') or 'lesson').strip().lower()
+        if selection_mode not in {'lesson', 'test'}:
+            selection_mode = 'lesson'
+
         selections = []
         total_questions = 0
-        for lesson in unlocked_lessons:
-            # Check if difficulty-based selection is used for this lesson
-            easy_raw = request.form.get(f"lesson_{lesson.id}_easy", "").strip()
-            medium_raw = request.form.get(f"lesson_{lesson.id}_medium", "").strip()
-            hard_raw = request.form.get(f"lesson_{lesson.id}_hard", "").strip()
-            
-            # Parse difficulty counts
-            try:
-                easy_count = int(easy_raw) if easy_raw else 0
-                medium_count = int(medium_raw) if medium_raw else 0
-                hard_count = int(hard_raw) if hard_raw else 0
-            except ValueError:
-                easy_count = medium_count = hard_count = 0
-            
-            # Total for this lesson (difficulty-based)
+
+        scopes = tests_data if selection_mode == 'test' else [{'lesson': lesson} for lesson in unlocked_lessons]
+        for scope in scopes:
+            if selection_mode == 'test':
+                test = scope['test']
+                title = f"{scope['lesson'].title} - {test.title}"
+                key_prefix = f"test_{test.id}"
+                max_available = test_question_counts.get(test.id, 0)
+                available_diff = test_difficulty_counts.get(test.id, {'easy': 0, 'medium': 0, 'hard': 0})
+                scope_id = str(test.id)
+            else:
+                lesson = scope['lesson']
+                title = lesson.title
+                key_prefix = f"lesson_{lesson.id}"
+                max_available = lesson_question_counts.get(lesson.id, 0)
+                available_diff = lesson_difficulty_counts.get(lesson.id, {'easy': 0, 'medium': 0, 'hard': 0})
+                scope_id = str(lesson.id)
+
+            easy_count = _to_int((request.form.get(f"{key_prefix}_easy", "") or '').strip(), 0)
+            medium_count = _to_int((request.form.get(f"{key_prefix}_medium", "") or '').strip(), 0)
+            hard_count = _to_int((request.form.get(f"{key_prefix}_hard", "") or '').strip(), 0)
             difficulty_total = easy_count + medium_count + hard_count
-            
-            # Check legacy total count input (fallback)
-            raw = request.form.get(f"lesson_{lesson.id}")
-            try:
-                legacy_count = int(raw) if raw else 0
-            except ValueError:
-                legacy_count = 0
-            
-            # Use difficulty-based if any difficulty is specified, otherwise use legacy
+            legacy_count = _to_int((request.form.get(key_prefix, "") or '').strip(), 0)
+
             if difficulty_total > 0:
                 count = difficulty_total
                 use_difficulty = True
-                
-                # Validate difficulty counts against available
-                available_diff = lesson_difficulty_counts.get(lesson.id, {'easy': 0, 'medium': 0, 'hard': 0})
-                if easy_count > available_diff['easy']:
-                    flash(f"طلب {easy_count} أسئلة سهلة من {lesson.title}، لكن {available_diff['easy']} فقط متاحة.", "error")
+                allocated_diff = _rebalance_difficulty_request(
+                    {'easy': easy_count, 'medium': medium_count, 'hard': hard_count},
+                    available_diff,
+                )
+                if sum(allocated_diff.values()) < difficulty_total:
+                    flash(f"عدد الأسئلة المطلوب في {title} أعلى من المتاح.", "error")
                     return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
-                if medium_count > available_diff['medium']:
-                    flash(f"طلب {medium_count} أسئلة متوسطة من {lesson.title}، لكن {available_diff['medium']} فقط متاحة.", "error")
-                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
-                if hard_count > available_diff['hard']:
-                    flash(f"طلب {hard_count} أسئلة صعبة من {lesson.title}، لكن {available_diff['hard']} فقط متاحة.", "error")
-                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                easy_count = allocated_diff['easy']
+                medium_count = allocated_diff['medium']
+                hard_count = allocated_diff['hard']
             elif legacy_count > 0:
                 count = legacy_count
                 use_difficulty = False
             else:
                 continue
-            
+
             if count <= 0:
                 continue
-                
-            max_available = lesson_question_counts.get(lesson.id, 0)
             if count > max_available:
-                flash(f"تم طلب {count} أسئلة لـ {lesson.title}، ولكن {max_available} فقط متاحة.", "error")
+                flash(f"تم طلب {count} أسئلة لـ {title}، ولكن {max_available} فقط متاحة.", "error")
                 return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
-            
+
             selection = {
-                "lesson_id": str(lesson.id),
+                "scope_type": selection_mode,
+                "scope_id": scope_id,
                 "count": count,
             }
-            
             if use_difficulty:
-                selection["difficulty"] = {
-                    "easy": easy_count,
-                    "medium": medium_count,
-                    "hard": hard_count
-                }
-            
+                selection['difficulty'] = {'easy': easy_count, 'medium': medium_count, 'hard': hard_count}
+
             selections.append(selection)
             total_questions += count
 
@@ -3712,24 +3768,30 @@ def custom_test_new():
             flash("يمكنك اختيار حتى 50 سؤالًا للاختبار المخصص.", "error")
             return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
 
-        # Build question pool
-        selected_questions = []
+        # Build question pool (MCQ + interactive)
+        selected_items = []
         for sel in selections:
-            tests = Test.objects(lesson_id=sel["lesson_id"]).all()
-            test_ids = [t.id for t in tests]
-            all_lesson_questions = list(Question.objects(test_id__in=test_ids)) if test_ids else []
-            
+            if sel.get('scope_type') == 'test':
+                test_ids = [sel.get('scope_id')] if ObjectId.is_valid(sel.get('scope_id')) else []
+            else:
+                lesson_id = sel.get('scope_id')
+                tests = Test.objects(lesson_id=lesson_id).all() if ObjectId.is_valid(str(lesson_id)) else []
+                test_ids = [t.id for t in tests]
+
+            mcq_pool = list(Question.objects(test_id__in=test_ids)) if test_ids else []
+            interactive_pool = list(TestInteractiveQuestion.objects(test_id__in=test_ids)) if test_ids else []
+            combined_pool = [('mcq', q) for q in mcq_pool] + [('interactive', iq) for iq in interactive_pool]
+
             if "difficulty" in sel:
-                # Use difficulty-based selection
                 diff_spec = sel["difficulty"]
                 level_map = {"easy": [], "medium": [], "hard": []}
-                
-                for q in all_lesson_questions:
-                    diff = (getattr(q, "difficulty", "medium") or "medium").lower()
+
+                for item_type, obj in combined_pool:
+                    diff = (getattr(obj, "difficulty", "medium") or "medium").lower()
                     if diff not in level_map:
                         diff = "medium"
-                    level_map[diff].append(q)
-                
+                    level_map[diff].append((item_type, obj))
+
                 picked = []
                 if diff_spec["easy"] > 0:
                     if len(level_map["easy"]) < diff_spec["easy"]:
@@ -3746,34 +3808,36 @@ def custom_test_new():
                         flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
                         return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
                     picked.extend(random.sample(level_map["hard"], diff_spec["hard"]))
-                
-                selected_questions.extend(picked)
+
+                selected_items.extend(picked)
             else:
-                # Legacy: random selection without difficulty filter
-                lesson_questions = all_lesson_questions
-                if len(lesson_questions) < sel["count"]:
+                if len(combined_pool) < sel["count"]:
                     flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
                     return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
-                picked = random.sample(lesson_questions, sel["count"])
-                selected_questions.extend(picked)
+                picked = random.sample(combined_pool, sel["count"])
+                selected_items.extend(picked)
 
-        # Ensure no duplicates
-        selected_questions = list({q.id: q for q in selected_questions}.values())
+        # Ensure no duplicates for mixed item types.
+        dedup = {}
+        for item_type, obj in selected_items:
+            dedup[_pack_custom_item_token(item_type, obj.id)] = (item_type, obj)
+        selected_items = list(dedup.values())
 
-        # Shuffle question order
-        random.shuffle(selected_questions)
-        question_order = [str(q.id) for q in selected_questions]
+        random.shuffle(selected_items)
+        question_order = [_pack_custom_item_token(item_type, obj.id) for item_type, obj in selected_items]
 
-        # Shuffle answer order per question
         answer_order = {}
-        for q in selected_questions:
-            choices = list(q.choices)
+        for token, (item_type, obj) in zip(question_order, selected_items):
+            if item_type != 'mcq':
+                continue
+            choices = list(obj.choices)
             random.shuffle(choices)
-            answer_order[str(q.id)] = [str(c.choice_id) for c in choices]
+            answer_order[token] = [str(c.choice_id) for c in choices]
 
         selections_payload = {
             "subject_id": str(selected_subject_id),
-            "lessons": selections,
+            "selection_mode": selection_mode,
+            "scopes": selections,
         }
 
         attempt = CustomTestAttempt(
@@ -3792,9 +3856,13 @@ def custom_test_new():
         "student/custom_test_setup.html",
         subjects=subjects,
         selected_subject_id=selected_subject_id,
+        selection_mode=request.form.get('selection_mode', 'lesson') if request.method == 'POST' else request.args.get('mode', 'lesson'),
         lessons=unlocked_lessons,
+        tests_data=tests_data,
         lesson_question_counts=lesson_question_counts,
         lesson_difficulty_counts=lesson_difficulty_counts,
+        test_question_counts=test_question_counts,
+        test_difficulty_counts=test_difficulty_counts,
         total_available_questions=total_available_questions,
     )
 
@@ -3811,18 +3879,42 @@ def custom_test_take(attempt_id):
 
     question_order = json.loads(attempt.question_order_json)
     answer_order = json.loads(attempt.answer_order_json)
-    questions = Question.objects(id__in=question_order).all()
+
+    parsed = []
+    mcq_ids = []
+    interactive_ids = []
+    for token in question_order:
+        item_type, item_id = _unpack_custom_item_token(token)
+        if not item_type:
+            continue
+        parsed.append((str(token), item_type, item_id))
+        if item_type == 'mcq':
+            mcq_ids.append(item_id)
+        else:
+            interactive_ids.append(item_id)
+
+    questions = Question.objects(id__in=mcq_ids).all() if mcq_ids else []
+    interactive_questions = TestInteractiveQuestion.objects(id__in=interactive_ids).all() if interactive_ids else []
     questions_by_id = {str(q.id): q for q in questions}
+    interactive_by_id = {str(iq.id): iq for iq in interactive_questions}
 
     ordered_questions = []
-    for qid in question_order:
-        q = questions_by_id.get(qid)
-        if not q:
-            continue
-        ordered_choice_ids = answer_order.get(str(qid), [])
-        choices = {str(c.choice_id): c for c in q.choices}
-        ordered_choices = [choices[cid] for cid in ordered_choice_ids if cid in choices]
-        ordered_questions.append({"question": q, "choices": ordered_choices})
+    for token, item_type, item_id in parsed:
+        if item_type == 'mcq':
+            q = questions_by_id.get(item_id)
+            if not q:
+                continue
+            ordered_choice_ids = answer_order.get(token) or answer_order.get(item_id, [])
+            choices = {str(c.choice_id): c for c in q.choices}
+            ordered_choices = [choices[cid] for cid in ordered_choice_ids if cid in choices]
+            if not ordered_choices:
+                ordered_choices = list(q.choices)
+            ordered_questions.append({"question": q, "choices": ordered_choices, "question_type": "mcq"})
+        else:
+            iq = interactive_by_id.get(item_id)
+            if not iq:
+                continue
+            ordered_questions.append({"interactive_question": iq, "choices": [], "question_type": "interactive"})
 
     time_limit_seconds = (attempt.total * 75) + 15
     return render_template(
@@ -3846,29 +3938,63 @@ def custom_test_submit(attempt_id):
         return redirect(url_for("student.custom_test_result", attempt_id=attempt.id))
 
     question_order = json.loads(attempt.question_order_json)
-    questions = Question.objects(id__in=question_order).all()
+    parsed = []
+    mcq_ids = []
+    interactive_ids = []
+    for token in question_order:
+        item_type, item_id = _unpack_custom_item_token(token)
+        if not item_type:
+            continue
+        parsed.append((str(token), item_type, item_id))
+        if item_type == 'mcq':
+            mcq_ids.append(item_id)
+        else:
+            interactive_ids.append(item_id)
+
+    questions = Question.objects(id__in=mcq_ids).all() if mcq_ids else []
+    interactive_questions = TestInteractiveQuestion.objects(id__in=interactive_ids).all() if interactive_ids else []
     questions_by_id = {str(q.id): q for q in questions}
+    interactive_by_id = {str(iq.id): iq for iq in interactive_questions}
 
     score = 0
-    total = len(question_order)
-    for qid in question_order:
-        selected_choice_id = request.form.get(f"question_{qid}")
-        q = questions_by_id.get(str(qid))
-        choice = next((c for c in q.choices if str(c.choice_id) == selected_choice_id), None) if (q and selected_choice_id) else None
-        if q and q.correct_choice_id:
-            is_correct = bool(choice and choice.choice_id == q.correct_choice_id)
+    total = len(parsed)
+    for token, item_type, item_id in parsed:
+        if item_type == 'mcq':
+            q = questions_by_id.get(item_id)
+            if not q:
+                continue
+            selected_choice_id = request.form.get(f"question_{item_id}")
+            choice = next((c for c in q.choices if str(c.choice_id) == selected_choice_id), None) if selected_choice_id else None
+            if q.correct_choice_id:
+                is_correct = bool(choice and choice.choice_id == q.correct_choice_id)
+            else:
+                is_correct = bool(choice and choice.is_correct)
+            if is_correct:
+                score += 1
+            CustomTestAnswer(
+                attempt_id=attempt.id,
+                question_id=q,
+                choice_id=choice.choice_id if choice else None,
+                selected_value=None,
+                is_correct=is_correct,
+            ).save()
         else:
-            is_correct = bool(choice and choice.is_correct)
-        if is_correct:
-            score += 1
-        choice_id = choice.choice_id if choice else None
-        ans = CustomTestAnswer(
-            attempt_id=attempt.id,
-            question_id=q,
-            choice_id=choice_id,
-            is_correct=is_correct,
-        )
-        ans.save()
+            iq = interactive_by_id.get(item_id)
+            if not iq:
+                continue
+            raw = (request.form.get(f"interactive_question_{item_id}") or "").strip().lower()
+            selected_value = raw == "true"
+            is_correct = bool(selected_value)
+            if is_correct:
+                score += 1
+            CustomTestAnswer(
+                attempt_id=attempt.id,
+                question_id=None,
+                interactive_question_id=iq,
+                choice_id=None,
+                selected_value=selected_value,
+                is_correct=is_correct,
+            ).save()
 
     attempt.score = score
     attempt.total = total
@@ -3898,28 +4024,62 @@ def custom_test_result(attempt_id):
 
     question_order = json.loads(attempt.question_order_json)
     answer_order = json.loads(attempt.answer_order_json)
-    questions = Question.objects(id__in=question_order).all()
+
+    parsed = []
+    mcq_ids = []
+    interactive_ids = []
+    for token in question_order:
+        item_type, item_id = _unpack_custom_item_token(token)
+        if not item_type:
+            continue
+        parsed.append((str(token), item_type, item_id))
+        if item_type == 'mcq':
+            mcq_ids.append(item_id)
+        else:
+            interactive_ids.append(item_id)
+
+    questions = Question.objects(id__in=mcq_ids).all() if mcq_ids else []
+    interactive_questions = TestInteractiveQuestion.objects(id__in=interactive_ids).all() if interactive_ids else []
     questions_by_id = {str(q.id): q for q in questions}
-    answers_by_qid = {str(a.question_id.id): a for a in CustomTestAnswer.objects(attempt_id=attempt.id).all()}
+    interactive_by_id = {str(iq.id): iq for iq in interactive_questions}
+
+    answers = list(CustomTestAnswer.objects(attempt_id=attempt.id).all())
+    answers_by_qid = {str(a.question_id.id): a for a in answers if a.question_id}
+    answers_by_iqid = {str(a.interactive_question_id.id): a for a in answers if a.interactive_question_id}
 
     review = []
-    for qid in question_order:
-        q = questions_by_id.get(qid)
-        if not q:
-            continue
-        ordered_choice_ids = answer_order.get(str(qid), [])
-        choices = {str(c.choice_id): c for c in q.choices}
-        ordered_choices = [choices[cid] for cid in ordered_choice_ids if cid in choices]
-        ans = answers_by_qid.get(str(qid))
-        selected_choice = choices.get(str(ans.choice_id)) if ans and ans.choice_id else None
-        correct_choice = next((c for c in q.choices if c.is_correct), None)
-        review.append({
-            "question": q,
-            "choices": ordered_choices,
-            "selected_choice": selected_choice,
-            "correct_choice": correct_choice,
-            "is_correct": ans.is_correct if ans else False,
-        })
+    for token, item_type, item_id in parsed:
+        if item_type == 'mcq':
+            q = questions_by_id.get(item_id)
+            if not q:
+                continue
+            ordered_choice_ids = answer_order.get(token) or answer_order.get(item_id, [])
+            choices = {str(c.choice_id): c for c in q.choices}
+            ordered_choices = [choices[cid] for cid in ordered_choice_ids if cid in choices]
+            if not ordered_choices:
+                ordered_choices = list(q.choices)
+            ans = answers_by_qid.get(item_id)
+            selected_choice = choices.get(str(ans.choice_id)) if ans and ans.choice_id else None
+            correct_choice = next((c for c in q.choices if c.is_correct), None)
+            review.append({
+                "question_type": "mcq",
+                "question": q,
+                "choices": ordered_choices,
+                "selected_choice": selected_choice,
+                "correct_choice": correct_choice,
+                "is_correct": ans.is_correct if ans else False,
+            })
+        else:
+            iq = interactive_by_id.get(item_id)
+            if not iq:
+                continue
+            ans = answers_by_iqid.get(item_id)
+            review.append({
+                "question_type": "interactive",
+                "question": iq,
+                "selected_value": ans.selected_value if ans else False,
+                "is_correct": ans.is_correct if ans else False,
+            })
 
     gamification = StudentGamification.objects(student_id=attempt.student_id.id).first()
     return render_template("student/custom_test_result.html", attempt=attempt, review=review, gamification=gamification)
@@ -3964,60 +4124,95 @@ def custom_test_retake_new(attempt_id):
         selections_payload = json.loads(source.selections_json)
     except Exception:
         selections_payload = {}
-    selections = selections_payload.get("lessons", []) if isinstance(selections_payload, dict) else []
+    if isinstance(selections_payload, dict):
+        selections = selections_payload.get("scopes", [])
+        if not selections:
+            # Backward compatibility with old payloads.
+            legacy = selections_payload.get("lessons", [])
+            selections = [
+                {
+                    "scope_type": "lesson",
+                    "scope_id": sel.get("lesson_id"),
+                    "count": sel.get("count"),
+                    "difficulty": sel.get("difficulty"),
+                }
+                for sel in legacy
+            ]
+    else:
+        selections = []
 
-    selected_questions = []
+    selected_items = []
     for sel in selections:
-        lesson_id = sel.get("lesson_id")
+        scope_type = (sel.get("scope_type") or "lesson").strip().lower()
+        scope_id = sel.get("scope_id")
         count = _to_int(sel.get("count"), 0)
-        if not lesson_id or count <= 0:
+        if not scope_id or count <= 0:
             continue
 
-        tests = Test.objects(lesson_id=lesson_id).all()
-        test_ids = [t.id for t in tests]
-        all_lesson_questions = list(Question.objects(test_id__in=test_ids)) if test_ids else []
+        if scope_type == "test":
+            test_ids = [scope_id] if ObjectId.is_valid(str(scope_id)) else []
+        else:
+            tests = Test.objects(lesson_id=scope_id).all() if ObjectId.is_valid(str(scope_id)) else []
+            test_ids = [t.id for t in tests]
+
+        mcq_pool = list(Question.objects(test_id__in=test_ids)) if test_ids else []
+        interactive_pool = list(TestInteractiveQuestion.objects(test_id__in=test_ids)) if test_ids else []
+        combined_pool = [("mcq", q) for q in mcq_pool] + [("interactive", iq) for iq in interactive_pool]
 
         if "difficulty" in sel and isinstance(sel["difficulty"], dict):
             diff_spec = sel["difficulty"]
             level_map = {"easy": [], "medium": [], "hard": []}
-            for q in all_lesson_questions:
-                diff = (getattr(q, "difficulty", "medium") or "medium").lower()
+            for item_type, obj in combined_pool:
+                diff = (getattr(obj, "difficulty", "medium") or "medium").lower()
                 if diff not in level_map:
                     diff = "medium"
-                level_map[diff].append(q)
+                level_map[diff].append((item_type, obj))
+
+            requested = {
+                "easy": _to_int(diff_spec.get("easy"), 0),
+                "medium": _to_int(diff_spec.get("medium"), 0),
+                "hard": _to_int(diff_spec.get("hard"), 0),
+            }
+            available = {
+                "easy": len(level_map["easy"]),
+                "medium": len(level_map["medium"]),
+                "hard": len(level_map["hard"]),
+            }
+            allocated = _rebalance_difficulty_request(requested, available)
 
             picked = []
-            easy_need = _to_int(diff_spec.get("easy"), 0)
-            medium_need = _to_int(diff_spec.get("medium"), 0)
-            hard_need = _to_int(diff_spec.get("hard"), 0)
+            if allocated["easy"]:
+                picked.extend(random.sample(level_map["easy"], allocated["easy"]))
+            if allocated["medium"]:
+                picked.extend(random.sample(level_map["medium"], allocated["medium"]))
+            if allocated["hard"]:
+                picked.extend(random.sample(level_map["hard"], allocated["hard"]))
 
-            if easy_need > len(level_map["easy"]) or medium_need > len(level_map["medium"]) or hard_need > len(level_map["hard"]):
+            if len(picked) < count:
                 flash("لا توجد أسئلة كافية لإعادة الاختبار بنفس الإعدادات.", "error")
                 return redirect(url_for("student.custom_test_result", attempt_id=source.id))
-
-            if easy_need:
-                picked.extend(random.sample(level_map["easy"], easy_need))
-            if medium_need:
-                picked.extend(random.sample(level_map["medium"], medium_need))
-            if hard_need:
-                picked.extend(random.sample(level_map["hard"], hard_need))
-            selected_questions.extend(picked)
+            selected_items.extend(picked)
         else:
-            if len(all_lesson_questions) < count:
+            if len(combined_pool) < count:
                 flash("لا توجد أسئلة كافية لإعادة الاختبار بنفس الإعدادات.", "error")
                 return redirect(url_for("student.custom_test_result", attempt_id=source.id))
-            selected_questions.extend(random.sample(all_lesson_questions, count))
+            selected_items.extend(random.sample(combined_pool, count))
 
-    # Keep unique questions and randomize like original custom test generation.
-    selected_questions = list({q.id: q for q in selected_questions}.values())
-    random.shuffle(selected_questions)
-    question_order = [str(q.id) for q in selected_questions]
+    # Keep unique items and randomize like original custom test generation.
+    dedup = {}
+    for item_type, obj in selected_items:
+        dedup[_pack_custom_item_token(item_type, obj.id)] = (item_type, obj)
+    selected_items = list(dedup.values())
+    random.shuffle(selected_items)
+    question_order = [_pack_custom_item_token(item_type, obj.id) for item_type, obj in selected_items]
 
     answer_order = {}
-    for q in selected_questions:
-        choices = list(q.choices)
+    for token, (item_type, obj) in zip(question_order, selected_items):
+        if item_type != 'mcq':
+            continue
+        choices = list(obj.choices)
         random.shuffle(choices)
-        answer_order[str(q.id)] = [str(c.choice_id) for c in choices]
+        answer_order[token] = [str(c.choice_id) for c in choices]
 
     attempt = CustomTestAttempt(
         student_id=current_user.id,

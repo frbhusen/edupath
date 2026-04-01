@@ -115,6 +115,7 @@
     {% if current_user.role == 'admin' %}
     <a class="btn btn-light btn-sm" href="{{ url_for('teacher.students') }}">الطلاب</a>
     {% endif %}
+    <a class="btn btn-light btn-sm" href="{{ url_for('teacher.batch_new_lessons') }}">إضافة دروس دفعة واحدة</a>
     <a class="btn btn-light btn-sm" href="{{ url_for('teacher.results_overview') }}">النتائج</a>
     <a class="btn btn-light btn-sm" href="{{ url_for('teacher.assignments_manage') }}">الواجبات</a>
     {% if current_user.role == 'admin' %}

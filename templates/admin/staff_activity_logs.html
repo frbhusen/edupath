@@ -5,7 +5,10 @@
     <h2 class="mb-1">سجل تعديلات الطاقم</h2>
     <p class="text-muted mb-0">{{ staff_user.full_name }} ({{ staff_user.username }}) - {{ staff_user.role }}</p>
   </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('admin.staff_accounts') }}">العودة لإدارة الطاقم</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.dashboard') }}">العودة للوحة الأدمن</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.staff_accounts') }}">إدارة الطاقم</a>
+  </div>
 </div>
 
 <div class="card mb-3">

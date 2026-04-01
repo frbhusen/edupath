@@ -14,30 +14,64 @@
 <form method="post" id="custom-test-form" action="{{ url_for('student.custom_test_submit', attempt_id=attempt.id) }}">
   <input type="hidden" name="time_expired" id="custom-time-expired" value="0" />
   {% for item in ordered_questions %}
-    {% set q = item.question %}
     <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
-        {% if q.question_images %}
-          <div class="d-flex flex-wrap gap-2 mb-2">
-            {% for img in q.question_images %}
-              <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 240px;">
+        {% if item.question_type == 'interactive' %}
+          {% set iq = item.interactive_question %}
+          <p class="fw-semibold preserve-format">س{{ loop.index }}.</p>
+          {% if iq.question_text %}
+            <div class="border rounded p-2 mb-2 math-content preserve-format">{{ iq.question_text }}</div>
+          {% endif %}
+          {% if iq.question_image_url %}
+            <div class="mb-2">
+              <img src="{{ iq.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 240px;">
+            </div>
+          {% endif %}
+
+          {% if iq.answer_text %}
+            <div class="border rounded p-2 mb-2 math-content preserve-format d-none interactive-answer-text">{{ iq.answer_text }}</div>
+          {% endif %}
+          {% if iq.answer_image_url %}
+            <div class="mb-2">
+              <img src="{{ iq.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border d-none interactive-answer-image" style="max-height: 240px;">
+            </div>
+          {% endif %}
+          <div class="small text-muted interactive-answer-note mb-2">اضغط إظهار الإجابة لعرض المحتوى</div>
+
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <button class="btn btn-outline-secondary reveal-interactive-answer" type="button">إظهار الإجابة</button>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <input class="btn-check interactive-eval-input" type="radio" name="interactive_question_{{ iq.id }}" id="custom-iq{{ iq.id }}-true" value="true" required disabled>
+            <label class="btn btn-outline-success" for="custom-iq{{ iq.id }}-true">حلّي صحيح</label>
+
+            <input class="btn-check interactive-eval-input" type="radio" name="interactive_question_{{ iq.id }}" id="custom-iq{{ iq.id }}-false" value="false" required disabled>
+            <label class="btn btn-outline-danger" for="custom-iq{{ iq.id }}-false">حلّي غير صحيح</label>
+          </div>
+        {% else %}
+          {% set q = item.question %}
+          <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
+          {% if q.question_images %}
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              {% for img in q.question_images %}
+                <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 240px;">
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="list-group">
+            {% for c in item.choices %}
+              <label class="list-group-item">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.choice_id }}">
+                  <span>{{ c.text }}</span>
+                  {% if c.image_url %}
+                    <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;">
+                  {% endif %}
+                </div>
+              </label>
             {% endfor %}
           </div>
         {% endif %}
-        <div class="list-group">
-          {% for c in item.choices %}
-            <label class="list-group-item">
-              <div class="d-flex align-items-center gap-2 flex-wrap">
-                <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.choice_id }}">
-                <span>{{ c.text }}</span>
-                {% if c.image_url %}
-                  <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;">
-                {% endif %}
-              </div>
-            </label>
-          {% endfor %}
-        </div>
       </div>
     </div>
   {% endfor %}
@@ -51,6 +85,34 @@
 <script>
   // New timer system - pure JavaScript countdown
   (function() {
+    const revealButtons = document.querySelectorAll('.reveal-interactive-answer');
+    revealButtons.forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const cardBody = btn.closest('.card-body');
+        if (!cardBody) return;
+        const img = cardBody.querySelector('.interactive-answer-image');
+        const answerText = cardBody.querySelector('.interactive-answer-text');
+        const note = cardBody.querySelector('.interactive-answer-note');
+        const radios = cardBody.querySelectorAll('.interactive-eval-input');
+        const imgHidden = img ? img.classList.contains('d-none') : true;
+        const textHidden = answerText ? answerText.classList.contains('d-none') : true;
+        const willShow = imgHidden && textHidden;
+
+        if (img) img.classList.toggle('d-none');
+        if (answerText) {
+          answerText.classList.toggle('d-none');
+          if (window.renderMath) {
+            window.renderMath(answerText);
+          }
+        }
+        if (note) note.classList.toggle('d-none', willShow);
+        btn.textContent = willShow ? 'إخفاء الإجابة' : 'إظهار الإجابة';
+        radios.forEach((r) => {
+          r.disabled = false;
+        });
+      });
+    });
+
     const timerElement = document.getElementById('test-timer');
     const testForm = document.getElementById('custom-test-form');
     const expiredInput = document.getElementById('custom-time-expired');

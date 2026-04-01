@@ -22,15 +22,10 @@
 		<div class="card shadow-sm mb-3">
 			<div class="card-body text-center">
 				{% set pct = (attempt.score / attempt.total * 100) if attempt.total else 0 %}
-				{% if pending_text_grading %}
-					<div class="display-6 fw-bold">بانتظار التصحيح</div>
-					<div class="alert alert-warning my-3 mb-2">تم إرسال إجاباتك النصية، وسيتم نشر النتيجة النهائية بعد تصحيحها.</div>
-				{% else %}
-					<div class="display-6 fw-bold">{{ attempt.score }} / {{ attempt.total }}</div>
-					<div class="progress my-3" style="height: 18px;">
-						<div class="progress-bar bg-success" role="progressbar" style="width: {{ pct }}%" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">{{ pct|round(0) }}%</div>
-					</div>
-				{% endif %}
+				<div class="display-6 fw-bold">{{ attempt.score }} / {{ attempt.total }}</div>
+				<div class="progress my-3" style="height: 18px;">
+					<div class="progress-bar bg-success" role="progressbar" style="width: {{ pct }}%" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">{{ pct|round(0) }}%</div>
+				</div>
 				{% if pct >= 90 %}
 					{% set messages = ["عمل رائع! أنت تتقن هذا.", "درجة ممتازة! استمر في التقدم.", "نتيجة مبهرة! أنت في القمة."] %}
 				{% elif pct >= 75 %}
@@ -40,11 +35,7 @@
 				{% else %}
 					{% set messages = ["استمر! كل محاولة تساعدك على التحسن.", "لا تستسلم—راجع وحاول مرة أخرى.", "التقدم يستغرق وقتاً. أنت قادر!"] %}
 				{% endif %}
-				{% if pending_text_grading %}
-					<p class="mt-2 fw-semibold">شكراً لمشاركتك. راجع الصفحة لاحقاً بعد اعتماد التصحيح.</p>
-				{% else %}
-					<p class="mt-2 fw-semibold">{{ messages|random }}</p>
-				{% endif %}
+				<p class="mt-2 fw-semibold">{{ messages|random }}</p>
 				<span class="chip">النتيجة</span>
 				<div class="d-flex justify-content-center gap-2 mt-2 flex-wrap">
 					<span class="badge text-bg-info">+{{ attempt.xp_earned|default(0) }} XP</span>
@@ -69,13 +60,13 @@
 		<div class="card shadow-sm">
 			<div class="card-body">
 				<h5 class="card-title">راجع إجاباتك</h5>
-				{% if review %}
+				{% if review or interactive_review %}
 					<div class="list-group list-group-flush">
 						{% for item in review %}
 							<div class="list-group-item">
 								<div class="d-flex justify-content-between align-items-start">
 									<div>
-										<div class="fw-semibold">س{{ loop.index }}. {{ item.question.text }}</div>
+										<div class="fw-semibold preserve-format">س{{ loop.index }}. {{ item.question.text }}</div>
 										{% if item.question.question_images %}
 											<div class="d-flex flex-wrap gap-2 my-2">
 												{% for img in item.question.question_images %}
@@ -87,7 +78,7 @@
 										<div class="mb-1">
 											<span class="text-muted small">إجابتك:</span>
 											{% if item.selected_choice %}
-												<span class="fw-semibold {% if item.is_correct %}text-success{% else %}text-danger{% endif %}">{{ item.selected_choice.text }}</span>
+												<span class="fw-semibold preserve-format {% if item.is_correct %}text-success{% else %}text-danger{% endif %}">{{ item.selected_choice.text }}</span>
 												{% if item.selected_choice.image_url %}
 													<div class="mt-2">
 														<img src="{{ item.selected_choice.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
@@ -100,7 +91,7 @@
 										<div class="mb-1">
 											<span class="text-muted small">الإجابة الصحيحة:</span>
 											{% if item.correct_choice %}
-												<span class="fw-semibold text-success">{{ item.correct_choice.text }}</span>
+												<span class="fw-semibold preserve-format text-success">{{ item.correct_choice.text }}</span>
 												{% if item.correct_choice.image_url %}
 													<div class="mt-2">
 														<img src="{{ item.correct_choice.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
@@ -121,64 +112,53 @@
 								</div>
 							</div>
 						{% endfor %}
+
+						{% for item in interactive_review %}
+							<div class="list-group-item">
+								<div class="d-flex justify-content-between align-items-start mb-2">
+									<div class="fw-semibold">س{{ loop.index + (review|length) }}.</div>
+									{% if item.is_correct %}
+										<span class="badge text-bg-success">صحيح</span>
+									{% else %}
+										<span class="badge text-bg-danger">خطأ</span>
+									{% endif %}
+								</div>
+								<div class="row g-2">
+									<div class="col-12 col-md-6">
+										<div class="small text-muted mb-1">السؤال</div>
+										{% if item.question.question_text %}
+											<div class="border rounded p-2 mb-2 math-content preserve-format">{{ item.question.question_text }}</div>
+										{% endif %}
+										{% if item.question.question_image_url %}
+											<img src="{{ item.question.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 220px;">
+										{% else %}
+											<div class="small text-muted">لا توجد صورة سؤال.</div>
+										{% endif %}
+									</div>
+									<div class="col-12 col-md-6">
+										<div class="small text-muted mb-1">الإجابة</div>
+										{% if item.question.answer_text %}
+											<div class="border rounded p-2 mb-2 math-content preserve-format">{{ item.question.answer_text }}</div>
+										{% endif %}
+										{% if item.question.answer_image_url %}
+											<img src="{{ item.question.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 220px;">
+										{% else %}
+											<div class="small text-muted">لا توجد صورة إجابة.</div>
+										{% endif %}
+									</div>
+								</div>
+								<div class="small mt-2">
+									<span class="text-muted">تقييمك الذاتي:</span>
+									<span class="fw-semibold">{{ 'حلّي صحيح' if item.selected_value else 'حلّي غير صحيح' }}</span>
+								</div>
+							</div>
+						{% endfor %}
 					</div>
 				{% else %}
 					<div class="alert alert-light mb-0">لا توجد إجابات للمراجعة.</div>
 				{% endif %}
 			</div>
 		</div>
-
-		{% if text_review %}
-		<div class="card shadow-sm mt-3">
-			<div class="card-body">
-				<h5 class="card-title">الإجابات النصية</h5>
-				<div class="list-group list-group-flush">
-					{% for item in text_review %}
-						<div class="list-group-item">
-							<div class="fw-semibold">سؤال: {{ item.question.text }}</div>
-							<div class="small text-muted mt-2" style="white-space: pre-wrap;">إجابتك: {{ item.answer_text }}</div>
-						</div>
-					{% endfor %}
-				</div>
-			</div>
-		</div>
-		{% endif %}
-
-		{% if interactive_review %}
-		<div class="card shadow-sm mt-3">
-			<div class="card-body">
-				<h5 class="card-title">مراجعة الأسئلة التفاعلية</h5>
-				<div class="list-group list-group-flush">
-					{% for item in interactive_review %}
-						<div class="list-group-item">
-							<div class="d-flex justify-content-between align-items-start mb-2">
-								<div class="fw-semibold">سؤال تفاعلي {{ loop.index }}</div>
-								{% if item.is_correct %}
-									<span class="badge text-bg-success">تم احتساب درجة</span>
-								{% else %}
-									<span class="badge text-bg-secondary">بدون درجة</span>
-								{% endif %}
-							</div>
-							<div class="row g-2">
-								<div class="col-12 col-md-6">
-									<div class="small text-muted mb-1">صورة السؤال</div>
-									<img src="{{ item.question.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 220px;">
-								</div>
-								<div class="col-12 col-md-6">
-									<div class="small text-muted mb-1">صورة الإجابة</div>
-									<img src="{{ item.question.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 220px;">
-								</div>
-							</div>
-							<div class="small mt-2">
-								<span class="text-muted">تقييمك الذاتي:</span>
-								<span class="fw-semibold">{{ 'حلّي صحيح' if item.selected_value else 'حلّي غير صحيح' }}</span>
-							</div>
-						</div>
-					{% endfor %}
-				</div>
-			</div>
-		</div>
-		{% endif %}
 	</div>
 </div>
 {% endblock %}

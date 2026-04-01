@@ -62,40 +62,67 @@
               <div class="list-group-item">
                 <div class="d-flex justify-content-between align-items-start">
                   <div>
-                    <div class="fw-semibold">س{{ loop.index }}. {{ item.question.text }}</div>
-                    {% if item.question.question_images %}
-                      <div class="d-flex flex-wrap gap-2 my-2">
-                        {% for img in item.question.question_images %}
-                          <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 220px;">
-                        {% endfor %}
+                    {% if item.question_type == 'interactive' %}
+                      <div class="fw-semibold">س{{ loop.index }}.</div>
+                      {% if item.question.question_text %}
+                        <div class="border rounded p-2 my-2 math-content preserve-format">{{ item.question.question_text }}</div>
+                      {% endif %}
+                      {% if item.question.question_image_url %}
+                        <div class="my-2">
+                          <img src="{{ item.question.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 220px;">
+                        </div>
+                      {% endif %}
+                      <div class="mb-1">
+                        <span class="text-muted small">إجابتك:</span>
+                        <span class="fw-semibold {% if item.is_correct %}text-success{% else %}text-danger{% endif %}">{{ 'حلّي صحيح' if item.selected_value else 'حلّي غير صحيح' }}</span>
+                      </div>
+                      <div class="mb-1">
+                        <span class="text-muted small">الإجابة النموذجية:</span>
+                        {% if item.question.answer_text %}
+                          <div class="border rounded p-2 my-2 math-content preserve-format">{{ item.question.answer_text }}</div>
+                        {% endif %}
+                        {% if item.question.answer_image_url %}
+                          <div class="mt-2">
+                            <img src="{{ item.question.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                          </div>
+                        {% endif %}
+                      </div>
+                    {% else %}
+                      <div class="fw-semibold">س{{ loop.index }}. {{ item.question.text }}</div>
+                      {% if item.question.question_images %}
+                        <div class="d-flex flex-wrap gap-2 my-2">
+                          {% for img in item.question.question_images %}
+                            <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 220px;">
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                      <div class="mb-1">
+                        <span class="text-muted small">إجابتك:</span>
+                        {% if item.selected_choice %}
+                          <span class="fw-semibold {% if item.is_correct %}text-success{% else %}text-danger{% endif %}">{{ item.selected_choice.text }}</span>
+                          {% if item.selected_choice.image_url %}
+                            <div class="mt-2">
+                              <img src="{{ item.selected_choice.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                            </div>
+                          {% endif %}
+                        {% else %}
+                          <span class="text-danger">لم يتم اختيار إجابة</span>
+                        {% endif %}
+                      </div>
+                      <div class="mb-1">
+                        <span class="text-muted small">الإجابة الصحيحة:</span>
+                        {% if item.correct_choice %}
+                          <span class="fw-semibold text-success">{{ item.correct_choice.text }}</span>
+                          {% if item.correct_choice.image_url %}
+                            <div class="mt-2">
+                              <img src="{{ item.correct_choice.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                            </div>
+                          {% endif %}
+                        {% else %}
+                          <span class="text-muted">غير محدد</span>
+                        {% endif %}
                       </div>
                     {% endif %}
-                    <div class="mb-1">
-                      <span class="text-muted small">إجابتك:</span>
-                      {% if item.selected_choice %}
-                        <span class="fw-semibold {% if item.is_correct %}text-success{% else %}text-danger{% endif %}">{{ item.selected_choice.text }}</span>
-                        {% if item.selected_choice.image_url %}
-                          <div class="mt-2">
-                            <img src="{{ item.selected_choice.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
-                          </div>
-                        {% endif %}
-                      {% else %}
-                        <span class="text-danger">لم يتم اختيار إجابة</span>
-                      {% endif %}
-                    </div>
-                    <div class="mb-1">
-                      <span class="text-muted small">الإجابة الصحيحة:</span>
-                      {% if item.correct_choice %}
-                        <span class="fw-semibold text-success">{{ item.correct_choice.text }}</span>
-                        {% if item.correct_choice.image_url %}
-                          <div class="mt-2">
-                            <img src="{{ item.correct_choice.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
-                          </div>
-                        {% endif %}
-                      {% else %}
-                        <span class="text-muted">غير محدد</span>
-                      {% endif %}
-                    </div>
                   </div>
                   <div>
                     {% if item.is_correct %}

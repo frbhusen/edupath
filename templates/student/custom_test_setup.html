@@ -33,15 +33,27 @@
 
 <form method="post" id="custom-test-setup-form">
   <input type="hidden" name="subject_id" value="{{ selected_subject_id or '' }}" />
+  <input type="hidden" name="selection_mode" id="selection-mode-input" value="{{ selection_mode if selection_mode in ['lesson', 'test'] else 'lesson' }}" />
   {% if not selected_subject_id %}
     <div class="alert alert-info">اختر مادة لعرض الدروس المفتوحة.</div>
   {% elif lessons %}
     <div class="card shadow-sm">
       <div class="card-body">
-        <div class="alert alert-info mb-3">اختر إجمالي من 10 إلى 50 سؤال عبر الدروس.</div>
-        <div class="row g-3">
+        <div class="alert alert-info mb-3">اختر إجمالي من 10 إلى 50 سؤال. يمكنك الاختيار حسب الدروس أو حسب الاختبارات.</div>
+        <div class="mb-3 d-flex gap-3 flex-wrap" id="selection-mode-group">
+          <label class="form-check-label d-flex align-items-center gap-2">
+            <input class="form-check-input selection-mode-radio" type="radio" name="selection_mode_ui" value="lesson" {% if selection_mode != 'test' %}checked{% endif %}>
+            حسب الدروس
+          </label>
+          <label class="form-check-label d-flex align-items-center gap-2">
+            <input class="form-check-input selection-mode-radio" type="radio" name="selection_mode_ui" value="test" {% if selection_mode == 'test' %}checked{% endif %}>
+            حسب الاختبارات
+          </label>
+        </div>
+
+        <div class="row g-3 selection-scope-block" data-mode="lesson">
           {% for lesson in lessons %}
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-6 selection-scope-row" data-mode="lesson">
               <div class="border rounded p-3 h-100">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                   <div>
@@ -53,6 +65,11 @@
                 
                 <div class="mt-3">
                   <div class="fw-semibold mb-2 small">اختر توزيع الصعوبات</div>
+                  <div class="d-flex flex-wrap gap-1 mb-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="easy">سهل</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="medium">متوسط</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="hard">صعب</button>
+                  </div>
                   <div class="row g-2">
                     <div class="col-4">
                       <label class="form-label small">سهل</label>
@@ -63,6 +80,7 @@
                         max="{{ lesson_difficulty_counts[lesson.id]['easy'] }}" 
                         name="lesson_{{ lesson.id }}_easy" 
                         value="0" 
+                        data-mode="lesson"
                         data-lesson-id="{{ lesson.id }}"
                         data-difficulty="easy"
                       />
@@ -77,6 +95,7 @@
                         max="{{ lesson_difficulty_counts[lesson.id]['medium'] }}" 
                         name="lesson_{{ lesson.id }}_medium" 
                         value="0" 
+                        data-mode="lesson"
                         data-lesson-id="{{ lesson.id }}"
                         data-difficulty="medium"
                       />
@@ -91,6 +110,7 @@
                         max="{{ lesson_difficulty_counts[lesson.id]['hard'] }}" 
                         name="lesson_{{ lesson.id }}_hard" 
                         value="0" 
+                        data-mode="lesson"
                         data-lesson-id="{{ lesson.id }}"
                         data-difficulty="hard"
                       />
@@ -99,6 +119,83 @@
                   </div>
                   <div class="mt-2 small text-primary">
                     المجموع لهذا الدرس: <span class="lesson-total" data-lesson-id="{{ lesson.id }}">0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="row g-3 selection-scope-block d-none" data-mode="test">
+          {% for item in tests_data %}
+            {% set test = item.test %}
+            {% set lesson = item.lesson %}
+            <div class="col-12 col-md-6 selection-scope-row" data-mode="test">
+              <div class="border rounded p-3 h-100">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                  <div>
+                    <div class="fw-semibold">{{ test.title }}</div>
+                    <div class="text-muted small">الدرس: {{ lesson.title }}</div>
+                  </div>
+                  <span class="badge text-bg-secondary">{{ test_question_counts.get(test.id, 0) }} أسئلة</span>
+                </div>
+
+                <div class="mt-3">
+                  <div class="fw-semibold mb-2 small">اختر توزيع الصعوبات</div>
+                  <div class="d-flex flex-wrap gap-1 mb-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="easy">سهل</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="medium">متوسط</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="hard">صعب</button>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-4">
+                      <label class="form-label small">سهل</label>
+                      <input
+                        type="number"
+                        class="form-control form-control-sm difficulty-input"
+                        min="0"
+                        max="{{ test_difficulty_counts.get(test.id, {}).get('easy', 0) }}"
+                        name="test_{{ test.id }}_easy"
+                        value="0"
+                        data-mode="test"
+                        data-test-id="{{ test.id }}"
+                        data-difficulty="easy"
+                      />
+                      <div class="text-muted small">متاح: {{ test_difficulty_counts.get(test.id, {}).get('easy', 0) }}</div>
+                    </div>
+                    <div class="col-4">
+                      <label class="form-label small">متوسط</label>
+                      <input
+                        type="number"
+                        class="form-control form-control-sm difficulty-input"
+                        min="0"
+                        max="{{ test_difficulty_counts.get(test.id, {}).get('medium', 0) }}"
+                        name="test_{{ test.id }}_medium"
+                        value="0"
+                        data-mode="test"
+                        data-test-id="{{ test.id }}"
+                        data-difficulty="medium"
+                      />
+                      <div class="text-muted small">متاح: {{ test_difficulty_counts.get(test.id, {}).get('medium', 0) }}</div>
+                    </div>
+                    <div class="col-4">
+                      <label class="form-label small">صعب</label>
+                      <input
+                        type="number"
+                        class="form-control form-control-sm difficulty-input"
+                        min="0"
+                        max="{{ test_difficulty_counts.get(test.id, {}).get('hard', 0) }}"
+                        name="test_{{ test.id }}_hard"
+                        value="0"
+                        data-mode="test"
+                        data-test-id="{{ test.id }}"
+                        data-difficulty="hard"
+                      />
+                      <div class="text-muted small">متاح: {{ test_difficulty_counts.get(test.id, {}).get('hard', 0) }}</div>
+                    </div>
+                  </div>
+                  <div class="mt-2 small text-primary">
+                    المجموع لهذا الاختبار: <span class="scope-total" data-mode="test" data-scope-id="{{ test.id }}">0</span>
                   </div>
                 </div>
               </div>
@@ -122,41 +219,60 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const difficultyInputs = document.querySelectorAll('.difficulty-input');
+    const lessonTemplateButtons = document.querySelectorAll('.lesson-template-btn');
+    const testTemplateButtons = document.querySelectorAll('.test-template-btn');
+    const selectionModeRadios = document.querySelectorAll('.selection-mode-radio');
+    const selectionModeInput = document.getElementById('selection-mode-input');
     const globalTotalEl = document.getElementById('selectedTotal');
     const submitBtn = document.getElementById('create-custom-test-btn');
     const setupForm = document.getElementById('custom-test-setup-form');
     if (!difficultyInputs.length || !globalTotalEl) return;
 
+    function getActiveMode() {
+      return (selectionModeInput && selectionModeInput.value === 'test') ? 'test' : 'lesson';
+    }
+
+    function applyModeUI() {
+      const mode = getActiveMode();
+      document.querySelectorAll('.selection-scope-block').forEach((block) => {
+        const blockMode = block.getAttribute('data-mode');
+        block.classList.toggle('d-none', blockMode !== mode);
+      });
+      updateTotals();
+    }
+
     function updateTotals() {
       let globalTotal = 0;
+      const activeMode = getActiveMode();
       
-      // Group inputs by lesson
-      const lessonInputs = {};
+      const scopeInputs = {};
       difficultyInputs.forEach((input) => {
-        const lessonId = input.getAttribute('data-lesson-id');
-        if (!lessonId) return;
-        
-        if (!lessonInputs[lessonId]) {
-          lessonInputs[lessonId] = [];
+        if (input.getAttribute('data-mode') !== activeMode) return;
+        const scopeId = activeMode === 'test'
+          ? input.getAttribute('data-test-id')
+          : input.getAttribute('data-lesson-id');
+        if (!scopeId) return;
+
+        if (!scopeInputs[scopeId]) {
+          scopeInputs[scopeId] = [];
         }
-        lessonInputs[lessonId].push(input);
+        scopeInputs[scopeId].push(input);
       });
       
-      // Calculate per-lesson totals
-      Object.keys(lessonInputs).forEach((lessonId) => {
-        let lessonTotal = 0;
-        lessonInputs[lessonId].forEach((input) => {
+      Object.keys(scopeInputs).forEach((scopeId) => {
+        let scopeTotal = 0;
+        scopeInputs[scopeId].forEach((input) => {
           const val = parseInt(input.value || '0', 10);
-          lessonTotal += Number.isNaN(val) ? 0 : val;
+          scopeTotal += Number.isNaN(val) ? 0 : val;
         });
         
-        // Update lesson total display
-        const lessonTotalEl = document.querySelector(`.lesson-total[data-lesson-id="${lessonId}"]`);
-        if (lessonTotalEl) {
-          lessonTotalEl.textContent = lessonTotal;
+        const selector = `.scope-total[data-mode="${activeMode}"][data-scope-id="${scopeId}"]`;
+        const scopeTotalEl = document.querySelector(selector) || document.querySelector(`.lesson-total[data-lesson-id="${scopeId}"]`);
+        if (scopeTotalEl) {
+          scopeTotalEl.textContent = scopeTotal;
         }
         
-        globalTotal += lessonTotal;
+        globalTotal += scopeTotal;
       });
       
       // Update global total
@@ -188,11 +304,145 @@
       
       updateTotals();
     }
+
+    function applyScopeTemplate(prefix, scopeId, level) {
+      const easyInput = document.querySelector(`input[name="${prefix}_${scopeId}_easy"]`);
+      const mediumInput = document.querySelector(`input[name="${prefix}_${scopeId}_medium"]`);
+      const hardInput = document.querySelector(`input[name="${prefix}_${scopeId}_hard"]`);
+      if (!easyInput || !mediumInput || !hardInput) return;
+
+      const maxes = {
+        easy: parseInt(easyInput.getAttribute('max') || '0', 10),
+        medium: parseInt(mediumInput.getAttribute('max') || '0', 10),
+        hard: parseInt(hardInput.getAttribute('max') || '0', 10)
+      };
+
+      const currentTotal =
+        (parseInt(easyInput.value || '0', 10) || 0) +
+        (parseInt(mediumInput.value || '0', 10) || 0) +
+        (parseInt(hardInput.value || '0', 10) || 0);
+
+      const lessonCapacity = maxes.easy + maxes.medium + maxes.hard;
+      const target = Math.max(0, Math.min(currentTotal > 0 ? currentTotal : Math.min(10, lessonCapacity), lessonCapacity));
+      if (target === 0) {
+        easyInput.value = 0;
+        mediumInput.value = 0;
+        hardInput.value = 0;
+        updateTotals();
+        return;
+      }
+
+      const ratiosByLevel = {
+        easy: { easy: 0.6, medium: 0.2, hard: 0.2 },
+        medium: { easy: 0.3, medium: 0.4, hard: 0.3 },
+        hard: { easy: 0.2, medium: 0.2, hard: 0.6 }
+      };
+      const ratios = ratiosByLevel[level] || ratiosByLevel.medium;
+
+      const keys = ['easy', 'medium', 'hard'];
+      const rawTargets = {
+        easy: target * ratios.easy,
+        medium: target * ratios.medium,
+        hard: target * ratios.hard
+      };
+      const targets = {
+        easy: Math.floor(rawTargets.easy),
+        medium: Math.floor(rawTargets.medium),
+        hard: Math.floor(rawTargets.hard)
+      };
+
+      let remainder = target - (targets.easy + targets.medium + targets.hard);
+      const byFraction = keys
+        .map((k) => ({ key: k, frac: rawTargets[k] - Math.floor(rawTargets[k]) }))
+        .sort((a, b) => b.frac - a.frac);
+      for (const item of byFraction) {
+        if (remainder <= 0) break;
+        targets[item.key] += 1;
+        remainder -= 1;
+      }
+
+      const values = { easy: 0, medium: 0, hard: 0 };
+      const remaining = { easy: maxes.easy, medium: maxes.medium, hard: maxes.hard };
+      const borrowMap = {
+        easy: ['medium', 'hard'],
+        medium: ['easy', 'hard'],
+        hard: ['medium', 'easy']
+      };
+
+      for (const key of keys) {
+        let need = targets[key];
+        const direct = Math.min(need, remaining[key]);
+        values[key] += direct;
+        remaining[key] -= direct;
+        need -= direct;
+
+        if (need > 0) {
+          for (const prevKey of borrowMap[key]) {
+            if (need <= 0) break;
+            const take = Math.min(need, remaining[prevKey]);
+            values[prevKey] += take;
+            remaining[prevKey] -= take;
+            need -= take;
+          }
+        }
+      }
+
+      let assigned = values.easy + values.medium + values.hard;
+      const fillOrder = level === 'easy'
+        ? ['easy', 'medium', 'hard']
+        : level === 'hard'
+          ? ['hard', 'medium', 'easy']
+          : ['medium', 'easy', 'hard'];
+      while (assigned < target) {
+        let progressed = false;
+        for (const k of fillOrder) {
+          if (remaining[k] > 0) {
+            values[k] += 1;
+            remaining[k] -= 1;
+            assigned += 1;
+            progressed = true;
+            if (assigned >= target) break;
+          }
+        }
+        if (!progressed) break;
+      }
+
+      easyInput.value = values.easy;
+      mediumInput.value = values.medium;
+      hardInput.value = values.hard;
+      updateTotals();
+    }
     
     // Attach listeners
     difficultyInputs.forEach((input) => {
       input.addEventListener('input', () => validateInput(input));
       input.addEventListener('change', () => validateInput(input));
+    });
+
+    lessonTemplateButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const lessonId = btn.getAttribute('data-lesson-id');
+        const template = btn.getAttribute('data-template') || 'medium';
+        if (!lessonId) return;
+        applyScopeTemplate('lesson', lessonId, template);
+      });
+    });
+
+    testTemplateButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const testId = btn.getAttribute('data-test-id');
+        const template = btn.getAttribute('data-template') || 'medium';
+        if (!testId) return;
+        applyScopeTemplate('test', testId, template);
+      });
+    });
+
+    selectionModeRadios.forEach((radio) => {
+      radio.addEventListener('change', () => {
+        if (!selectionModeInput) return;
+        selectionModeInput.value = radio.value === 'test' ? 'test' : 'lesson';
+        applyModeUI();
+      });
     });
 
     if (setupForm) {
@@ -204,8 +454,7 @@
       });
     }
     
-    // Initial calculation
-    updateTotals();
+    applyModeUI();
   });
 </script>
 {% endblock %}
