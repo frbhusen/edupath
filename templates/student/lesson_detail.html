@@ -68,10 +68,14 @@
                   {% if locked %}<span class="text-muted small">&#128274;</span>{% endif %}
                 </div>
               </div>
-              <p class="text-muted small mb-1">{{ test.description or 'اختبار MCQ' }}</p>
+              <p class="text-muted small mb-1">{{ test.description or '' }}</p>
               <div class="mt-auto d-flex justify-content-end">
                 {% if locked %}
-                  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_lesson', lesson_id=lesson.id) }}">تفعيل الدرس</a>
+                  {% if section.subject.requires_code and not subject_open %}
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_subject', subject_id=section.subject.id) }}">تفعيل المادة</a>
+                  {% else %}
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_section', section_id=section.id) }}">تفعيل القسم</a>
+                  {% endif %}
                 {% else %}
                   <a class="btn btn-cta btn-sm" href="{{ url_for('student.take_test', test_id=test.id) }}">ابدأ</a>
                 {% endif %}

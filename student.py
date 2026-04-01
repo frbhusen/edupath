@@ -8,11 +8,10 @@ from datetime import datetime, timedelta
 import time
 from flask_login import login_required, current_user
 from bson import ObjectId
-from mongoengine.errors import DoesNotExist
 
-from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
-from .forms import ActivationForm, LessonActivationForm
-from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
+from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
+from .forms import ActivationForm
+from .activation_utils import cascade_subject_activation, cascade_section_activation
 from .extensions import cache
 
 student_bp = Blueprint("student", __name__, template_folder="templates")
@@ -50,36 +49,19 @@ class AccessContext:
         #   regardless of subject lock state.
         self.section_open = self.section_active or not self.section_requires_code
 
-        # Precompute active lesson activations for faster access checks
-        lesson_ids = [l.id for l in section.lessons]
-
-        if lesson_ids:
-            self.lesson_activation_ids = set()
-            for la in LessonActivation.objects(
-                lesson_id__in=lesson_ids,
-                student_id=student_id,
-                active=True,
-            ).all():
-                try:
-                    if la.lesson_id and la.lesson_id.id:
-                        self.lesson_activation_ids.add(la.lesson_id.id)
-                except (DoesNotExist, AttributeError):
-                    continue
-        else:
-            self.lesson_activation_ids = set()
-
+        # Always-open rule: first lesson of first section in the subject is never locked.
         self.first_lesson_id = None
+        first_section = Section.objects(subject_id=self.subject.id).order_by("created_at", "id").first()
+        if first_section:
+            first_lesson = Lesson.objects(section_id=first_section.id).order_by("created_at", "id").first()
+            if first_lesson:
+                self.first_lesson_id = first_lesson.id
         self.first_section_wide_test_id = None
 
     def lesson_open(self, lesson: Lesson) -> bool:
         """Check if student can access this lesson."""
-        # Lesson unlock precedence: explicit lesson activation always opens it.
-        if lesson.id in self.lesson_activation_ids:
-            return True
-
-        # If a lesson itself does not require code, it stays open regardless
-        # of subject/section lock state.
-        if not bool(getattr(lesson, "requires_code", True)):
+        # First lesson in the first section of a subject is always unlocked.
+        if self.first_lesson_id and lesson.id == self.first_lesson_id:
             return True
 
         # Open section should open all lessons in that section.
@@ -1177,16 +1159,6 @@ def get_unlocked_lessons(student_id: int):
             lessons_by_section[section_id] = []
         lessons_by_section[section_id].append(lesson)
     
-    # Bulk load activations
-    lesson_ids = [l.id for l in all_lessons]
-    lesson_activations = set(
-        la.lesson_id for la in LessonActivation.objects(
-            lesson_id__in=lesson_ids, 
-            student_id=student_id, 
-            active=True
-        ).all()
-    )
-    
     unlocked = []
     for section in sections:
         section_lessons = lessons_by_section.get(section.id, [])
@@ -1596,14 +1568,18 @@ def lesson_detail(lesson_id):
     if not lesson:
         return "404", 404
     section = lesson.section
+    subject_open = True
+    section_open = True
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
+        subject_open = access.subject_open
+        section_open = access.section_open
         if not access.lesson_open(lesson):
-            if access.subject_requires_code and not access.section_active:
-                flash("قم بتفعيل الدرس للوصول إليه.", "warning")
-                return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
-            flash("قم بتفعيل الدرس للوصول إليه.", "warning")
-            return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
+            if access.subject_requires_code and not access.subject_open:
+                flash("قم بتفعيل المادة للوصول إلى الدروس.", "warning")
+                return redirect(url_for("student.activate_subject", subject_id=section.subject.id))
+            flash("قم بتفعيل القسم للوصول إلى الدروس.", "warning")
+            return redirect(url_for("student.activate_section", section_id=section.id))
     def infer_resource_type(resource):
         if resource.resource_type:
             return resource.resource_type.lower()
@@ -1716,6 +1692,8 @@ def lesson_detail(lesson_id):
         "student/lesson_detail.html",
         lesson=lesson,
         section=section,
+        subject_open=subject_open,
+        section_open=section_open,
         resources=resources,
         tests_data=tests_data,
         is_completed=is_completed,
@@ -1734,8 +1712,11 @@ def lesson_discussion(lesson_id):
     if current_user.role == "student":
         access = AccessContext(lesson.section, current_user.id)
         if not access.lesson_open(lesson):
-            flash("قم بتفعيل الدرس للوصول إلى المناقشة.", "warning")
-            return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
+            if access.subject_requires_code and not access.subject_open:
+                flash("قم بتفعيل المادة للوصول إلى المناقشة.", "warning")
+                return redirect(url_for("student.activate_subject", subject_id=lesson.section.subject.id))
+            flash("قم بتفعيل القسم للوصول إلى المناقشة.", "warning")
+            return redirect(url_for("student.activate_section", section_id=lesson.section.id))
 
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
@@ -1936,8 +1917,11 @@ def complete_lesson(lesson_id):
 
     access = AccessContext(lesson.section, current_user.id)
     if not access.lesson_open(lesson):
-        flash("قم بتفعيل الدرس أولاً.", "warning")
-        return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
+        if access.subject_requires_code and not access.subject_open:
+            flash("قم بتفعيل المادة أولاً.", "warning")
+            return redirect(url_for("student.activate_subject", subject_id=lesson.section.subject.id))
+        flash("قم بتفعيل القسم أولاً.", "warning")
+        return redirect(url_for("student.activate_section", section_id=lesson.section.id))
 
     existing_completion = LessonCompletion.objects(
         lesson_id=lesson.id,
@@ -2664,8 +2648,11 @@ def take_test(test_id):
         if not access.test_open(test):
             # Redirect to appropriate activation page based on test type
             if test.lesson_id:
-                flash("قم بتفعيل الدرس للوصول إلى هذا الاختبار.", "warning")
-                return redirect(url_for("student.activate_lesson", lesson_id=test.lesson_id))
+                if access.subject_requires_code and not access.subject_open:
+                    flash("قم بتفعيل المادة للوصول إلى هذا الاختبار.", "warning")
+                    return redirect(url_for("student.activate_subject", subject_id=test.section.subject.id))
+                flash("قم بتفعيل القسم للوصول إلى هذا الاختبار.", "warning")
+                return redirect(url_for("student.activate_section", section_id=test.section_id))
             else:
                 flash("قم بتفعيل القسم للوصول إلى هذا الاختبار.", "warning")
                 return redirect(url_for("student.activate_section", section_id=test.section_id))
@@ -2973,27 +2960,12 @@ def activate_lesson(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
         return "404", 404
-    section = lesson.section
-    form = LessonActivationForm()
-    if request.method == "POST" and form.validate_on_submit():
-        code_value = form.code.data.strip().upper()
-        ac = LessonActivationCode.objects(lesson_id=lesson.id, student_id=current_user.id, code=code_value).first()
-        if not ac:
-            flash("رمز غير صحيح لهذا الدرس.", "error")
-            return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
-        if ac.is_used:
-            flash("This code has already been used.", "error")
-            return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
-        ac.is_used = True
-        ac.used_at = datetime.utcnow()
-        ac.save()
-        existing = LessonActivation.objects(lesson_id=lesson.id, student_id=current_user.id, active=True).first()
-        if not existing:
-            LessonActivation(lesson_id=lesson.id, student_id=current_user.id).save()
-        cascade_lesson_activation(lesson, current_user.id)
-        flash("تم تفعيل الدرس!", "success")
-        return redirect(url_for("student.lesson_detail", lesson_id=lesson.id))
-    return render_template("student/activate_lesson.html", lesson=lesson, section=section, form=form)
+    access = AccessContext(lesson.section, current_user.id)
+    if access.subject_requires_code and not access.subject_open:
+        flash("تفعيل الدروس بشكل فردي غير متاح. فعّل المادة أو القسم.", "info")
+        return redirect(url_for("student.activate_subject", subject_id=lesson.section.subject.id))
+    flash("تفعيل الدروس بشكل فردي غير متاح. فعّل القسم للوصول إلى جميع دروسه.", "info")
+    return redirect(url_for("student.activate_section", section_id=lesson.section.id))
 
 
 @student_bp.route("/assignments")
@@ -3678,7 +3650,8 @@ def custom_test_new():
 
                 test._question_count = cnt
                 test._difficulty_counts = diff_map
-                tests_data.append({'test': test, 'lesson': lesson})
+                if cnt > 0:
+                    tests_data.append({'test': test, 'lesson': lesson})
 
             lesson_question_counts[lesson.id] = lesson_total
             lesson_difficulty_counts[lesson.id] = lesson_diff
@@ -3690,9 +3663,9 @@ def custom_test_new():
             flash("اختر مادة قبل إنشاء اختبار مخصص.", "error")
             return redirect(url_for("student.custom_test_new"))
 
-        selection_mode = (request.form.get('selection_mode') or 'lesson').strip().lower()
+        selection_mode = (request.form.get('selection_mode') or 'test').strip().lower()
         if selection_mode not in {'lesson', 'test'}:
-            selection_mode = 'lesson'
+            selection_mode = 'test'
 
         selections = []
         total_questions = 0
@@ -3856,7 +3829,7 @@ def custom_test_new():
         "student/custom_test_setup.html",
         subjects=subjects,
         selected_subject_id=selected_subject_id,
-        selection_mode=request.form.get('selection_mode', 'lesson') if request.method == 'POST' else request.args.get('mode', 'lesson'),
+        selection_mode=request.form.get('selection_mode', 'test') if request.method == 'POST' else request.args.get('mode', 'test'),
         lessons=unlocked_lessons,
         tests_data=tests_data,
         lesson_question_counts=lesson_question_counts,
@@ -4245,8 +4218,11 @@ def view_flashcards(resource_id):
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
         if not access.lesson_open(lesson):
-            flash("قم بتفعيل هذا الدرس لعرضه.", "warning")
-            return redirect(url_for("student.activate_lesson", lesson_id=lesson.id))
+            if access.subject_requires_code and not access.subject_open:
+                flash("قم بتفعيل المادة لعرض هذا الدرس.", "warning")
+                return redirect(url_for("student.activate_subject", subject_id=section.subject.id))
+            flash("قم بتفعيل القسم لعرض هذا الدرس.", "warning")
+            return redirect(url_for("student.activate_section", section_id=section.id))
     
     # Fetch flashcards from URL
     try:
