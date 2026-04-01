@@ -19,7 +19,7 @@ from .models import (
     StudentGamification, XPEvent, Assignment, AssignmentSubmission, LessonCompletion,
     StudyPlan, StudyPlanItem, AssignmentAttempt, TestTextQuestion, AttemptTextAnswer,
     DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats,
-    CourseSet, CourseQuestion
+    CourseSet, CourseQuestion, TestInteractiveQuestion
 )
 from .activation_utils import (
     cascade_subject_activation, cascade_section_activation, cascade_lesson_activation,
@@ -2842,7 +2842,14 @@ def test_detail(test_id):
         return scope_response
     questions = list(Question.objects(test_id=test.id).order_by('created_at').all())
     text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
-    return render_template("teacher/test_detail.html", test=test, questions=questions, text_questions=text_questions)
+    interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
+    return render_template(
+        "teacher/test_detail.html",
+        test=test,
+        questions=questions,
+        text_questions=text_questions,
+        interactive_questions=interactive_questions,
+    )
 
 
 @teacher_bp.route("/tests/<test_id>/edit", methods=["GET", "POST"])
@@ -2862,6 +2869,8 @@ def edit_test(test_id):
         "batch_delete_questions",
         "upsert_text_question",
         "delete_text_question",
+        "upsert_interactive_question",
+        "delete_interactive_question",
         "import_json",
     }
     
@@ -3023,6 +3032,47 @@ def edit_test(test_id):
                 if tq:
                     tq.delete()
                     flash("تم حذف السؤال النصي.", "success")
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+        elif form_name == "upsert_interactive_question":
+            interactive_question_id = request.form.get("interactive_question_id")
+            q_img = (request.form.get("interactive_question_image_url") or "").strip()
+            a_img = (request.form.get("interactive_answer_image_url") or "").strip()
+            correct_raw = (request.form.get("interactive_correct_value") or "").strip().lower()
+            correct_value = correct_raw == "true"
+
+            if not q_img or not a_img:
+                flash("أدخل رابط صورة السؤال ورابط صورة الإجابة للسؤال التفاعلي.", "error")
+                return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+            row = None
+            if interactive_question_id:
+                row = TestInteractiveQuestion.objects(id=interactive_question_id, test_id=test.id).first()
+
+            if row:
+                row.question_image_url = q_img
+                row.answer_image_url = a_img
+                row.correct_value = correct_value
+                row.save()
+                flash("تم تحديث السؤال التفاعلي.", "success")
+            else:
+                TestInteractiveQuestion(
+                    test_id=test.id,
+                    question_image_url=q_img,
+                    answer_image_url=a_img,
+                    correct_value=correct_value,
+                ).save()
+                flash("تمت إضافة سؤال تفاعلي.", "success")
+
+            return redirect(url_for("teacher.edit_test", test_id=test.id))
+
+        elif form_name == "delete_interactive_question":
+            interactive_question_id = request.form.get("interactive_question_id")
+            if interactive_question_id:
+                iq = TestInteractiveQuestion.objects(id=interactive_question_id, test_id=test.id).first()
+                if iq:
+                    iq.delete()
+                    flash("تم حذف السؤال التفاعلي.", "success")
             return redirect(url_for("teacher.edit_test", test_id=test.id))
 
         elif form_name == "import_json":
@@ -3200,7 +3250,15 @@ def edit_test(test_id):
                 q.save()
 
     text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
-    return render_template("teacher/test_edit.html", form=form, meta_form=form, test=test, text_questions=text_questions)
+    interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
+    return render_template(
+        "teacher/test_edit.html",
+        form=form,
+        meta_form=form,
+        test=test,
+        text_questions=text_questions,
+        interactive_questions=interactive_questions,
+    )
 
 
 @teacher_bp.route("/tests/<test_id>/delete", methods=["POST"])

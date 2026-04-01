@@ -81,6 +81,7 @@
   <form method="post" id="test-form">
     <input type="hidden" name="question_ids" value="{{ question_ids_str }}" />
     <input type="hidden" name="text_question_ids" value="{{ text_question_ids_str|default('') }}" />
+    <input type="hidden" name="interactive_question_ids" value="{{ interactive_question_ids_str|default('') }}" />
     <input type="hidden" name="time_expired" id="time-expired" value="0" />
     <input type="hidden" name="count" value="{{ selected_count or 0 }}" />
     <input type="hidden" name="easy" value="{{ easy_count|default(0) }}" />
@@ -102,6 +103,31 @@
               <div class="small text-muted mb-2">تلميح: {{ tq.hint }}</div>
             {% endif %}
             <textarea class="form-control" name="text_question_{{ tq.id }}" rows="4" placeholder="اكتب إجابتك هنا" required></textarea>
+          {% elif item.question_type == 'interactive' %}
+            {% set iq = item.interactive_question %}
+            <p class="fw-semibold">س{{ loop.index }} (سؤال تفاعلي)</p>
+            <div class="row g-2 mb-3">
+              <div class="col-12 col-lg-6">
+                <div class="small text-muted mb-1">صورة السؤال</div>
+                <img src="{{ iq.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 260px;">
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="small text-muted mb-1">صورة الإجابة</div>
+                <div class="border rounded p-2 d-flex align-items-center justify-content-center" style="min-height: 180px;">
+                  <img src="{{ iq.answer_image_url }}" alt="صورة الإجابة" class="img-fluid d-none interactive-answer-image" style="max-height: 240px;">
+                  <div class="small text-muted interactive-answer-note">اضغط إظهار الإجابة لعرض الصورة</div>
+                </div>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <button class="btn btn-outline-secondary btn-sm reveal-interactive-answer" type="button">إظهار الإجابة</button>
+              <input class="btn-check interactive-eval-input" type="radio" name="interactive_question_{{ iq.id }}" id="iq{{ iq.id }}-true" value="true" required disabled>
+              <label class="btn btn-outline-success btn-sm" for="iq{{ iq.id }}-true">حلّي صحيح</label>
+
+              <input class="btn-check interactive-eval-input" type="radio" name="interactive_question_{{ iq.id }}" id="iq{{ iq.id }}-false" value="false" required disabled>
+              <label class="btn btn-outline-danger btn-sm" for="iq{{ iq.id }}-false">حلّي غير صحيح</label>
+            </div>
+            <div class="small text-muted mt-2">بعد إظهار الإجابة، اختر تقييمك الذاتي.</div>
           {% else %}
             <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
             {% if q.question_images %}
@@ -313,6 +339,27 @@
 
     setDisabled();
     updateSumDisplay();
+  })();
+
+  (function () {
+    const revealButtons = document.querySelectorAll('.reveal-interactive-answer');
+    revealButtons.forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const cardBody = btn.closest('.card-body');
+        if (!cardBody) return;
+        const img = cardBody.querySelector('.interactive-answer-image');
+        const note = cardBody.querySelector('.interactive-answer-note');
+        const radios = cardBody.querySelectorAll('.interactive-eval-input');
+        if (!img) return;
+        const willShow = img.classList.contains('d-none');
+        img.classList.toggle('d-none');
+        if (note) note.classList.toggle('d-none', willShow);
+        btn.textContent = willShow ? 'إخفاء الإجابة' : 'إظهار الإجابة';
+        radios.forEach((r) => {
+          r.disabled = false;
+        });
+      });
+    });
   })();
 
   // New timer system - pure JavaScript countdown

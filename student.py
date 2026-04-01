@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from bson import ObjectId
 from mongoengine.errors import DoesNotExist
 
-from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, AttemptTextAnswer, TestTextQuestion, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
+from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, AttemptTextAnswer, TestTextQuestion, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, LessonActivationCode, LessonActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
 from .forms import ActivationForm, LessonActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation, cascade_lesson_activation
 from .extensions import cache
@@ -2609,6 +2609,7 @@ def take_test(test_id):
 
     total_questions_available = len(test.questions)
     text_questions = list(TestTextQuestion.objects(test_id=test.id).order_by('created_at').all())
+    interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
     min_select = 10 if total_questions_available >= 10 else total_questions_available
     max_select = min(50, total_questions_available)
 
@@ -2624,7 +2625,7 @@ def take_test(test_id):
     retake_source_id = request.values.get("retake_source_id")
     retake_mode = request.values.get("retake_mode")
 
-    if selected_count is None and total_questions_available == 0 and text_questions:
+    if selected_count is None and total_questions_available == 0 and (text_questions or interactive_questions):
         selected_count = 0
 
     if selected_count is None and preset_question_ids:
@@ -2638,6 +2639,7 @@ def take_test(test_id):
         # Evaluate answers
         question_ids_raw = request.form.get("question_ids", "")
         text_question_ids_raw = request.form.get("text_question_ids", "")
+        interactive_question_ids_raw = request.form.get("interactive_question_ids", "")
         if question_ids_raw:
             question_ids = [qid.strip() for qid in question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
             questions = Question.objects(id__in=question_ids).all()
@@ -2651,6 +2653,15 @@ def take_test(test_id):
             text_question_ids = [qid.strip() for qid in text_question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
             text_q_map = {str(tq.id): tq for tq in TestTextQuestion.objects(id__in=text_question_ids, test_id=test.id).all()}
             ordered_text_questions = [text_q_map[qid] for qid in text_question_ids if qid in text_q_map]
+
+        ordered_interactive_questions = list(interactive_questions)
+        if interactive_question_ids_raw:
+            interactive_question_ids = [qid.strip() for qid in interactive_question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
+            interactive_q_map = {
+                str(iq.id): iq
+                for iq in TestInteractiveQuestion.objects(id__in=interactive_question_ids, test_id=test.id).all()
+            }
+            ordered_interactive_questions = [interactive_q_map[qid] for qid in interactive_question_ids if qid in interactive_q_map]
 
         settings_payload = {
             "count": _to_int(request.form.get("count"), len(ordered_questions)),
@@ -2666,7 +2677,8 @@ def take_test(test_id):
 
         question_order = [str(q.id) for q in ordered_questions]
         text_total = sum(max(1, int(getattr(tq, "max_score", 5) or 5)) for tq in ordered_text_questions)
-        total = len(ordered_questions) + text_total
+        interactive_total = len(ordered_interactive_questions)
+        total = len(ordered_questions) + text_total + interactive_total
         score = 0
         attempt = Attempt(
             test_id=test.id,
@@ -2711,6 +2723,20 @@ def take_test(test_id):
                     max_score=max(1, int(getattr(tq, "max_score", 5) or 5)),
                     score_awarded=None,
                 ).save()
+
+        for iq in ordered_interactive_questions:
+            raw = (request.form.get(f"interactive_question_{iq.id}") or "").strip().lower()
+            selected_value = raw == "true"
+            is_correct = bool(selected_value)
+            if is_correct:
+                score += 1
+            AttemptInteractiveAnswer(
+                attempt_id=attempt.id,
+                interactive_question_id=iq.id,
+                selected_value=selected_value,
+                is_correct=is_correct,
+            ).save()
+
         attempt.score = score
         earned_xp, _ = _award_xp_for_attempt(
             student_id=current_user.id,
@@ -2729,6 +2755,7 @@ def take_test(test_id):
     question_ids_str = ""
     time_limit_seconds = None
     text_question_ids_str = ",".join(str(tq.id) for tq in text_questions)
+    interactive_question_ids_str = ",".join(str(iq.id) for iq in interactive_questions)
     if selected_count:
         questions = list(test.questions)
         if preset_question_ids:
@@ -2773,11 +2800,15 @@ def take_test(test_id):
             ordered_questions.append({"question": q, "choices": choices, "question_type": "mcq"})
         for tq in text_questions:
             ordered_questions.append({"text_question": tq, "choices": [], "question_type": "text"})
+        for iq in interactive_questions:
+            ordered_questions.append({"interactive_question": iq, "choices": [], "question_type": "interactive"})
         time_limit_seconds = (len(question_ids) * 75) + 15
-    elif selected_count is not None and total_questions_available == 0 and text_questions:
+    elif selected_count is not None and total_questions_available == 0 and (text_questions or interactive_questions):
         for tq in text_questions:
             ordered_questions.append({"text_question": tq, "choices": [], "question_type": "text"})
-        time_limit_seconds = (len(text_questions) * 75) + 15
+        for iq in interactive_questions:
+            ordered_questions.append({"interactive_question": iq, "choices": [], "question_type": "interactive"})
+        time_limit_seconds = ((len(text_questions) + len(interactive_questions)) * 75) + 15
 
     # Available counts per difficulty for UI
     def _norm_level(q):
@@ -2804,6 +2835,7 @@ def take_test(test_id):
         ordered_questions=ordered_questions,
         question_ids_str=question_ids_str,
         text_question_ids_str=text_question_ids_str,
+        interactive_question_ids_str=interactive_question_ids_str,
         time_limit_seconds=time_limit_seconds,
         retake_source_id=retake_source_id,
         retake_mode=retake_mode,
@@ -3443,6 +3475,26 @@ def test_result(attempt_id):
             }
         )
 
+    interactive_answers = list(AttemptInteractiveAnswer.objects(attempt_id=attempt.id).all())
+    interactive_question_ids = [ia.interactive_question_id.id for ia in interactive_answers if ia.interactive_question_id]
+    interactive_questions_map = {
+        str(iq.id): iq for iq in TestInteractiveQuestion.objects(id__in=interactive_question_ids).all()
+    } if interactive_question_ids else {}
+    interactive_review = []
+    for ia in interactive_answers:
+        if not ia.interactive_question_id:
+            continue
+        iq = interactive_questions_map.get(str(ia.interactive_question_id.id))
+        if not iq:
+            continue
+        interactive_review.append(
+            {
+                "question": iq,
+                "selected_value": ia.selected_value,
+                "is_correct": ia.is_correct,
+            }
+        )
+
     pending_text_grading = bool(text_answers) and any(getattr(ta, "score_awarded", None) is None for ta in text_answers)
 
     gamification = StudentGamification.objects(student_id=attempt.student_id.id).first()
@@ -3451,6 +3503,7 @@ def test_result(attempt_id):
         attempt=attempt,
         review=review,
         text_review=text_review,
+        interactive_review=interactive_review,
         gamification=gamification,
         pending_text_grading=pending_text_grading,
     )

@@ -143,6 +143,42 @@
 			</div>
 		</div>
 		{% endif %}
+
+		{% if interactive_review %}
+		<div class="card shadow-sm mt-3">
+			<div class="card-body">
+				<h5 class="card-title">مراجعة الأسئلة التفاعلية</h5>
+				<div class="list-group list-group-flush">
+					{% for item in interactive_review %}
+						<div class="list-group-item">
+							<div class="d-flex justify-content-between align-items-start mb-2">
+								<div class="fw-semibold">سؤال تفاعلي {{ loop.index }}</div>
+								{% if item.is_correct %}
+									<span class="badge text-bg-success">تم احتساب درجة</span>
+								{% else %}
+									<span class="badge text-bg-secondary">بدون درجة</span>
+								{% endif %}
+							</div>
+							<div class="row g-2">
+								<div class="col-12 col-md-6">
+									<div class="small text-muted mb-1">صورة السؤال</div>
+									<img src="{{ item.question.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 220px;">
+								</div>
+								<div class="col-12 col-md-6">
+									<div class="small text-muted mb-1">صورة الإجابة</div>
+									<img src="{{ item.question.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 220px;">
+								</div>
+							</div>
+							<div class="small mt-2">
+								<span class="text-muted">تقييمك الذاتي:</span>
+								<span class="fw-semibold">{{ 'حلّي صحيح' if item.selected_value else 'حلّي غير صحيح' }}</span>
+							</div>
+						</div>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+		{% endif %}
 	</div>
 </div>
 {% endblock %}

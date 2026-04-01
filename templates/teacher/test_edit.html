@@ -254,6 +254,87 @@
                 </div>
               </div>
 
+              <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-title mb-0">الأسئلة التفاعلية (مشابهة للدورات)</h6>
+                    <span class="badge text-bg-secondary">{{ interactive_questions|length if interactive_questions else 0 }}</span>
+                  </div>
+
+                  <form method="post" class="mb-3">
+                    <input type="hidden" name="form_name" value="upsert_interactive_question" />
+                    <div class="row g-2">
+                      <div class="col-12 col-md-5">
+                        <label class="form-label">رابط صورة السؤال</label>
+                        <input class="form-control" name="interactive_question_image_url" required>
+                      </div>
+                      <div class="col-12 col-md-5">
+                        <label class="form-label">رابط صورة الإجابة</label>
+                        <input class="form-control" name="interactive_answer_image_url" required>
+                      </div>
+                      <div class="col-12 col-md-2">
+                        <label class="form-label">القيمة الصحيحة</label>
+                        <select class="form-select" name="interactive_correct_value" required>
+                          <option value="true">صحيح</option>
+                          <option value="false">خطأ</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary btn-sm mt-2">إضافة سؤال تفاعلي</button>
+                  </form>
+
+                  {% if interactive_questions %}
+                    <div class="list-group list-group-flush">
+                      {% for iq in interactive_questions %}
+                        <div class="list-group-item px-0">
+                          <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="fw-semibold">سؤال تفاعلي {{ loop.index }}</div>
+                            <span class="badge text-bg-light border">{{ 'صحيح' if iq.correct_value else 'خطأ' }}</span>
+                          </div>
+                          <form method="post" class="row g-2">
+                            <input type="hidden" name="form_name" value="upsert_interactive_question" />
+                            <input type="hidden" name="interactive_question_id" value="{{ iq.id }}" />
+                            <div class="col-12 col-md-5">
+                              <label class="form-label">صورة السؤال</label>
+                              <input class="form-control" name="interactive_question_image_url" value="{{ iq.question_image_url }}" required>
+                            </div>
+                            <div class="col-12 col-md-5">
+                              <label class="form-label">صورة الإجابة</label>
+                              <input class="form-control" name="interactive_answer_image_url" value="{{ iq.answer_image_url }}" required>
+                            </div>
+                            <div class="col-12 col-md-2">
+                              <label class="form-label">القيمة الصحيحة</label>
+                              <select class="form-select" name="interactive_correct_value" required>
+                                <option value="true" {% if iq.correct_value %}selected{% endif %}>صحيح</option>
+                                <option value="false" {% if not iq.correct_value %}selected{% endif %}>خطأ</option>
+                              </select>
+                            </div>
+                            <div class="col-12 d-flex justify-content-end">
+                              <button type="submit" class="btn btn-outline-primary btn-sm">حفظ</button>
+                            </div>
+                          </form>
+                          <div class="row g-2 mt-1">
+                            <div class="col-12 col-md-6">
+                              <img src="{{ iq.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 180px;">
+                            </div>
+                            <div class="col-12 col-md-6">
+                              <img src="{{ iq.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
+                            </div>
+                          </div>
+                          <form method="post" class="mt-2" onsubmit="return confirm('حذف السؤال التفاعلي؟');">
+                            <input type="hidden" name="form_name" value="delete_interactive_question" />
+                            <input type="hidden" name="interactive_question_id" value="{{ iq.id }}" />
+                            <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+                          </form>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="text-muted small">لا توجد أسئلة تفاعلية بعد.</div>
+                  {% endif %}
+                </div>
+              </div>
+
               <div class="card border-0 shadow-sm">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center mb-3">

@@ -93,4 +93,33 @@
 {% else %}
   <div class="alert alert-light">لا توجد أسئلة نصية بعد.</div>
 {% endif %}
+
+<div class="mt-4 d-flex justify-content-between align-items-center mb-3">
+  <h3 class="h6 mb-0">الأسئلة التفاعلية</h3>
+</div>
+
+{% if interactive_questions %}
+  <div class="list-group">
+    {% for question in interactive_questions %}
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div class="fw-semibold">سؤال تفاعلي {{ loop.index }}</div>
+          <span class="badge text-bg-light border">{{ 'صحيح' if question.correct_value else 'خطأ' }}</span>
+        </div>
+        <div class="row g-2">
+          <div class="col-12 col-md-6">
+            <div class="small text-muted mb-1">صورة السؤال</div>
+            <img src="{{ question.question_image_url }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 200px;">
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="small text-muted mb-1">صورة الإجابة</div>
+            <img src="{{ question.answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 200px;">
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-light">لا توجد أسئلة تفاعلية بعد.</div>
+{% endif %}
 {% endblock %}

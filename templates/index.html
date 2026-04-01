@@ -1,32 +1,43 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="dashboard-hero mb-4 d-flex justify-content-between align-items-center">
-	<div>
-		{% if current_user.is_authenticated and current_user.role == 'student' %}
-			<h1 class="h4 mb-1">مرحباً {{ current_user.first_name }} في EduPath</h1>
-			<p class="mb-0">لوحة التحكم الرئيسية للطالب: تعلم، اختبر نفسك، وتابع تقدمك.</p>
-		{% elif current_user.is_authenticated and current_user.role in ['teacher', 'admin', 'question_editor'] %}
-			<h1 class="h4 mb-1">مرحباً {{ current_user.username }} في EduPath</h1>
-			<p class="mb-0">لوحة تشغيل لإدارة المحتوى التعليمي حسب الصلاحيات.</p>
-		{% else %}
-			<h1 class="h4 mb-1">مرحباً بك في EduPath</h1>
-			<p class="mb-0">تعلم من خلال دروس منظمة، نفذ الاختبارات، وتتبع تقدمك.</p>
-		{% endif %}
-	</div>
-	<div class="d-flex gap-2">
-		{% if current_user.is_authenticated %}
-		  {% if current_user.role in ['teacher', 'admin'] %}
-		    <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.dashboard') }}">الذهاب إلى لوحة التحكم</a>
-		  {% elif current_user.role == 'question_editor' %}
-		    <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.question_editor_dashboard') }}">الذهاب إلى لوحة محرر الأسئلة</a>
-		  {% else %}
-		    
-		  {% endif %}
-		{% else %}
-		  <a class="btn btn-light btn-sm" href="{{ url_for('auth.login') }}">تسجيل الدخول</a>
-		  <a class="btn btn-cta btn-sm" href="{{ url_for('auth.register') }}">ابدأ الآن</a>
-		{% endif %}
-	</div>
+{% extends 'base.html' %} {% block content %}
+<div
+  class="dashboard-hero mb-4 d-flex justify-content-between align-items-center"
+>
+  <div>
+    {% if current_user.is_authenticated and current_user.role == 'student' %}
+    <h1 class="h4 mb-1">مرحباً {{ current_user.first_name }} في EduPath</h1>
+    <p class="mb-0">
+      لوحة التحكم الرئيسية للطالب: تعلم، اختبر نفسك، وتابع تقدمك.
+    </p>
+    {% elif current_user.is_authenticated and current_user.role in ['teacher',
+    'admin', 'question_editor'] %}
+    <h1 class="h4 mb-1">مرحباً {{ current_user.username }} في EduPath</h1>
+    <p class="mb-0">لوحة تشغيل لإدارة المحتوى التعليمي حسب الصلاحيات.</p>
+    {% else %}
+    <h1 class="h4 mb-1">مرحباً بك في EduPath</h1>
+    <p class="mb-0">تعلم من خلال دروس منظمة، نفذ الاختبارات، وتتبع تقدمك.</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    {% if current_user.is_authenticated %} {% if current_user.role in
+    ['teacher', 'admin'] %}
+    <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.dashboard') }}"
+      >الذهاب إلى لوحة التحكم</a
+    >
+    {% elif current_user.role == 'question_editor' %}
+    <a
+      class="btn btn-cta btn-sm"
+      href="{{ url_for('teacher.question_editor_dashboard') }}"
+      >الذهاب إلى لوحة محرر الأسئلة</a
+    >
+    {% else %} {% endif %} {% else %}
+    <a class="btn btn-light btn-sm" href="{{ url_for('auth.login') }}"
+      >تسجيل الدخول</a
+    >
+    <a class="btn btn-cta btn-sm" href="{{ url_for('auth.register') }}"
+      >ابدأ الآن</a
+    >
+    {% endif %}
+  </div>
 </div>
 
 {% if current_user.is_authenticated %}
@@ -37,42 +48,93 @@
   </div>
   <div class="action-grid">
     {% if current_user.role == 'student' %}
-      <a class="action-card" href="{{ url_for('student.subjects') }}"><span class="icon">📚</span><span>المواد</span></a>
-			<a class="action-card" href="{{ url_for('student.pinned_discussions') }}"><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a>
-      <a class="action-card" href="{{ url_for('student.assignments') }}"><span class="icon">📝</span><span>واجباتي</span></a>
-      <a class="action-card" href="{{ url_for('student.results') }}"><span class="icon">📊</span><span>النتائج</span></a>
-	<a class="action-card" href="{{ url_for('student.frequently_wrong') }}"><span class="icon">🔁</span><span>الأخطاء المتكررة</span></a>
-      <a class="action-card" href="{{ url_for('student.leaderboard') }}"><span class="icon">🏆</span><span>لوحة الصدارة</span></a>
-			<a class="action-card" href="{{ url_for('notifications_inbox') }}"><span class="icon">🔔</span><span>الإشعارات</span></a>
-			<a class="action-card" href="{{ url_for('student.duels_home') }}"><span class="icon">⚔️</span><span>التحديات الودية</span></a>
-      <a class="action-card" href="{{ url_for('student.study_plans') }}"><span class="icon">🗂️</span><span>خطتي الدراسية</span></a>
-			<a class="action-card" href="{{ url_for('student.certificates') }}"><span class="icon">🎓</span><span>شهاداتي</span></a>
-	{% elif current_user.role in ['teacher', 'admin'] %}
-      <a class="action-card" href="{{ url_for('teacher.dashboard') }}"><span class="icon">🧭</span><span>لوحة المعلم</span></a>
-			<a class="action-card" href="{{ url_for('student.subjects') }}"><span class="icon">📚</span><span>المواد</span></a>
-			<a class="action-card" href="{{ url_for('student.pinned_discussions') }}"><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a>
-      <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}"><span class="icon">✅</span><span>إدارة الواجبات</span></a>
-			<a class="action-card" href="{{ url_for('teacher.discussions_manage') }}"><span class="icon">💬</span><span>إدارة المناقشات</span></a>
-			<a class="action-card" href="{{ url_for('teacher.certificates_manage') }}"><span class="icon">🎓</span><span>إدارة الشهادات</span></a>
-			<a class="action-card" href="{{ url_for('teacher.certificates_verification') }}"><span class="icon">✅</span><span>التحقق من الشهادات</span></a>
-			<a class="action-card" href="{{ url_for('notifications_inbox') }}"><span class="icon">🔔</span><span>الإشعارات</span></a>
-			{% if current_user.role == 'admin' %}
-			  <a class="action-card" href="{{ url_for('teacher.analytics_dashboard') }}"><span class="icon">📈</span><span>التحليلات</span></a>
-			  <a class="action-card" href="{{ url_for('teacher.study_plans_manage') }}"><span class="icon">🗓️</span><span>إدارة الخطط</span></a>
-			  <a class="action-card" href="{{ url_for('teacher.reports_dashboard') }}"><span class="icon">📄</span><span>التقارير</span></a>
-			  <a class="action-card" href="{{ url_for('teacher.gamification_admin') }}"><span class="icon">🎮</span><span>إدارة XP</span></a>
-			  <a class="action-card" href="{{ url_for('admin.notifications_manage') }}"><span class="icon">📣</span><span>إرسال إشعار</span></a>
-			{% endif %}
-      {% if current_user.role == 'admin' %}
-        <a class="action-card" href="{{ url_for('admin.dashboard') }}"><span class="icon">⚙️</span><span>الإدارة</span></a>
-      {% endif %}
-	{% elif current_user.role == 'question_editor' %}
-	  <a class="action-card" href="{{ url_for('teacher.question_editor_dashboard') }}"><span class="icon">🧩</span><span>لوحة محرر الأسئلة</span></a>
-			<a class="action-card" href="{{ url_for('notifications_inbox') }}"><span class="icon">🔔</span><span>الإشعارات</span></a>
+    <a class="action-card" href="{{ url_for('student.subjects') }}"
+      ><span class="icon">📚</span><span>المواد</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.pinned_discussions') }}"
+      ><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.assignments') }}"
+      ><span class="icon">📝</span><span>واجباتي</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.results') }}"
+      ><span class="icon">📊</span><span>النتائج</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.frequently_wrong') }}"
+      ><span class="icon">🔁</span><span>الأخطاء المتكررة</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.leaderboard') }}"
+      ><span class="icon">🏆</span><span>لوحة الصدارة</span></a
+    >
+    <a class="action-card" href="{{ url_for('notifications_inbox') }}"
+      ><span class="icon">🔔</span><span>الإشعارات</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.duels_home') }}"
+      ><span class="icon">⚔️</span><span>التحديات الودية</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.study_plans') }}"
+      ><span class="icon">🗂️</span><span>خطتي الدراسية</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.certificates') }}"
+      ><span class="icon">🎓</span><span>شهاداتي</span></a
+    >
+    {% elif current_user.role in ['teacher', 'admin'] %}
+    <a class="action-card" href="{{ url_for('teacher.dashboard') }}"
+      ><span class="icon">🧭</span><span>لوحة المعلم</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.subjects') }}"
+      ><span class="icon">📚</span><span>المواد</span></a
+    >
+    <a class="action-card" href="{{ url_for('student.pinned_discussions') }}"
+      ><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a
+    >
+    <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}"
+      ><span class="icon">✅</span><span>إدارة الواجبات</span></a
+    >
+    <a class="action-card" href="{{ url_for('teacher.discussions_manage') }}"
+      ><span class="icon">💬</span><span>إدارة المناقشات</span></a
+    >
+    <a class="action-card" href="{{ url_for('teacher.certificates_manage') }}"
+      ><span class="icon">🎓</span><span>إدارة الشهادات</span></a
+    >
+    <a
+      class="action-card"
+      href="{{ url_for('teacher.certificates_verification') }}"
+      ><span class="icon">✅</span><span>التحقق من الشهادات</span></a
+    >
+    <a class="action-card" href="{{ url_for('notifications_inbox') }}"
+      ><span class="icon">🔔</span><span>الإشعارات</span></a
+    >
+    {% if current_user.role == 'admin' %}
+    <a class="action-card" href="{{ url_for('teacher.analytics_dashboard') }}"
+      ><span class="icon">📈</span><span>التحليلات</span></a
+    >
+    <a class="action-card" href="{{ url_for('teacher.study_plans_manage') }}"
+      ><span class="icon">🗓️</span><span>إدارة الخطط</span></a
+    >
+    <a class="action-card" href="{{ url_for('teacher.reports_dashboard') }}"
+      ><span class="icon">📄</span><span>التقارير</span></a
+    >
+    <a class="action-card" href="{{ url_for('teacher.gamification_admin') }}"
+      ><span class="icon">🎮</span><span>إدارة XP</span></a
+    >
+    <a class="action-card" href="{{ url_for('admin.notifications_manage') }}"
+      ><span class="icon">📣</span><span>إرسال إشعار</span></a
+    >
+    {% endif %} {% if current_user.role == 'admin' %}
+    <a class="action-card" href="{{ url_for('admin.dashboard') }}"
+      ><span class="icon">⚙️</span><span>الإدارة</span></a
+    >
+    {% endif %} {% elif current_user.role == 'question_editor' %}
+    <a
+      class="action-card"
+      href="{{ url_for('teacher.question_editor_dashboard') }}"
+      ><span class="icon">🧩</span><span>لوحة محرر الأسئلة</span></a
+    >
+    <a class="action-card" href="{{ url_for('notifications_inbox') }}"
+      ><span class="icon">🔔</span><span>الإشعارات</span></a
+    >
     {% endif %}
   </div>
 </div>
-{% endif %}
-
-
-{% endblock %}
+{% endif %} {% endblock %}

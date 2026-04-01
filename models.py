@@ -335,6 +335,23 @@ class TestTextQuestion(Document):
     }
 
 
+class TestInteractiveQuestion(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    test_id = ReferenceField(Test, required=True)
+    question_image_url = StringField(required=True, max_length=500)
+    answer_image_url = StringField(required=True, max_length=500)
+    correct_value = BooleanField(required=True, default=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'test_interactive_questions',
+        'indexes': [
+            'test_id',
+            'created_at'
+        ]
+    }
+
+
 class Attempt(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     test_id = ReferenceField(Test, required=True)
@@ -410,6 +427,24 @@ class AttemptTextAnswer(Document):
             'attempt_id',
             'text_question_id',
             ('attempt_id', 'text_question_id')
+        ]
+    }
+
+
+class AttemptInteractiveAnswer(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    attempt_id = ReferenceField(Attempt, required=True)
+    interactive_question_id = ReferenceField(TestInteractiveQuestion, required=True)
+    selected_value = BooleanField(required=True, default=False)
+    is_correct = BooleanField(required=True, default=False)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'attempt_interactive_answers',
+        'indexes': [
+            'attempt_id',
+            'interactive_question_id',
+            ('attempt_id', 'interactive_question_id')
         ]
     }
 
