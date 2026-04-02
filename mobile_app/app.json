@@ -4,12 +4,17 @@
     "slug": "study-platform-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/edupath-logo.png",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
     ],
     "android": {
       "package": "com.edupath.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/edupath-logo.png",
+        "backgroundColor": "#ffffff"
+      },
       "edgeToEdgeEnabled": true,
       "permissions": [
         "INTERNET"
