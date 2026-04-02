@@ -176,18 +176,36 @@ def create_app():
     @app.route("/notifications/popup-feed", methods=["GET"])
     @login_required
     def notifications_popup_feed():
-        from .models import NotificationRecipient
+        from .models import NotificationRecipient, Notification
 
         unread_rows = list(
             NotificationRecipient.objects(user_id=current_user.id, is_read=False)
+            .only("id", "notification_id", "created_at")
+            .no_dereference()
             .order_by("-created_at")
             .limit(10)
             .all()
         )
 
+        def _ref_id(value):
+            if not value:
+                return None
+            if isinstance(value, ObjectId):
+                return value
+            if hasattr(value, "id"):
+                return value.id
+            maybe = getattr(value, "$id", None)
+            if maybe:
+                return maybe
+            return None
+
+        notification_ids = [nid for nid in (_ref_id(getattr(r, "notification_id", None)) for r in unread_rows) if nid]
+        notifications = Notification.objects(id__in=notification_ids).only("id", "title", "body", "template_type", "created_at").all() if notification_ids else []
+        notifications_by_id = {n.id: n for n in notifications}
+
         payload = []
         for row in unread_rows:
-            notif = row.notification_id
+            notif = notifications_by_id.get(_ref_id(getattr(row, "notification_id", None)))
             if not notif:
                 continue
             payload.append(

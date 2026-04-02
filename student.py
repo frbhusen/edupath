@@ -2206,16 +2206,41 @@ def duels_pending_popup():
     if (current_user.role or "").lower() != "student":
         return jsonify({"ok": True, "invites": []})
 
-    rows = list(Duel.objects(opponent_id=current_user.id, status="pending").order_by("-created_at").limit(3).all())
+    rows = list(
+        Duel.objects(opponent_id=current_user.id, status="pending")
+        .only("id", "invite_token", "scope_title", "expires_at", "challenger_id", "created_at")
+        .no_dereference()
+        .order_by("-created_at")
+        .limit(3)
+        .all()
+    )
+
+    def _ref_id(value):
+        if not value:
+            return None
+        if isinstance(value, ObjectId):
+            return value
+        if hasattr(value, "id"):
+            return value.id
+        maybe = getattr(value, "$id", None)
+        if maybe:
+            return maybe
+        return None
+
+    challenger_ids = [cid for cid in (_ref_id(getattr(r, "challenger_id", None)) for r in rows) if cid]
+    challengers = User.objects(id__in=challenger_ids).only("id", "first_name", "last_name", "username").all() if challenger_ids else []
+    challenger_map = {u.id: u.full_name for u in challengers}
+
     payload = []
     for duel in rows:
         if _duel_expire_if_needed(duel):
             continue
+        challenger_name = challenger_map.get(_ref_id(getattr(duel, "challenger_id", None)), "لاعب")
         payload.append(
             {
                 "id": str(duel.id),
                 "token": duel.invite_token,
-                "from": (duel.challenger_id.full_name if duel.challenger_id else "لاعب"),
+                "from": challenger_name,
                 "scope": duel.scope_title,
                 "expires_at": duel.expires_at.isoformat() + "Z" if duel.expires_at else None,
                 "url": url_for("student.duel_invite", token=duel.invite_token),
@@ -4226,7 +4251,7 @@ def view_flashcards(resource_id):
     
     # Fetch flashcards from URL
     try:
-        import requests
+        from urllib.request import Request, urlopen
         
         # Helper functions for URL normalization
         def extract_drive_file_id(url):
@@ -4248,10 +4273,11 @@ def view_flashcards(resource_id):
         
         # Normalize URL if it's a Google Drive link
         fetch_url = normalize_drive_url_for_download(resource.url)
-        
-        response = requests.get(fetch_url, timeout=5)
-        response.raise_for_status()
-        data = response.json()
+
+        req = Request(fetch_url, headers={"User-Agent": "EduPath/1.0"})
+        with urlopen(req, timeout=7) as response:
+            raw = response.read().decode("utf-8")
+        data = json.loads(raw)
         flashcards = data.get("flashcards", []) if isinstance(data, dict) else data
         
         if not isinstance(flashcards, list):

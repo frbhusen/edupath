@@ -221,7 +221,12 @@ def dashboard():
         # Group sections by subject
         sections_by_subject = {}
         for section in sections:
-            subject_id = section.subject_id.id
+            try:
+                subject_id = section.subject_id.id if section.subject_id else None
+            except (DoesNotExist, AttributeError):
+                continue
+            if not subject_id:
+                continue
             if subject_id not in sections_by_subject:
                 sections_by_subject[subject_id] = []
             sections_by_subject[subject_id].append(section)
@@ -251,13 +256,23 @@ def dashboard():
         tests_by_lesson = {}
         
         for lesson in lessons:
-            section_id = lesson.section_id.id
+            try:
+                section_id = lesson.section_id.id if lesson.section_id else None
+            except (DoesNotExist, AttributeError):
+                continue
+            if not section_id:
+                continue
             if section_id not in lessons_by_section:
                 lessons_by_section[section_id] = []
             lessons_by_section[section_id].append(lesson)
         
         for test in tests:
-            section_id = test.section_id.id
+            try:
+                section_id = test.section_id.id if test.section_id else None
+            except (DoesNotExist, AttributeError):
+                continue
+            if not section_id:
+                continue
             if section_id not in tests_by_section:
                 tests_by_section[section_id] = []
             tests_by_section[section_id].append(test)
@@ -265,7 +280,12 @@ def dashboard():
             
             # Also group by lesson if test is linked to lesson
             if test.lesson_id:
-                lesson_id = test.lesson_id.id
+                try:
+                    lesson_id = test.lesson_id.id
+                except (DoesNotExist, AttributeError):
+                    lesson_id = None
+                if not lesson_id:
+                    continue
                 if lesson_id not in tests_by_lesson:
                     tests_by_lesson[lesson_id] = []
                 tests_by_lesson[lesson_id].append(test)
