@@ -26,6 +26,7 @@ wheels/
 # Node
 node_modules/
 package-lock.json
+!mobile_app/package-lock.json
 
 # Flask
 instance/
