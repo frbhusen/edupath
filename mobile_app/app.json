@@ -10,7 +10,6 @@
     ],
     "android": {
       "package": "com.edupath.mobile",
-      "versionCode": 1,
       "edgeToEdgeEnabled": true,
       "permissions": [
         "INTERNET"
