@@ -208,7 +208,7 @@
                   {% for lesson in lesson_list %}
                   <tr>
                     <td class="fw-semibold">{{ lesson.title }}</td>
-                    <td class="text-muted small">{{ (lesson.resources|length) + (1 if lesson.link_label and lesson.link_url else 0) }}</td>
+                    <td class="text-muted small">{{ lesson._cached_resource_count|default(0) }}</td>
                     <td class="text-muted small">{{ lesson._cached_test_count|default(0) }}</td>
                     <td>
                       <span class="badge {% if section.requires_code or lesson.requires_code %}text-bg-warning{% else %}text-bg-success{% endif %}">

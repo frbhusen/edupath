@@ -263,7 +263,7 @@ def dashboard():
         section_ids = [s.id for s in sections]
         lessons = list(
             Lesson.objects(section_id__in=section_ids)
-            .only("id", "title", "resources", "link_label", "link_url", "requires_code", "section_id")
+            .only("id", "title", "link_label", "link_url", "requires_code", "section_id")
             .all()
         )
         tests = list(
@@ -271,6 +271,24 @@ def dashboard():
             .only("id", "title", "requires_code", "section_id", "lesson_id")
             .all()
         )
+
+        # Count attached lesson resources in bulk to avoid per-lesson property queries.
+        lesson_ids = [lesson.id for lesson in lessons]
+        resource_counts = {}
+        if lesson_ids:
+            try:
+                pipeline = [
+                    {"$match": {"lesson_id": {"$in": lesson_ids}}},
+                    {"$group": {"_id": "$lesson_id", "count": {"$sum": 1}}},
+                ]
+                for row in LessonResource._get_collection().aggregate(pipeline, allowDiskUse=True):
+                    lesson_ref = row.get("_id")
+                    if isinstance(lesson_ref, DBRef):
+                        lesson_ref = lesson_ref.id
+                    if lesson_ref is not None:
+                        resource_counts[lesson_ref] = int(row.get("count", 0))
+            except Exception:
+                resource_counts = {}
 
         # Count questions with aggregation to avoid loading all question docs into Python.
         test_ids = [t.id for t in tests]
@@ -329,6 +347,9 @@ def dashboard():
                 # Also attach test counts to lessons
                 for lesson in section._cached_lessons:
                     lesson._cached_test_count = len(tests_by_lesson.get(lesson.id, []))
+                    lesson._cached_resource_count = resource_counts.get(lesson.id, 0) + (
+                        1 if lesson.link_label and lesson.link_url else 0
+                    )
     
     # Calculate pagination info
     total_pages = (total_subjects + per_page - 1) // per_page
