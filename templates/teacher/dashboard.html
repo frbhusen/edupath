@@ -130,7 +130,7 @@
 {% if subjects %}
 <div class="vstack gap-3">
   {% for subject in subjects %}
-  {% set section_list = subject._cached_sections|default(subject.sections, true) %}
+  {% set section_list = subject._cached_sections if subject._cached_sections is defined else [] %}
   <div class="card shadow-sm subject-card">
     <div class="card-body">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
@@ -167,8 +167,8 @@
       {% if section_list %}
       <div class="vstack gap-2 mt-3">
         {% for section in section_list %}
-        {% set lesson_list = section._cached_lessons|default(section.lessons, true) %}
-        {% set test_list = section._cached_tests|default(section.tests, true) %}
+        {% set lesson_list = section._cached_lessons if section._cached_lessons is defined else [] %}
+        {% set test_list = section._cached_tests if section._cached_tests is defined else [] %}
         <details class="section-panel" {% if loop.first %}open{% endif %}>
           <summary class="section-summary px-3 py-2 d-flex justify-content-between align-items-center" style="cursor:pointer;">
             <div>
