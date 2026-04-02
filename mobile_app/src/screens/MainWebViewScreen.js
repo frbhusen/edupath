@@ -4,11 +4,9 @@ import {
   Alert,
   BackHandler,
   Platform,
-  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
@@ -18,7 +16,6 @@ export default function MainWebViewScreen() {
   const webViewRef = useRef(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [failedUrls, setFailedUrls] = useState([]);
   const [currentUrl, setCurrentUrl] = useState(BASE_URL);
 
@@ -47,11 +44,6 @@ export default function MainWebViewScreen() {
     return () => subscription.remove();
   }, [handleBackPress]);
 
-  const onRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    webViewRef.current?.reload();
-  }, []);
-
   const onNavigationStateChange = (state) => {
     setCanGoBack(state.canGoBack);
   };
@@ -62,12 +54,10 @@ export default function MainWebViewScreen() {
 
   const onLoadEnd = () => {
     setIsLoading(false);
-    setIsRefreshing(false);
   };
 
   const onError = () => {
     setIsLoading(false);
-    setIsRefreshing(false);
 
     if (availableFallback) {
       setFailedUrls((prev) => [...new Set([...prev, currentUrl])]);
@@ -83,13 +73,6 @@ export default function MainWebViewScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Study Platform</Text>
-        <TouchableOpacity style={styles.button} onPress={onRefresh}>
-          <Text style={styles.buttonText}>Refresh</Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.webviewContainer}>
         <WebView
           ref={webViewRef}
@@ -103,12 +86,10 @@ export default function MainWebViewScreen() {
           domStorageEnabled
           sharedCookiesEnabled
           thirdPartyCookiesEnabled
-          pullToRefreshEnabled
           cacheEnabled
           originWhitelist={["*"]}
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
           renderLoading={() => (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#0f172a" />
@@ -129,32 +110,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#ffffff",
-  },
-  header: {
-    height: 56,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#f8fafc",
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#0f172a",
-  },
-  button: {
-    backgroundColor: "#0f172a",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "600",
   },
   webviewContainer: {
     flex: 1,
