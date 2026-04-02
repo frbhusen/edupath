@@ -245,7 +245,7 @@
                   {% for test in test_list %}
                   <tr>
                     <td class="fw-semibold">{{ test.title }}</td>
-                    <td class="text-muted small">{{ test.lesson.title if test.lesson else 'اختبار شامل للقسم' }}</td>
+                    <td class="text-muted small">{{ test._cached_lesson_title|default('اختبار شامل للقسم') }}</td>
                     <td class="text-muted small">{{ test._cached_question_count|default(0) }}</td>
                     <td>
                       <span class="badge {% if section.requires_code or test.requires_code %}text-bg-warning{% else %}text-bg-success{% endif %}">

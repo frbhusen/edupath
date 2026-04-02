@@ -6,6 +6,7 @@ from flask_login import login_required, current_user
 from werkzeug.exceptions import NotFound
 from mongoengine.errors import DoesNotExist
 from bson import ObjectId
+from bson.dbref import DBRef
 
 try:
     from fpdf import FPDF
@@ -196,6 +197,29 @@ def _custom_attempt_subject_id(custom_attempt):
         return None
     return _subject_id_for_test(question.test_id)
 
+
+def _aggregate_question_counts_by_test(model_cls, test_ids):
+    """Return {test_id: count} using Mongo aggregation without loading all question docs."""
+    counts = {}
+    if not test_ids:
+        return counts
+
+    try:
+        pipeline = [
+            {"$match": {"test_id": {"$in": test_ids}}},
+            {"$group": {"_id": "$test_id", "count": {"$sum": 1}}},
+        ]
+        for row in model_cls._get_collection().aggregate(pipeline, allowDiskUse=True):
+            test_ref = row.get("_id")
+            if isinstance(test_ref, DBRef):
+                test_ref = test_ref.id
+            if test_ref is not None:
+                counts[test_ref] = int(row.get("count", 0))
+    except Exception:
+        # Fall back to zero counts on aggregation edge-cases instead of blocking dashboard rendering.
+        return {}
+    return counts
+
 @teacher_bp.route("/dashboard")
 @login_required
 @role_required("teacher")
@@ -216,7 +240,11 @@ def dashboard():
     # Bulk load sections, lessons, and tests to avoid N+1 in templates
     if subjects:
         subject_ids = [s.id for s in subjects]
-        sections = list(Section.objects(subject_id__in=subject_ids).all())
+        sections = list(
+            Section.objects(subject_id__in=subject_ids)
+            .only("id", "title", "requires_code", "subject_id")
+            .all()
+        )
         
         # Group sections by subject
         sections_by_subject = {}
@@ -233,22 +261,22 @@ def dashboard():
         
         # Bulk load lessons and tests
         section_ids = [s.id for s in sections]
-        lessons = list(Lesson.objects(section_id__in=section_ids).all())
-        tests = list(Test.objects(section_id__in=section_ids).all())
+        lessons = list(
+            Lesson.objects(section_id__in=section_ids)
+            .only("id", "title", "resources", "link_label", "link_url", "requires_code", "section_id")
+            .all()
+        )
+        tests = list(
+            Test.objects(section_id__in=section_ids)
+            .only("id", "title", "requires_code", "section_id", "lesson_id")
+            .all()
+        )
 
-        # Bulk count questions per test (MCQ + interactive) to avoid per-row queries.
+        # Count questions with aggregation to avoid loading all question docs into Python.
         test_ids = [t.id for t in tests]
-        mcq_counts = {}
-        interactive_counts = {}
-        if test_ids:
-            for q in Question.objects(test_id__in=test_ids).only("test_id").all():
-                tid = q.test_id.id if q.test_id else None
-                if tid:
-                    mcq_counts[tid] = mcq_counts.get(tid, 0) + 1
-            for iq in TestInteractiveQuestion.objects(test_id__in=test_ids).only("test_id").all():
-                tid = iq.test_id.id if iq.test_id else None
-                if tid:
-                    interactive_counts[tid] = interactive_counts.get(tid, 0) + 1
+        mcq_counts = _aggregate_question_counts_by_test(Question, test_ids)
+        interactive_counts = _aggregate_question_counts_by_test(TestInteractiveQuestion, test_ids)
+        lesson_title_by_id = {lesson.id: lesson.title for lesson in lessons}
         
         # Group by section
         lessons_by_section = {}
@@ -277,6 +305,7 @@ def dashboard():
                 tests_by_section[section_id] = []
             tests_by_section[section_id].append(test)
             test._cached_question_count = mcq_counts.get(test.id, 0) + interactive_counts.get(test.id, 0)
+            test._cached_lesson_title = "اختبار شامل للقسم"
             
             # Also group by lesson if test is linked to lesson
             if test.lesson_id:
@@ -286,6 +315,7 @@ def dashboard():
                     lesson_id = None
                 if not lesson_id:
                     continue
+                test._cached_lesson_title = lesson_title_by_id.get(lesson_id, "درس محذوف")
                 if lesson_id not in tests_by_lesson:
                     tests_by_lesson[lesson_id] = []
                 tests_by_lesson[lesson_id].append(test)
