@@ -21,7 +21,7 @@
     {% if current_user.is_authenticated %} {% if current_user.role in
     ['teacher', 'admin'] %}
     <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.dashboard') }}"
-      >الذهggاب إلى لوحة التحكم</a
+      >الذهاب إلى لوحة التحكم</a
     >
     {% elif current_user.role == 'question_editor' %}
     <a
