@@ -173,7 +173,7 @@
           <summary class="section-summary px-3 py-2 d-flex justify-content-between align-items-center" style="cursor:pointer;">
             <div>
               <strong>{{ section.title }}</strong>
-              <span class="text-muted small ms-2">دروس: {{ lesson_list|length }} | اختبارات: {{ test_list|length }}</span>
+              <span class="text-muted small ms-2">دروس: {{ lesson_list|length }}{% if section._cached_total_lessons|default(lesson_list|length) > lesson_list|length %}/{{ section._cached_total_lessons }}{% endif %} | اختبارات: {{ test_list|length }}{% if section._cached_total_tests|default(test_list|length) > test_list|length %}/{{ section._cached_total_tests }}{% endif %}</span>
             </div>
             <span class="badge {% if section.requires_code %}text-bg-warning{% else %}text-bg-success{% endif %}">
               {% if section.requires_code %}يتطلب رمز{% else %}مفتوح{% endif %}
@@ -193,6 +193,9 @@
             </div>
 
             {% if lesson_list %}
+            {% if section._cached_total_lessons|default(lesson_list|length) > lesson_list|length %}
+            <div class="alert alert-light py-2 px-3 small mb-2">يتم عرض أول {{ lesson_list|length }} درساً فقط لتحسين الأداء. يمكنك إدارة الكل من صفحة المادة.</div>
+            {% endif %}
             <div class="table-responsive mb-3">
               <table class="table table-sm align-middle mb-0">
                 <thead>
@@ -230,6 +233,9 @@
             {% endif %}
 
             {% if test_list %}
+            {% if section._cached_total_tests|default(test_list|length) > test_list|length %}
+            <div class="alert alert-light py-2 px-3 small mb-2">يتم عرض أول {{ test_list|length }} اختباراً فقط لتحسين الأداء. يمكنك إدارة الكل من صفحة المادة.</div>
+            {% endif %}
             <div class="table-responsive">
               <table class="table table-sm align-middle mb-0">
                 <thead>

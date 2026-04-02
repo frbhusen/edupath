@@ -223,16 +223,17 @@ def _aggregate_question_counts_by_test(model_cls, test_ids):
 @teacher_bp.route("/dashboard")
 @login_required
 @role_required("teacher")
-@cache.cached(timeout=60, key_prefix=lambda: f"teacher_dashboard_{current_user.id}_{request.args.get('page', 1)}")
+@cache.cached(timeout=180, key_prefix=lambda: f"teacher_dashboard_{current_user.id}_{request.args.get('page', 1)}")
 def dashboard():
-    # Pagination for better performance - reduced to 10 for faster loading
+    # Keep payload predictable so large datasets don't hit Heroku timeouts.
     page = request.args.get('page', 1, type=int)
-    per_page = 10
+    per_page = 5
+    max_rows_per_section = 20
     
     if is_admin(current_user):
         subjects_query = Subject.objects().order_by('created_at')
     else:
-        allowed_ids = [s.id for s in Subject.objects().only('id').all() if has_subject_access(current_user, s.id)]
+        allowed_ids = list(_allowed_subject_ids_for_current_user() or [])
         subjects_query = Subject.objects(id__in=allowed_ids).order_by('created_at')
     total_subjects = subjects_query.count()
     subjects = list(subjects_query.skip((page - 1) * per_page).limit(per_page))
@@ -342,8 +343,12 @@ def dashboard():
         for subject in subjects:
             subject._cached_sections = sections_by_subject.get(subject.id, [])
             for section in subject._cached_sections:
-                section._cached_lessons = lessons_by_section.get(section.id, [])
-                section._cached_tests = tests_by_section.get(section.id, [])
+                section_lessons = lessons_by_section.get(section.id, [])
+                section_tests = tests_by_section.get(section.id, [])
+                section._cached_total_lessons = len(section_lessons)
+                section._cached_total_tests = len(section_tests)
+                section._cached_lessons = section_lessons[:max_rows_per_section]
+                section._cached_tests = section_tests[:max_rows_per_section]
                 # Also attach test counts to lessons
                 for lesson in section._cached_lessons:
                     lesson._cached_test_count = len(tests_by_lesson.get(lesson.id, []))
