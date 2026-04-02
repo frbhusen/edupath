@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Study Platform",
+    "name": "Edupath",
     "slug": "study-platform-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,7 @@
       "**/*"
     ],
     "android": {
-      "package": "com.studyplatform.mobile",
+      "package": "com.edupath.mobile",
       "versionCode": 1,
       "edgeToEdgeEnabled": true,
       "permissions": [

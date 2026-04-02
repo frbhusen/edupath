@@ -1,12 +1,17 @@
 const LOCAL_ANDROID = "http://10.0.2.2:5000";
 const LOCAL_DEVICE = "http://192.168.1.10:5000";
-const PRODUCTION_DEFAULT = "https://your-heroku-app-name.herokuapp.com";
+const PRODUCTION_DEFAULT = "https://www.edu-path.app";
 
 function cleanUrl(url) {
 	if (!url || typeof url !== "string") {
 		return "";
 	}
-	return url.trim().replace(/\/$/, "");
+	let value = url.trim();
+	value = value.replace(/\\+/g, "/");
+	if (!/^https?:\/\//i.test(value)) {
+		value = `https://${value.replace(/^\/+/, "")}`;
+	}
+	return value.replace(/\/$/, "");
 }
 
 // Set EXPO_PUBLIC_BASE_URL in mobile_app/.env for local dev,
