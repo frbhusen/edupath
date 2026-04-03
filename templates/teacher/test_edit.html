@@ -359,8 +359,8 @@
                         <h6 class="card-title mb-0">قائمة الأسئلة</h6>
                         <span class="badge text-bg-secondary">{{ test.questions|length }}</span>
                       </div>
-                      <button class="btn btn-outline-secondary btn-sm question-drawer-toggle mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#questionDrawer" aria-expanded="false" aria-controls="questionDrawer">فتح درج الأسئلة</button>
-                      <div class="collapse" id="questionDrawer">
+                      <button class="btn btn-outline-secondary btn-sm question-drawer-toggle mb-2" type="button" id="questionDrawerToggle" aria-expanded="false" aria-controls="questionDrawer">فتح درج الأسئلة</button>
+                      <div class="d-none" id="questionDrawer">
                         <div class="mb-2">
                           <input type="text" class="form-control form-control-sm" id="questionSearch" placeholder="ابحث داخل الأسئلة...">
                         </div>
@@ -888,6 +888,18 @@
   });
 
   const questionSearch = document.getElementById('questionSearch');
+  const questionDrawerToggle = document.getElementById('questionDrawerToggle');
+  const questionDrawer = document.getElementById('questionDrawer');
+  if (questionDrawerToggle && questionDrawer) {
+    questionDrawerToggle.addEventListener('click', () => {
+      const isHidden = questionDrawer.classList.toggle('d-none');
+      questionDrawerToggle.setAttribute('aria-expanded', String(!isHidden));
+      questionDrawerToggle.textContent = isHidden ? 'فتح درج الأسئلة' : 'إخفاء درج الأسئلة';
+      if (!isHidden && questionSearch) {
+        questionSearch.focus();
+      }
+    });
+  }
   if (questionSearch) {
     questionSearch.addEventListener('input', () => {
       const q = questionSearch.value.trim().toLowerCase();
