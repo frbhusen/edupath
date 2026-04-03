@@ -221,6 +221,13 @@
                     <td class="text-end">
                       <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.edit_lesson', lesson_id=lesson.id) }}">تعديل</a>
                       <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher.manage_lesson_access', lesson_id=lesson.id) }}">الوصول</a>
+                      {% if current_user.role == 'admin' %}
+                      <form class="d-inline" action="{{ url_for('teacher.toggle_lesson_full_test', lesson_id=lesson.id) }}" method="post">
+                        <button type="submit" class="btn btn-sm {% if lesson.allow_full_lesson_test %}btn-warning{% else %}btn-outline-success{% endif %}">
+                          {% if lesson.allow_full_lesson_test %}Disable Full lesson test{% else %}Allow Full lesson test{% endif %}
+                        </button>
+                      </form>
+                      {% endif %}
                       <form class="d-inline" action="{{ url_for('teacher.delete_lesson', lesson_id=lesson.id) }}" method="post" onsubmit="return confirm('هل أنت متأكد من حذف هذا الدرس؟ سيتم حذف الاختبارات المرتبطة أيضاً.');">
                         <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
                       </form>

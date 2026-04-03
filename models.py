@@ -216,6 +216,7 @@ class Lesson(Document):
     link_url = StringField(max_length=500, null=True)
     link_label_2 = StringField(max_length=120, null=True)
     link_url_2 = StringField(max_length=500, null=True)
+    allow_full_lesson_test = BooleanField(default=False, required=True)
     xp_reward = IntField(default=10, required=True)
     created_at = DateTimeField(default=datetime.utcnow)
     

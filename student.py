@@ -1667,6 +1667,7 @@ def lesson_detail(lesson_id):
             test._question_count = question_counts.get(test.id, 0)
     
     is_completed = False
+    lesson_full_custom_test_enabled = bool(getattr(lesson, "allow_full_lesson_test", False))
     lesson_completion_xp = max(0, int(getattr(lesson, "xp_reward", 10) or 10))
 
     if current_user.role == "student":
@@ -1696,6 +1697,7 @@ def lesson_detail(lesson_id):
         section_open=section_open,
         resources=resources,
         tests_data=tests_data,
+        lesson_full_custom_test_enabled=lesson_full_custom_test_enabled,
         is_completed=is_completed,
         lesson_completion_xp=lesson_completion_xp,
         certificate=certificate,
@@ -3647,13 +3649,36 @@ def retake_test_new_questions(attempt_id):
 def custom_test_new():
     subjects = list(Subject.objects().order_by('created_at').all())
     selected_subject_id = request.args.get("subject_id") or request.form.get("subject_id")
+    selected_lesson_id = request.args.get("lesson_id") or request.form.get("lesson_id")
     if selected_subject_id and not ObjectId.is_valid(str(selected_subject_id)):
         selected_subject_id = None
+    if selected_lesson_id and not ObjectId.is_valid(str(selected_lesson_id)):
+        selected_lesson_id = None
 
     if current_user.role == "student":
         unlocked_lessons = get_unlocked_lessons(current_user.id)
     else:
         unlocked_lessons = list(Lesson.objects().all())
+
+    selected_lesson = None
+    if selected_lesson_id:
+        selected_lesson = Lesson.objects(id=selected_lesson_id).first()
+        if not selected_lesson:
+            flash("الدرس المحدد غير موجود.", "error")
+            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id) if selected_subject_id else url_for("student.custom_test_new"))
+
+        if current_user.role == "student":
+            if not bool(getattr(selected_lesson, "allow_full_lesson_test", False)):
+                flash("هذا الدرس لا يدعم Full lesson test حالياً.", "warning")
+                return redirect(url_for("student.lesson_detail", lesson_id=selected_lesson.id))
+
+            unlocked_ids = {lesson.id for lesson in unlocked_lessons}
+            if selected_lesson.id not in unlocked_ids:
+                flash("لا يمكنك الوصول إلى هذا الدرس حالياً.", "warning")
+                return redirect(url_for("student.lesson_detail", lesson_id=selected_lesson.id))
+
+        if selected_lesson.section and selected_lesson.section.subject_id:
+            selected_subject_id = str(selected_lesson.section.subject_id.id)
     
     subject_filter = None
     if selected_subject_id:
@@ -3663,6 +3688,9 @@ def custom_test_new():
                 lesson for lesson in unlocked_lessons
                 if lesson.section and lesson.section.subject_id == subject_filter
             ]
+
+    if selected_lesson:
+        unlocked_lessons = [lesson for lesson in unlocked_lessons if lesson.id == selected_lesson.id]
 
     lesson_question_counts = {}
     lesson_difficulty_counts = {}
@@ -3772,7 +3800,7 @@ def custom_test_new():
                 )
                 if sum(allocated_diff.values()) < difficulty_total:
                     flash(f"عدد الأسئلة المطلوب في {title} أعلى من المتاح.", "error")
-                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
                 easy_count = allocated_diff['easy']
                 medium_count = allocated_diff['medium']
                 hard_count = allocated_diff['hard']
@@ -3786,7 +3814,7 @@ def custom_test_new():
                 continue
             if count > max_available:
                 flash(f"تم طلب {count} أسئلة لـ {title}، ولكن {max_available} فقط متاحة.", "error")
-                return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
 
             selection = {
                 "scope_type": selection_mode,
@@ -3801,15 +3829,15 @@ def custom_test_new():
 
         if total_questions == 0:
             flash("اختر درسًا واحدًا على الأقل وعدد الأسئلة.", "error")
-            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
 
         if total_questions < 10:
             flash("اختر 10 أسئلة على الأقل لإنشاء اختبار مخصص.", "error")
-            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
 
         if total_questions > 50:
             flash("يمكنك اختيار حتى 50 سؤالًا للاختبار المخصص.", "error")
-            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
 
         # Build question pool (MCQ + interactive)
         selected_items = []
@@ -3839,24 +3867,24 @@ def custom_test_new():
                 if diff_spec["easy"] > 0:
                     if len(level_map["easy"]) < diff_spec["easy"]:
                         flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
-                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
                     picked.extend(random.sample(level_map["easy"], diff_spec["easy"]))
                 if diff_spec["medium"] > 0:
                     if len(level_map["medium"]) < diff_spec["medium"]:
                         flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
-                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
                     picked.extend(random.sample(level_map["medium"], diff_spec["medium"]))
                 if diff_spec["hard"] > 0:
                     if len(level_map["hard"]) < diff_spec["hard"]:
                         flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
-                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                        return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
                     picked.extend(random.sample(level_map["hard"], diff_spec["hard"]))
 
                 selected_items.extend(picked)
             else:
                 if len(combined_pool) < sel["count"]:
                     flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
-                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id))
+                    return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
                 picked = random.sample(combined_pool, sel["count"])
                 selected_items.extend(picked)
 
@@ -3899,6 +3927,8 @@ def custom_test_new():
         "student/custom_test_setup.html",
         subjects=subjects,
         selected_subject_id=selected_subject_id,
+        selected_lesson_id=selected_lesson_id,
+        selected_lesson=selected_lesson,
         selection_mode=request.form.get('selection_mode', 'test') if request.method == 'POST' else request.args.get('mode', 'test'),
         lessons=unlocked_lessons,
         tests_data=tests_data,

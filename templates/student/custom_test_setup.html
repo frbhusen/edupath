@@ -3,16 +3,26 @@
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
     <h1 class="h4 mb-1">اختبار مخصص</h1>
-    <p class="mb-0">{% if selected_subject_id %}اختر عدد الأسئلة من كل درس مفتوح.{% else %}اختر مادة للبدء.{% endif %}</p>
+    <p class="mb-0">
+      {% if selected_lesson %}
+        اختبار شامل للدرس: {{ selected_lesson.title }}
+      {% elif selected_subject_id %}
+        اختر عدد الأسئلة من كل درس مفتوح.
+      {% else %}
+        اختر مادة للبدء.
+      {% endif %}
+    </p>
   </div>
-  {% if selected_subject_id %}
+  {% if selected_lesson %}
+    <a class="btn btn-light btn-sm" href="{{ url_for('student.lesson_detail', lesson_id=selected_lesson.id) }}">رجوع</a>
+  {% elif selected_subject_id %}
     <a class="btn btn-light btn-sm" href="{{ url_for('student.subject_detail', subject_id=selected_subject_id) }}">رجوع</a>
   {% else %}
     <a class="btn btn-light btn-sm" href="{{ url_for('student.subjects') }}">رجوع</a>
   {% endif %}
 </div>
 
-{% if not selected_subject_id %}
+{% if not selected_subject_id and not selected_lesson %}
   <div class="mb-4">
     <h5 class="mb-3">اختر مادة</h5>
     <div class="row g-3">
@@ -33,13 +43,15 @@
 
 <form method="post" id="custom-test-setup-form">
   <input type="hidden" name="subject_id" value="{{ selected_subject_id or '' }}" />
-  <input type="hidden" name="selection_mode" id="selection-mode-input" value="{{ selection_mode if selection_mode in ['lesson', 'test'] else 'test' }}" />
-  {% if not selected_subject_id %}
+  <input type="hidden" name="lesson_id" value="{{ selected_lesson_id or '' }}" />
+  <input type="hidden" name="selection_mode" id="selection-mode-input" value="{% if selected_lesson %}lesson{% else %}{{ selection_mode if selection_mode in ['lesson', 'test'] else 'test' }}{% endif %}" />
+  {% if not selected_subject_id and not selected_lesson %}
     <div class="alert alert-info">اختر مادة لعرض الدروس المفتوحة.</div>
   {% elif lessons %}
     <div class="card shadow-sm">
       <div class="card-body">
-        <div class="alert alert-info mb-3">اختر إجمالي من 10 إلى 50 سؤال. يمكنك الاختيار حسب الدروس أو حسب الاختبارات.</div>
+        <div class="alert alert-info mb-3">اختر إجمالي من 10 إلى 50 سؤال.{% if not selected_lesson %} يمكنك الاختيار حسب الدروس أو حسب الاختبارات.{% endif %}</div>
+        {% if not selected_lesson %}
         <div class="mb-3 d-flex gap-3 flex-wrap" id="selection-mode-group">
           <label class="form-check-label d-flex align-items-center gap-2">
             <input class="form-check-input selection-mode-radio" type="radio" name="selection_mode_ui" value="lesson" {% if selection_mode != 'test' %}checked{% endif %}>
@@ -50,6 +62,7 @@
             حسب الاختبارات
           </label>
         </div>
+        {% endif %}
 
         <div class="row g-3 selection-scope-block" data-mode="lesson">
           {% for lesson in lessons %}

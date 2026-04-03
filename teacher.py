@@ -264,7 +264,7 @@ def dashboard():
         section_ids = [s.id for s in sections]
         lessons = list(
             Lesson.objects(section_id__in=section_ids)
-            .only("id", "title", "link_label", "link_url", "requires_code", "section_id")
+            .only("id", "title", "link_label", "link_url", "requires_code", "section_id", "allow_full_lesson_test")
             .all()
         )
         tests = list(
@@ -2956,6 +2956,32 @@ def delete_lesson(lesson_id):
     lesson.delete()
     flash("تم حذف الدرس بنجاح.", "success")
     return redirect(url_for("teacher.section_detail", section_id=section_id))
+
+
+@teacher_bp.route("/lessons/<lesson_id>/toggle-full-lesson-test", methods=["POST"])
+@login_required
+@role_required("teacher")
+def toggle_lesson_full_test(lesson_id):
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        raise NotFound()
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response:
+        return scope_response
+    if not is_admin(current_user):
+        flash("هذا الإجراء متاح للمشرف فقط.", "error")
+        return redirect(url_for("teacher.dashboard"))
+
+    lesson.allow_full_lesson_test = not bool(getattr(lesson, "allow_full_lesson_test", False))
+    lesson.save()
+    cache.clear()
+
+    if lesson.allow_full_lesson_test:
+        flash("تم تفعيل Full lesson test لهذا الدرس.", "success")
+    else:
+        flash("تم تعطيل Full lesson test لهذا الدرس.", "info")
+
+    return redirect(url_for("teacher.dashboard"))
 
 
 @teacher_bp.route("/lessons/<lesson_id>/resources/new", methods=["GET", "POST"])
