@@ -133,7 +133,7 @@
       <div class="workspace-tabs mt-3" role="tablist" aria-label="مساحات التحرير">
         <button type="button" class="workspace-tab active" data-tab="settings">إعدادات الاختبار</button>
         <button type="button" class="workspace-tab" data-tab="mcq">أسئلة الاختيار</button>
-        <button type="button" class="workspace-tab" data-tab="interactive">الأسئلة التفاعلية</button>
+        <button type="button" class="workspace-tab" data-tab="interactive">الأسئلة التحريرية</button>
         <button type="button" class="workspace-tab" data-tab="import">استيراد JSON</button>
       </div>
     </div>
@@ -416,7 +416,7 @@
       <div class="card panel-card mb-3">
         <div class="card-header bg-primary text-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
           <div>
-            <h4 class="mb-1">الأسئلة التفاعلية</h4>
+            <h4 class="mb-1">الأسئلة التحريرية</h4>
             <div class="small opacity-75">{{ test.title }}</div>
           </div>
           <div class="text-end">
@@ -426,7 +426,7 @@
         </div>
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="card-title mb-0">إضافة وتعديل الأسئلة التفاعلية</h5>
+            <h5 class="card-title mb-0">إضافة وتعديل الأسئلة التحريرية</h5>
             <span class="badge text-bg-secondary">{{ interactive_questions|length if interactive_questions else 0 }}</span>
           </div>
           <p class="section-note mb-3">صيغة جدول قابلة للتحرير السريع.</p>
