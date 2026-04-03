@@ -76,6 +76,27 @@ def _award_certificate_xp_once(student_id, certificate_id, amount: int = 30):
     profile.save()
     return xp_amount
 
+
+def _extract_drive_file_id(url: str):
+    lowered = (url or "").lower()
+    if "/file/d/" in lowered:
+        return (url or "").split("/file/d/")[-1].split("/")[0]
+    if "id=" in lowered:
+        return (url or "").split("id=")[-1].split("&")[0]
+    return None
+
+
+def _normalize_image_url(url: str):
+    cleaned = (url or "").strip()
+    if not cleaned:
+        return None
+    lowered = cleaned.lower()
+    if "drive.google.com" in lowered:
+        file_id = _extract_drive_file_id(cleaned)
+        if file_id:
+            return f"https://drive.google.com/uc?export=view&id={file_id}"
+    return cleaned
+
 # Role guard decorator
 
 def role_required(*roles):
@@ -3216,7 +3237,9 @@ def edit_test(test_id):
                     for chunk in line.split(","):
                         val = chunk.strip()
                         if val:
-                            parts.append(val)
+                            normalized = _normalize_image_url(val)
+                            if normalized:
+                                parts.append(normalized)
                 return parts
 
             question_id = request.form.get("question_id")
@@ -3232,7 +3255,7 @@ def edit_test(test_id):
             choices = []
             for i in range(1, 5):
                 choice_text = (request.form.get(f"choice_{i}") or "").strip()
-                choice_image = (request.form.get(f"choice_{i}_image") or "").strip() or None
+                choice_image = _normalize_image_url(request.form.get(f"choice_{i}_image"))
                 if choice_text:
                     choices.append(Choice(text=choice_text, image_url=choice_image, is_correct=(correct_index == i)))
 
@@ -3299,9 +3322,9 @@ def edit_test(test_id):
         elif form_name == "upsert_interactive_question":
             interactive_question_id = request.form.get("interactive_question_id")
             q_text = (request.form.get("interactive_question_text") or "").strip() or None
-            q_img = (request.form.get("interactive_question_image_url") or "").strip()
+            q_img = _normalize_image_url(request.form.get("interactive_question_image_url"))
             a_text = (request.form.get("interactive_answer_text") or "").strip() or None
-            a_img = (request.form.get("interactive_answer_image_url") or "").strip()
+            a_img = _normalize_image_url(request.form.get("interactive_answer_image_url"))
             difficulty = (request.form.get("interactive_difficulty") or "medium").strip().lower()
             if difficulty not in {"easy", "medium", "hard"}:
                 difficulty = "medium"
@@ -3330,9 +3353,9 @@ def edit_test(test_id):
                 TestInteractiveQuestion(
                     test_id=test.id,
                     question_text=q_text,
-                    question_image_url=q_img or None,
+                    question_image_url=q_img,
                     answer_text=a_text,
-                    answer_image_url=a_img or None,
+                    answer_image_url=a_img,
                     difficulty=difficulty,
                     correct_value=True,
                 ).save()
@@ -3454,7 +3477,7 @@ def edit_test(test_id):
                             or opt.get("imageUri")
                             or opt.get("image_uri")
                         )
-                        opt_image = str(opt_image).strip() if opt_image else None
+                        opt_image = _normalize_image_url(opt_image)
                         is_correct = _to_bool(opt.get("isCorrect") if "isCorrect" in opt else opt.get("is_correct"))
                         if not is_correct and correct_indices:
                             if idx in correct_indices:
@@ -3478,7 +3501,7 @@ def edit_test(test_id):
                                 or opt.get("imageUri")
                                 or opt.get("image_uri")
                             )
-                            opt_image = str(opt_image).strip() if opt_image else None
+                            opt_image = _normalize_image_url(opt_image)
                         else:
                             opt_text = str(opt).strip()
                             opt_image = None
