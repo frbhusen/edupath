@@ -1,48 +1,89 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
-  .course-edit-shell .panel-card {
-    border: 1px solid #dbe2ea;
-    border-radius: 12px;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  .editor-shell {
+    background: #f8fcff;
+    border: 1px solid #d7e8f5;
+    border-radius: 18px;
+    padding: 1rem;
   }
-
-  .course-edit-shell .question-item {
-    border: 1px solid #dbe2ea;
-    border-radius: 12px;
-    background: #ffffff;
+  .editor-subtitle {
+    color: #4e6679;
+    font-size: 0.92rem;
   }
-
-  .course-edit-shell .question-item-head {
-    border-bottom: 1px solid #e5edf5;
-    background: #f8fafc;
-    border-radius: 12px 12px 0 0;
-    padding: 0.65rem 0.9rem;
+  .editor-badge {
+    border: 1px solid #b9d8e8;
+    background: #fff;
+    color: #165872;
+    border-radius: 999px;
+    padding: 0.22rem 0.72rem;
+    font-size: 0.78rem;
+    font-weight: 700;
   }
-
-  .course-edit-shell .preview-grid {
+  .workspace-tabs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    background: #fff;
+    border: 1px solid #dce8f1;
+    border-radius: 14px;
+    padding: 0.35rem;
+  }
+  .workspace-tab {
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #3f5b70;
+    font-weight: 700;
+    padding: 0.5rem 0.9rem;
+    transition: all 0.2s ease;
+  }
+  .workspace-tab:hover {
+    background: #edf7fb;
+    color: #1b5b77;
+  }
+  .workspace-tab.active {
+    color: #fff;
+    background: linear-gradient(140deg, #1f8198 0%, #2a9fb1 100%);
+    box-shadow: 0 6px 16px rgba(32, 129, 152, 0.3);
+  }
+  .workspace-panel {
+    animation: fadeSlide 0.18s ease;
+  }
+  @keyframes fadeSlide {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .panel-card {
+    border: 1px solid #dfebf3;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(26, 61, 80, 0.08);
+  }
+  .preview-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
-
-  .course-edit-shell .preview-box {
+  .preview-box {
     border: 1px solid #dbe2ea;
     border-radius: 10px;
     background: #f8fafc;
     padding: 0.45rem;
   }
-
-  .course-edit-shell .preview-box .label {
+  .preview-box .label {
     font-size: 0.75rem;
     color: #475569;
     font-weight: 600;
     margin-bottom: 0.3rem;
     display: block;
   }
-
-  .course-edit-shell .preview-frame {
+  .preview-frame {
     width: 100%;
     height: 130px;
     border: 1px solid #dbe2ea;
@@ -53,221 +94,282 @@
     justify-content: center;
     overflow: hidden;
   }
-
-  .course-edit-shell .preview-frame img {
+  .preview-frame img {
     width: 100%;
     height: 100%;
     object-fit: contain;
   }
-
-  .course-edit-shell .preview-empty {
+  .preview-empty {
     color: #94a3b8;
     font-size: 0.78rem;
   }
 </style>
 
-<div class="course-edit-shell">
-<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
-  <div>
-    <h1 class="h4 mb-1">تعديل الدورة</h1>
-    <p class="mb-0">{{ course_set.title }}</p>
+<div class="row mb-3">
+  <div class="col-12">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">الدورات التفاعلية</a></li>
+        <li class="breadcrumb-item active">تعديل الدورة</li>
+      </ol>
+    </nav>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">رجوع</a>
 </div>
 
-<div class="card panel-card mb-4">
-  <div class="card-body">
-    <h5 class="card-title mb-3">إعدادات الدورة</h5>
-    <form method="post" class="row g-2">
-      <input type="hidden" name="action" value="update_set">
-      <div class="col-12 col-md-6">
-        <label class="form-label">اسم الدورة</label>
-        <input class="form-control" name="title" value="{{ course_set.title }}" required>
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">الوصف (اختياري)</label>
-        <input class="form-control" name="description" value="{{ course_set.description or '' }}">
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">اسم رابط المورد 1 (اختياري)</label>
-        <input class="form-control" name="link_label" value="{{ course_set.link_label or '' }}" placeholder="مثال: اختبار أتمتة">
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">رابط المورد 1 (اختياري)</label>
-        <input class="form-control" name="link_url" value="{{ course_set.link_url or '' }}" placeholder="https://...">
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">اسم رابط المورد 2 (اختياري)</label>
-        <input class="form-control" name="link_label_2" value="{{ course_set.link_label_2 or '' }}" placeholder="مثال: تحميل ملفات الموارد">
-      </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">رابط المورد 2 (اختياري)</label>
-        <input class="form-control" name="link_url_2" value="{{ course_set.link_url_2 or '' }}" placeholder="https://...">
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">XP لكل سؤال</label>
-        <input class="form-control" type="number" name="xp_per_question" min="1" value="{{ course_set.xp_per_question|default(1) }}" required>
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">القسم</label>
-        <select class="form-select" name="section_id">
-          <option value="">بدون قسم محدد</option>
-          {% for section in sections %}
-            <option value="{{ section.id }}" {% if course_set.section_id and section.id == course_set.section_id.id %}selected{% endif %}>{{ section.title }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-4">
-        <label class="form-label">الدرس</label>
-        <select class="form-select" name="lesson_id">
-          <option value="">بدون درس محدد</option>
-          {% for lesson in lessons %}
-            <option value="{{ lesson.id }}" {% if course_set.lesson_id and lesson.id == course_set.lesson_id.id %}selected{% endif %}>{{ lesson.title }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-4 d-flex align-items-end">
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" id="set-active" name="is_active" {% if course_set.is_active %}checked{% endif %}>
-          <label class="form-check-label" for="set-active">نشطة للطلاب</label>
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-11">
+    <div id="editorState" data-active-tab="{{ active_tab|default('settings') }}" class="d-none"></div>
+
+    <div class="editor-shell mb-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <h4 class="mb-1">إدارة الدورة التفاعلية</h4>
+          <div class="editor-subtitle">واجهة مطابقة لنمط تعديل الاختبار مع تبويب موارد مستقل.</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <span class="editor-badge">إعدادات</span>
+          <span class="editor-badge">أسئلة</span>
+          <span class="editor-badge">موارد</span>
         </div>
       </div>
-      <div class="col-12 d-flex justify-content-end">
-        <button class="btn btn-cta" type="submit">حفظ الإعدادات</button>
+      <div class="workspace-tabs mt-3" role="tablist" aria-label="مساحات التحرير">
+        <button type="button" class="workspace-tab active" data-tab="settings">إعدادات الدورة</button>
+        <button type="button" class="workspace-tab" data-tab="questions">الأسئلة التحريرية</button>
+        <button type="button" class="workspace-tab" data-tab="resources">الموارد</button>
       </div>
-    </form>
-  </div>
-</div>
+    </div>
 
-<div class="card panel-card mb-4">
-  <div class="card-body">
-    <h5 class="card-title mb-3">إضافة سؤال جديد</h5>
-    <form method="post" class="row g-2">
-      <input type="hidden" name="action" value="add_question">
-      <div class="col-12 col-lg-6">
-        <label class="form-label">نص السؤال (يدعم LaTeX)</label>
-        <textarea class="form-control" name="question_text" rows="2" placeholder="اكتب السؤال نصيًا إن رغبت"></textarea>
-      </div>
-      <div class="col-12 col-lg-6">
-        <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
-        <textarea class="form-control" name="answer_text" rows="2" placeholder="اكتب الإجابة نصيًا إن رغبت"></textarea>
-      </div>
-      <div class="col-12 col-lg-5">
-        <label class="form-label">رابط صورة السؤال</label>
-        <input class="form-control" name="question_image_url" data-preview-target="new-question-preview" placeholder="https://drive.google.com/...">
-      </div>
-      <div class="col-12 col-lg-5">
-        <label class="form-label">رابط صورة الإجابة</label>
-        <input class="form-control" name="answer_image_url" data-preview-target="new-answer-preview" placeholder="https://drive.google.com/...">
-      </div>
-      <div class="col-12 d-flex justify-content-end">
-        <button class="btn btn-outline-primary" type="submit">إضافة السؤال</button>
-      </div>
-      <div class="col-12">
-        <div class="preview-grid">
-          <div class="preview-box">
-            <span class="label">معاينة صورة السؤال</span>
-            <div class="preview-frame">
-              <img id="new-question-preview" src="" alt="معاينة السؤال" class="d-none">
-              <span class="preview-empty" id="new-question-preview-empty">لا توجد صورة بعد</span>
-            </div>
+    <div class="workspace-panel" data-panel="settings">
+      <div class="card panel-card mb-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <div>
+            <h4 class="mb-1">إعدادات الدورة</h4>
+            <div class="small opacity-75">{{ course_set.title }}</div>
           </div>
-          <div class="preview-box">
-            <span class="label">معاينة صورة الإجابة</span>
-            <div class="preview-frame">
-              <img id="new-answer-preview" src="" alt="معاينة الإجابة" class="d-none">
-              <span class="preview-empty" id="new-answer-preview-empty">لا توجد صورة بعد</span>
+          <a class="btn btn-light btn-sm" href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">رجوع</a>
+        </div>
+        <div class="card-body">
+          <form method="post" class="row g-3">
+            <input type="hidden" name="action" value="update_set">
+            <input type="hidden" name="link_label" value="{{ course_set.link_label or '' }}">
+            <input type="hidden" name="link_url" value="{{ course_set.link_url or '' }}">
+            <input type="hidden" name="link_label_2" value="{{ course_set.link_label_2 or '' }}">
+            <input type="hidden" name="link_url_2" value="{{ course_set.link_url_2 or '' }}">
+            <div class="col-12 col-lg-6">
+              <label class="form-label">اسم الدورة</label>
+              <input class="form-control" name="title" value="{{ course_set.title }}" required>
             </div>
-          </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">الوصف (اختياري)</label>
+              <input class="form-control" name="description" value="{{ course_set.description or '' }}">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label">XP لكل سؤال</label>
+              <input class="form-control" type="number" name="xp_per_question" min="1" value="{{ course_set.xp_per_question|default(1) }}" required>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">القسم</label>
+              <select class="form-select" name="section_id">
+                <option value="">بدون قسم محدد</option>
+                {% for section in sections %}
+                  <option value="{{ section.id }}" {% if course_set.section_id and section.id == course_set.section_id.id %}selected{% endif %}>{{ section.title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">الدرس</label>
+              <select class="form-select" name="lesson_id">
+                <option value="">بدون درس محدد</option>
+                {% for lesson in lessons %}
+                  <option value="{{ lesson.id }}" {% if course_set.lesson_id and lesson.id == course_set.lesson_id.id %}selected{% endif %}>{{ lesson.title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-md-4 d-flex align-items-end">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="set-active" name="is_active" {% if course_set.is_active %}checked{% endif %}>
+                <label class="form-check-label" for="set-active">نشطة للطلاب</label>
+              </div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-cta" type="submit">حفظ الإعدادات</button>
+            </div>
+          </form>
         </div>
       </div>
-    </form>
-  </div>
-</div>
+    </div>
 
-<div class="card panel-card">
-  <div class="card-body">
-    <h5 class="card-title">أسئلة الدورة ({{ questions|length }})</h5>
-    {% if questions %}
-      <div class="d-flex flex-column gap-3">
-        {% for q in questions %}
-          <div class="question-item">
-            <div class="question-item-head d-flex justify-content-between align-items-center">
-              <span class="fw-semibold">السؤال {{ loop.index }}</span>
+    <div class="workspace-panel d-none" data-panel="questions">
+      <div class="card panel-card mb-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <h4 class="mb-0">الأسئلة التحريرية</h4>
+          <span class="badge text-bg-light">{{ questions|length }}</span>
+        </div>
+        <div class="card-body">
+          <h5 class="card-title mb-3">إضافة سؤال جديد</h5>
+          <form method="post" class="row g-2 mb-4">
+            <input type="hidden" name="action" value="add_question">
+            <div class="col-12 col-lg-6">
+              <label class="form-label">نص السؤال (يدعم LaTeX)</label>
+              <textarea class="form-control" name="question_text" rows="2" placeholder="اكتب السؤال نصيًا إن رغبت"></textarea>
             </div>
-            <div class="p-3">
-            <form method="post" class="row g-2">
-              <input type="hidden" name="action" value="update_question">
-              <input type="hidden" name="question_id" value="{{ q.id }}">
-              <div class="col-12 col-lg-6">
-                <label class="form-label">نص السؤال (يدعم LaTeX)</label>
-                <textarea class="form-control" name="question_text" rows="2">{{ q.question_text or '' }}</textarea>
-              </div>
-              <div class="col-12 col-lg-6">
-                <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
-                <textarea class="form-control" name="answer_text" rows="2">{{ q.answer_text or '' }}</textarea>
-              </div>
-              <div class="col-12 col-lg-5">
-                <label class="form-label">صورة السؤال</label>
-                <input class="form-control" name="question_image_url" value="{{ q.question_image_url or '' }}" data-preview-target="q-preview-{{ q.id }}">
-              </div>
-              <div class="col-12 col-lg-5">
-                <label class="form-label">صورة الإجابة</label>
-                <input class="form-control" name="answer_image_url" value="{{ q.answer_image_url or '' }}" data-preview-target="a-preview-{{ q.id }}">
-              </div>
-              <div class="col-12 d-flex justify-content-end">
-                <button class="btn btn-outline-primary btn-sm" type="submit">حفظ</button>
-              </div>
-              <div class="col-12">
-                {% if q.question_text %}
-                  <div class="mb-2">
-                    <span class="label">نص السؤال</span>
-                    <div class="border rounded p-2 math-content preserve-format">{{ q.question_text }}</div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
+              <textarea class="form-control" name="answer_text" rows="2" placeholder="اكتب الإجابة نصيًا إن رغبت"></textarea>
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">رابط صورة السؤال</label>
+              <input class="form-control" name="question_image_url" data-preview-target="new-question-preview" placeholder="https://...">
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">رابط صورة الإجابة</label>
+              <input class="form-control" name="answer_image_url" data-preview-target="new-answer-preview" placeholder="https://...">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-outline-primary" type="submit">إضافة السؤال</button>
+            </div>
+            <div class="col-12">
+              <div class="preview-grid">
+                <div class="preview-box">
+                  <span class="label">معاينة صورة السؤال</span>
+                  <div class="preview-frame">
+                    <img id="new-question-preview" src="" alt="معاينة السؤال" class="d-none">
+                    <span class="preview-empty" id="new-question-preview-empty">لا توجد صورة بعد</span>
                   </div>
-                {% endif %}
-                {% if q.answer_text %}
-                  <div class="mb-2">
-                    <span class="label">نص الإجابة</span>
-                    <div class="border rounded p-2 math-content preserve-format">{{ q.answer_text }}</div>
-                  </div>
-                {% endif %}
-                <div class="preview-grid">
-                  <div class="preview-box">
-                    <span class="label">معاينة السؤال</span>
-                    <div class="preview-frame">
-                      <img id="q-preview-{{ q.id }}" src="{{ q.question_image_url or '' }}" alt="معاينة السؤال" {% if not q.question_image_url %}class="d-none"{% endif %}>
-                      <span class="preview-empty {% if q.question_image_url %}d-none{% endif %}" id="q-preview-{{ q.id }}-empty">لا توجد صورة</span>
-                    </div>
-                  </div>
-                  <div class="preview-box">
-                    <span class="label">معاينة الإجابة</span>
-                    <div class="preview-frame">
-                      <img id="a-preview-{{ q.id }}" src="{{ q.answer_image_url or '' }}" alt="معاينة الإجابة" {% if not q.answer_image_url %}class="d-none"{% endif %}>
-                      <span class="preview-empty {% if q.answer_image_url %}d-none{% endif %}" id="a-preview-{{ q.id }}-empty">لا توجد صورة</span>
-                    </div>
+                </div>
+                <div class="preview-box">
+                  <span class="label">معاينة صورة الإجابة</span>
+                  <div class="preview-frame">
+                    <img id="new-answer-preview" src="" alt="معاينة الإجابة" class="d-none">
+                    <span class="preview-empty" id="new-answer-preview-empty">لا توجد صورة بعد</span>
                   </div>
                 </div>
               </div>
-            </form>
-            <form method="post" class="mt-2 d-flex justify-content-end" onsubmit="return confirm('حذف السؤال؟');">
-              <input type="hidden" name="action" value="delete_question">
-              <input type="hidden" name="question_id" value="{{ q.id }}">
-              <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
-            </form>
             </div>
-          </div>
-        {% endfor %}
+          </form>
+
+          <h5 class="card-title">أسئلة الدورة ({{ questions|length }})</h5>
+          {% if questions %}
+            <div class="d-flex flex-column gap-3">
+              {% for q in questions %}
+                <div class="border rounded p-3">
+                  <div class="fw-semibold mb-2">السؤال {{ loop.index }}</div>
+                  <form method="post" class="row g-2">
+                    <input type="hidden" name="action" value="update_question">
+                    <input type="hidden" name="question_id" value="{{ q.id }}">
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label">نص السؤال</label>
+                      <textarea class="form-control" name="question_text" rows="2">{{ q.question_text or '' }}</textarea>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label">نص الإجابة</label>
+                      <textarea class="form-control" name="answer_text" rows="2">{{ q.answer_text or '' }}</textarea>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label">صورة السؤال</label>
+                      <input class="form-control" name="question_image_url" value="{{ q.question_image_url or '' }}" data-preview-target="q-preview-{{ q.id }}">
+                    </div>
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label">صورة الإجابة</label>
+                      <input class="form-control" name="answer_image_url" value="{{ q.answer_image_url or '' }}" data-preview-target="a-preview-{{ q.id }}">
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                      <button class="btn btn-outline-primary btn-sm" type="submit">حفظ</button>
+                    </div>
+                    <div class="col-12">
+                      <div class="preview-grid">
+                        <div class="preview-box">
+                          <span class="label">معاينة السؤال</span>
+                          <div class="preview-frame">
+                            <img id="q-preview-{{ q.id }}" src="{{ q.question_image_url or '' }}" alt="معاينة السؤال" {% if not q.question_image_url %}class="d-none"{% endif %}>
+                            <span class="preview-empty {% if q.question_image_url %}d-none{% endif %}" id="q-preview-{{ q.id }}-empty">لا توجد صورة</span>
+                          </div>
+                        </div>
+                        <div class="preview-box">
+                          <span class="label">معاينة الإجابة</span>
+                          <div class="preview-frame">
+                            <img id="a-preview-{{ q.id }}" src="{{ q.answer_image_url or '' }}" alt="معاينة الإجابة" {% if not q.answer_image_url %}class="d-none"{% endif %}>
+                            <span class="preview-empty {% if q.answer_image_url %}d-none{% endif %}" id="a-preview-{{ q.id }}-empty">لا توجد صورة</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                  <form method="post" class="mt-2 d-flex justify-content-end" onsubmit="return confirm('حذف السؤال؟');">
+                    <input type="hidden" name="action" value="delete_question">
+                    <input type="hidden" name="question_id" value="{{ q.id }}">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
+                  </form>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="alert alert-light mb-0">لا توجد أسئلة بعد.</div>
+          {% endif %}
+        </div>
       </div>
-    {% else %}
-      <div class="alert alert-light mb-0">لا توجد أسئلة بعد.</div>
-    {% endif %}
+    </div>
+
+    <div class="workspace-panel d-none" data-panel="resources">
+      <div class="card panel-card mb-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <h4 class="mb-0">موارد الدورة</h4>
+          <span class="badge text-bg-light">روابط إضافية</span>
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">أضف روابط أتمتة أو ملفات الموارد المرتبطة بالدورة.</p>
+          <form method="post" class="row g-3">
+            <input type="hidden" name="action" value="update_set">
+            <input type="hidden" name="title" value="{{ course_set.title }}">
+            <input type="hidden" name="description" value="{{ course_set.description or '' }}">
+            <input type="hidden" name="xp_per_question" value="{{ course_set.xp_per_question|default(1) }}">
+            <input type="hidden" name="section_id" value="{{ course_set.section_id.id if course_set.section_id else '' }}">
+            <input type="hidden" name="lesson_id" value="{{ course_set.lesson_id.id if course_set.lesson_id else '' }}">
+            {% if course_set.is_active %}
+              <input type="hidden" name="is_active" value="on">
+            {% endif %}
+
+            <div class="col-12 col-md-6">
+              <label class="form-label">اسم رابط المورد 1</label>
+              <input class="form-control" name="link_label" value="{{ course_set.link_label or '' }}" placeholder="مثال: اختبار أتمتة">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">رابط المورد 1</label>
+              <input class="form-control" name="link_url" value="{{ course_set.link_url or '' }}" placeholder="https://...">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">اسم رابط المورد 2</label>
+              <input class="form-control" name="link_label_2" value="{{ course_set.link_label_2 or '' }}" placeholder="مثال: تحميل ملفات الموارد">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">رابط المورد 2</label>
+              <input class="form-control" name="link_url_2" value="{{ course_set.link_url_2 or '' }}" placeholder="https://...">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-cta" type="submit">حفظ الموارد</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+  const workspaceTabs = Array.from(document.querySelectorAll('.workspace-tab'));
+  const workspacePanels = Array.from(document.querySelectorAll('.workspace-panel'));
+
+  function switchWorkspace(tabName){
+    workspaceTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabName));
+    workspacePanels.forEach(panel => panel.classList.toggle('d-none', panel.dataset.panel !== tabName));
+  }
+
+  workspaceTabs.forEach(tab => {
+    tab.addEventListener('click', () => switchWorkspace(tab.dataset.tab));
+  });
+
   (function () {
     const inputs = document.querySelectorAll('[data-preview-target]');
     inputs.forEach((input) => {
@@ -294,5 +396,9 @@
       updatePreview();
     });
   })();
+
+  const editorState = document.getElementById('editorState');
+  const activeTab = (editorState && editorState.dataset.activeTab) ? editorState.dataset.activeTab : 'settings';
+  switchWorkspace(activeTab);
 </script>
 {% endblock %}

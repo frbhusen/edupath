@@ -2546,6 +2546,12 @@ def course_set_edit(course_set_id):
     sections = list(Section.objects(subject_id=subject.id).order_by("created_at").all())
     section_ids = [s.id for s in sections]
     lessons = list(Lesson.objects(section_id__in=section_ids).order_by("created_at").all()) if section_ids else []
+    active_tab = (request.args.get("tab") or "settings").strip().lower()
+    if active_tab not in {"settings", "questions", "resources"}:
+        active_tab = "settings"
+
+    def _edit_redirect(tab_name="settings"):
+        return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id, tab=tab_name))
 
     if request.method == "POST":
         action = (request.form.get("action") or "").strip()
@@ -2564,20 +2570,20 @@ def course_set_edit(course_set_id):
 
             if not title:
                 flash("عنوان الدورة مطلوب.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("settings")
 
             try:
                 xp_per_question = max(1, int(xp_per_question_raw or "1"))
             except Exception:
                 flash("قيمة XP لكل سؤال غير صالحة.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("settings")
 
             section = None
             if section_id and ObjectId.is_valid(section_id):
                 section = Section.objects(id=section_id, subject_id=subject.id).first()
             if section_id and not section:
                 flash("القسم المحدد غير صالح.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("settings")
 
             lesson = None
             if lesson_id and ObjectId.is_valid(lesson_id):
@@ -2589,7 +2595,7 @@ def course_set_edit(course_set_id):
                         lesson = None
             if lesson_id and not lesson:
                 flash("الدرس المحدد غير صالح.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("settings")
 
             if lesson and not section:
                 section = lesson.section_id
@@ -2606,7 +2612,7 @@ def course_set_edit(course_set_id):
             course_set.is_active = is_active
             course_set.save()
             flash("تم تحديث بيانات الدورة.", "success")
-            return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+            return _edit_redirect("settings")
 
         if action == "add_question":
             q_text = (request.form.get("question_text") or "").strip() or None
@@ -2616,10 +2622,10 @@ def course_set_edit(course_set_id):
 
             if not q_text and not q_img:
                 flash("أدخل نص السؤال أو رابط صورة السؤال على الأقل.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("questions")
             if not a_text and not a_img:
                 flash("أدخل نص الإجابة أو رابط صورة الإجابة على الأقل.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("questions")
 
             CourseQuestion(
                 course_set_id=course_set.id,
@@ -2630,14 +2636,14 @@ def course_set_edit(course_set_id):
                 correct_value=True,
             ).save()
             flash("تمت إضافة سؤال جديد.", "success")
-            return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+            return _edit_redirect("questions")
 
         if action == "update_question":
             qid = (request.form.get("question_id") or "").strip()
             q = CourseQuestion.objects(id=qid, course_set_id=course_set.id).first() if ObjectId.is_valid(qid) else None
             if not q:
                 flash("السؤال غير موجود.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("questions")
 
             q_text = (request.form.get("question_text") or "").strip() or None
             q_img = (request.form.get("question_image_url") or "").strip()
@@ -2646,10 +2652,10 @@ def course_set_edit(course_set_id):
 
             if not q_text and not q_img:
                 flash("أدخل نص السؤال أو رابط صورة السؤال على الأقل.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("questions")
             if not a_text and not a_img:
                 flash("أدخل نص الإجابة أو رابط صورة الإجابة على الأقل.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("questions")
 
             q.question_text = q_text
             q.question_image_url = q_img
@@ -2658,17 +2664,17 @@ def course_set_edit(course_set_id):
             q.correct_value = True
             q.save()
             flash("تم تحديث السؤال.", "success")
-            return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+            return _edit_redirect("questions")
 
         if action == "delete_question":
             qid = (request.form.get("question_id") or "").strip()
             q = CourseQuestion.objects(id=qid, course_set_id=course_set.id).first() if ObjectId.is_valid(qid) else None
             if not q:
                 flash("السؤال غير موجود.", "error")
-                return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+                return _edit_redirect("questions")
             q.delete()
             flash("تم حذف السؤال.", "success")
-            return redirect(url_for("teacher.course_set_edit", course_set_id=course_set.id))
+            return _edit_redirect("questions")
 
     questions = list(CourseQuestion.objects(course_set_id=course_set.id).order_by("created_at").all())
 
@@ -2679,6 +2685,7 @@ def course_set_edit(course_set_id):
         questions=questions,
         sections=sections,
         lessons=lessons,
+        active_tab=active_tab,
     )
 
 
