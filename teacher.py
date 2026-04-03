@@ -3060,10 +3060,9 @@ def delete_lesson(lesson_id):
     scope_response = _ensure_scope_for_lesson(lesson)
     if scope_response:
         return scope_response
-    section_id = lesson.section_id.id if lesson.section_id else None
     lesson.delete()
     flash("تم حذف الدرس بنجاح.", "success")
-    return redirect(url_for("teacher.section_detail", section_id=section_id))
+    return redirect(url_for("teacher.dashboard"))
 
 
 @teacher_bp.route("/lessons/<lesson_id>/toggle-full-lesson-test", methods=["POST"])
@@ -3765,14 +3764,10 @@ def delete_test(test_id):
     scope_response = _ensure_scope_for_test(test)
     if scope_response:
         return scope_response
-    section_id = test.section_id.id if test.section_id else None
-    lesson_id = test.lesson_id.id if test.lesson_id else None
     TestResource.objects(test_id=test.id).delete()
     test.delete()
     flash("تم حذف الاختبار بنجاح.", "success")
-    if lesson_id:
-        return redirect(url_for("teacher.lesson_detail", lesson_id=lesson_id))
-    return redirect(url_for("teacher.section_detail", section_id=section_id))
+    return redirect(url_for("teacher.dashboard"))
 
 
 @teacher_bp.route("/questions/<question_id>/delete", methods=["POST"])
