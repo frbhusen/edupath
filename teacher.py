@@ -94,7 +94,7 @@ def _normalize_image_url(url: str):
     if "drive.google.com" in lowered:
         file_id = _extract_drive_file_id(cleaned)
         if file_id:
-            return f"https://drive.google.com/uc?export=view&id={file_id}"
+            return f"https://lh3.googleusercontent.com/d/{file_id}=w2000"
     return cleaned
 
 # Role guard decorator

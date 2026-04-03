@@ -256,6 +256,86 @@
       }, 5000);
     });
 
+    function extractDriveFileId(url) {
+      if (!url) return null;
+      try {
+        const raw = String(url);
+        const byPath = raw.match(/\/file\/d\/([^/]+)/i);
+        if (byPath && byPath[1]) return byPath[1];
+        const parsed = new URL(raw, window.location.origin);
+        const id = parsed.searchParams.get('id');
+        if (id) return id;
+      } catch (err) {
+        return null;
+      }
+      return null;
+    }
+
+    function driveImageCandidates(url) {
+      const id = extractDriveFileId(url);
+      if (!id) return [url];
+      return [
+        `https://lh3.googleusercontent.com/d/${id}=w2000`,
+        `https://drive.google.com/thumbnail?id=${id}&sz=w2000`,
+        `https://drive.google.com/uc?export=view&id=${id}`
+      ];
+    }
+
+    function normalizeImageUrl(url) {
+      const raw = String(url || '');
+      if (!raw) return raw;
+      const lowered = raw.toLowerCase();
+      if (lowered.includes('drive.google.com')) {
+        return driveImageCandidates(raw)[0];
+      }
+      return raw;
+    }
+    window.normalizeImageUrl = normalizeImageUrl;
+
+    function enhanceDriveImageElement(img) {
+      if (!img || img.dataset.driveFixBound === '1') return;
+      const originalSrc = img.getAttribute('src') || '';
+      if (!originalSrc.toLowerCase().includes('drive.google.com')) return;
+
+      const candidates = driveImageCandidates(originalSrc);
+      let idx = 0;
+      img.dataset.driveFixBound = '1';
+      img.src = candidates[idx];
+      img.addEventListener('error', () => {
+        idx += 1;
+        if (idx < candidates.length) {
+          img.src = candidates[idx];
+        }
+      });
+    }
+
+    function applyDriveImageFixes(root) {
+      const scope = root || document;
+      const imgs = scope.querySelectorAll ? scope.querySelectorAll('img[src*="drive.google.com"]') : [];
+      imgs.forEach((img) => enhanceDriveImageElement(img));
+    }
+
+    window.addEventListener('load', function() {
+      applyDriveImageFixes(document);
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+      applyDriveImageFixes(document);
+      const observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          for (const node of m.addedNodes || []) {
+            if (!node || node.nodeType !== 1) continue;
+            if (node.tagName === 'IMG') {
+              enhanceDriveImageElement(node);
+            } else {
+              applyDriveImageFixes(node);
+            }
+          }
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
+
     {% if current_user.is_authenticated and (current_user.role|lower) == 'student' %}
     (function initDuelInvitePopup() {
       const storageKey = 'duel_seen_tokens_v1';
