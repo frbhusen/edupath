@@ -418,7 +418,78 @@ def question_editor_dashboard():
         tests_q = tests_q.filter(section_id__in=allowed_sections)
 
     tests = list(tests_q.order_by("created_at").all())
-    return render_template("teacher/question_editor_dashboard.html", tests=tests)
+    section_ids = []
+    for test in tests:
+        if test.section_id:
+            try:
+                section_ids.append(test.section_id.id)
+            except (DoesNotExist, AttributeError):
+                continue
+
+    sections = list(Section.objects(id__in=section_ids).only("id", "title", "subject_id", "requires_code").all()) if section_ids else []
+    subject_ids = []
+    for section in sections:
+        if section.subject_id:
+            try:
+                subject_ids.append(section.subject_id.id)
+            except (DoesNotExist, AttributeError):
+                continue
+
+    subjects = list(Subject.objects(id__in=subject_ids).only("id", "name", "description", "requires_code").order_by("created_at").all()) if subject_ids else []
+    subject_by_id = {subject.id: subject for subject in subjects}
+    sections_by_subject = {}
+    for section in sections:
+        try:
+            subject_id = section.subject_id.id if section.subject_id else None
+        except (DoesNotExist, AttributeError):
+            subject_id = None
+        if not subject_id:
+            continue
+        sections_by_subject.setdefault(subject_id, []).append(section)
+
+    tests_by_section = {}
+    for test in tests:
+        try:
+            section_id = test.section_id.id if test.section_id else None
+        except (DoesNotExist, AttributeError):
+            section_id = None
+        if not section_id:
+            continue
+        tests_by_section.setdefault(section_id, []).append(test)
+
+    test_ids = [test.id for test in tests]
+    mcq_counts = _aggregate_question_counts_by_test(Question, test_ids)
+    interactive_counts = _aggregate_question_counts_by_test(TestInteractiveQuestion, test_ids)
+    lesson_title_by_id = {}
+    lesson_ids = []
+    for test in tests:
+        if test.lesson_id:
+            try:
+                lesson_ids.append(test.lesson_id.id)
+            except (DoesNotExist, AttributeError):
+                continue
+    if lesson_ids:
+        lesson_title_by_id = {lesson.id: lesson.title for lesson in Lesson.objects(id__in=lesson_ids).only("id", "title").all()}
+
+    for test in tests:
+        test._cached_question_count = mcq_counts.get(test.id, 0) + interactive_counts.get(test.id, 0)
+        if test.lesson_id:
+            try:
+                lesson_id = test.lesson_id.id
+            except (DoesNotExist, AttributeError):
+                lesson_id = None
+            test._cached_lesson_title = lesson_title_by_id.get(lesson_id, "درس محذوف") if lesson_id else ""
+        else:
+            test._cached_lesson_title = "اختبار شامل للقسم"
+
+    for subject in subjects:
+        subject._cached_sections = sections_by_subject.get(subject.id, [])
+        for section in subject._cached_sections:
+            section_tests = tests_by_section.get(section.id, [])
+            section._cached_tests = section_tests
+            section._cached_total_tests = len(section_tests)
+
+    return render_template("teacher/question_editor_dashboard.html", subjects=subjects)
 
 
 @teacher_bp.route("/results")

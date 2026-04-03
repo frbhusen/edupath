@@ -118,6 +118,7 @@ def create_app():
     @app.route("/")
     def index():
         teacher_home_subject = None
+        teacher_home_subjects = []
         if current_user.is_authenticated and (getattr(current_user, "role", "") or "").lower() == "teacher":
             try:
                 from .models import Subject
@@ -125,10 +126,16 @@ def create_app():
 
                 scoped_ids = list(get_staff_subject_ids(current_user.id))
                 if scoped_ids:
-                    teacher_home_subject = Subject.objects(id__in=scoped_ids).order_by("created_at").first()
+                    teacher_home_subjects = list(Subject.objects(id__in=scoped_ids).order_by("created_at").all())
+                    teacher_home_subject = teacher_home_subjects[0] if teacher_home_subjects else None
             except Exception:
                 teacher_home_subject = None
-        return render_template("index.html", teacher_home_subject=teacher_home_subject)
+                teacher_home_subjects = []
+        return render_template(
+            "index.html",
+            teacher_home_subject=teacher_home_subject,
+            teacher_home_subjects=teacher_home_subjects,
+        )
 
     @app.route("/latex-cheatsheet")
     def latex_cheatsheet():

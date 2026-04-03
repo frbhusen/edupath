@@ -82,12 +82,18 @@
     <a class="action-card" href="{{ url_for('student.subjects') }}"
       ><span class="icon">📚</span><span>المواد</span></a
     >
-    {% if teacher_home_subject %}
-    <a
-      class="action-card"
-      href="{{ url_for('teacher.subject_detail', subject_id=teacher_home_subject.id) }}"
-      ><span class="icon">📚</span><span>My Subject</span></a
-    >
+    {% if teacher_home_subjects %}
+    <div class="w-100 mt-2">
+      <div class="small text-muted mb-2">موادي</div>
+      <div class="action-grid">
+        {% for subject in teacher_home_subjects %}
+        <a class="action-card" href="{{ url_for('teacher.subject_detail', subject_id=subject.id) }}">
+          <span class="icon">📚</span>
+          <span>{{ subject.name }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
     {% else %}
     <a class="action-card" href="{{ url_for('teacher.dashboard') }}"
       ><span class="icon">📚</span><span>My Subject</span></a
