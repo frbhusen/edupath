@@ -12,11 +12,15 @@
     border-radius: 14px;
     box-shadow: 0 8px 22px rgba(34, 51, 84, 0.06);
   }
-  .qe-table thead th {
-    background: #f4f7fd;
-    color: #3b4a66;
-    font-weight: 700;
-    border-bottom: 1px solid #dce3ef;
+  .qe-test-card {
+    border: 1px solid #dfeaf3;
+    border-radius: 12px;
+    background: #ffffff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .qe-test-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(29, 74, 102, 0.12);
   }
 </style>
 
@@ -29,30 +33,23 @@
 
 {% if tests %}
   <div class="card qe-card">
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0 qe-table">
-          <thead>
-            <tr>
-              <th>الاختبار</th>
-              <th>القسم</th>
-              <th>الدرس</th>
-              <th class="text-end">الإجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for test in tests %}
-              <tr>
-                <td class="fw-semibold">{{ test.title }}</td>
-                <td>{{ test.section_id.title if test.section_id else '-' }}</td>
-                <td>{{ test.lesson_id.title if test.lesson_id else 'اختبار شامل' }}</td>
-                <td class="text-end">
-                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.edit_test', test_id=test.id) }}">تعديل الأسئلة</a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    <div class="card-body">
+      <div class="row g-3">
+        {% for test in tests %}
+          <div class="col-12 col-lg-6">
+            <div class="qe-test-card p-3 h-100 d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="mb-0 fw-bold">{{ test.title }}</h6>
+                <span class="badge text-bg-light">اختبار</span>
+              </div>
+              <div class="small text-muted mb-1">القسم: {{ test.section_id.title if test.section_id else '-' }}</div>
+              <div class="small text-muted mb-3">الدرس: {{ test.lesson_id.title if test.lesson_id else 'اختبار شامل' }}</div>
+              <div class="mt-auto text-end">
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.edit_test', test_id=test.id) }}">فتح مساحة التحرير</a>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
       </div>
     </div>
   </div>
