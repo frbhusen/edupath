@@ -110,7 +110,6 @@
     <h1 class="h4 mb-1">{{ test.title }}</h1>
     <p class="mb-0">{{ test.description or 'أجب عن جميع الأسئلة أدناه.' }}</p>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('student.section_detail', section_id=test.section.id) }}">رجوع</a>
 </div>
 
 {% if selected_count is not none %}
@@ -211,12 +210,13 @@
               <div class="interactive-grid mb-2">
                 <div class="interactive-panel">
                   <div class="interactive-panel-title">السؤال</div>
+                  {% if iq.question_text %}
+                    <div class="border rounded p-2 math-content preserve-format">{{ iq.question_text }}</div>
+                  {% endif %}
                   {% if iq.question_image_url %}
-                    <div class="interactive-image-frame">
+                    <div class="interactive-image-frame mt-2">
                       <img src="{{ iq.question_image_url }}" alt="صورة السؤال">
                     </div>
-                  {% elif iq.question_text %}
-                    <div class="border rounded p-2 math-content preserve-format">{{ iq.question_text }}</div>
                   {% endif %}
                 </div>
 
@@ -593,6 +593,86 @@
     
     // Start the timer immediately
     updateTimer();
+  })();
+
+  (function () {
+    const testForm = document.getElementById('test-form');
+    if (!testForm) return;
+
+    const abandonEndpoint = "{{ url_for('student.abandon_test', test_id=test.id) }}";
+    const exitToken = "{{ exit_token|default('') }}";
+    const warningMessage = "مغادرة الاختبار الآن ستخصم 25 XP. هل تريد المتابعة؟";
+    let isSubmitting = false;
+    let penaltySent = false;
+    let popGuardEnabled = false;
+
+    function sendPenaltyOnce() {
+      if (penaltySent || !exitToken) return;
+      penaltySent = true;
+      const payload = new URLSearchParams();
+      payload.append('exit_token', exitToken);
+      navigator.sendBeacon(abandonEndpoint, payload);
+    }
+
+    function beforeUnloadHandler(event) {
+      if (isSubmitting) return;
+      event.preventDefault();
+      event.returnValue = '';
+    }
+
+    function confirmExitAndRun(onApprove) {
+      if (isSubmitting) {
+        onApprove();
+        return;
+      }
+      const approved = window.confirm(warningMessage);
+      if (!approved) return;
+      sendPenaltyOnce();
+      onApprove();
+    }
+
+    testForm.addEventListener('submit', function () {
+      isSubmitting = true;
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
+    });
+
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+
+    document.addEventListener('click', function (event) {
+      const anchor = event.target.closest('a[href]');
+      if (!anchor || isSubmitting) return;
+      if (anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+      const targetUrl = new URL(anchor.href, window.location.href);
+      if (targetUrl.href === window.location.href) return;
+
+      event.preventDefault();
+      confirmExitAndRun(function () {
+        window.removeEventListener('beforeunload', beforeUnloadHandler);
+        window.location.href = targetUrl.href;
+      });
+    }, true);
+
+    try {
+      history.pushState({ testGuard: true }, '', window.location.href);
+      popGuardEnabled = true;
+    } catch (e) {
+      popGuardEnabled = false;
+    }
+
+    window.addEventListener('popstate', function () {
+      if (!popGuardEnabled || isSubmitting) return;
+      const approved = window.confirm(warningMessage);
+      if (approved) {
+        sendPenaltyOnce();
+        window.removeEventListener('beforeunload', beforeUnloadHandler);
+        popGuardEnabled = false;
+        history.back();
+      } else {
+        history.pushState({ testGuard: true }, '', window.location.href);
+      }
+    });
   })();
 </script>
 {% endblock %}

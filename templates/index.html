@@ -51,32 +51,26 @@
     <a class="action-card" href="{{ url_for('student.subjects') }}"
       ><span class="icon">📚</span><span>المواد</span></a
     >
+    <a class="action-card" href="{{ url_for('student.favorites') }}"
+      ><span class="icon">⭐</span><span>الأسئلة المفضلة</span></a
+    >
     <a class="action-card" href="{{ url_for('student.pinned_discussions') }}"
       ><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a
-    >
-    <a class="action-card" href="{{ url_for('student.assignments') }}"
-      ><span class="icon">📝</span><span>واجباتي</span></a
-    >
-    <a class="action-card" href="{{ url_for('student.results') }}"
-      ><span class="icon">📊</span><span>النتائج</span></a
-    >
-    <a class="action-card" href="{{ url_for('student.favorites') }}"
-      ><span class="icon">⭐</span><span>المفضلة</span></a
     >
     <a class="action-card" href="{{ url_for('student.frequently_wrong') }}"
       ><span class="icon">🔁</span><span>الأخطاء المتكررة</span></a
     >
+    <a class="action-card" href="{{ url_for('student.results') }}"
+      ><span class="icon">📊</span><span>النتائج</span></a
+    > 
     <a class="action-card" href="{{ url_for('student.leaderboard') }}"
       ><span class="icon">🏆</span><span>لوحة الصدارة</span></a
-    >
-    <a class="action-card" href="{{ url_for('notifications_inbox') }}"
-      ><span class="icon">🔔</span><span>الإشعارات</span></a
     >
     <a class="action-card" href="{{ url_for('student.duels_home') }}"
       ><span class="icon">⚔️</span><span>التحديات الودية</span></a
     >
-    <a class="action-card" href="{{ url_for('student.certificates') }}"
-      ><span class="icon">🎓</span><span>شهاداتي</span></a
+    <a class="action-card" href="{{ url_for('notifications_inbox') }}"
+      ><span class="icon">🔔</span><span>الإشعارات</span></a
     >
     {% elif current_user.role == 'teacher' %}
     <a class="action-card" href="{{ url_for('teacher.my_students') }}"

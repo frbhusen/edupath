@@ -22,6 +22,7 @@ DUEL_SAME_OPPONENT_COOLDOWN_SECONDS = 180
 DUEL_PENDING_LIMIT_PER_CHALLENGER = 3
 DUEL_WAITING_JOIN_TIMEOUT_SECONDS = 300
 DUEL_PAIR_RECENT_LOCK_SECONDS = 45
+TEST_EXIT_XP_PENALTY = 25
 
 
 def _redirect_to_next_or(default_endpoint, **default_kwargs):
@@ -436,6 +437,36 @@ def _award_flat_xp_once(student_id, event_type: str, source_id: str, amount: int
     profile.updated_at = datetime.utcnow()
     profile.save()
     return earned_xp, profile
+
+
+def _apply_xp_penalty_once(student_id, event_type: str, source_id: str, penalty_amount: int):
+    existing_event = XPEvent.objects(
+        student_id=student_id,
+        event_type=event_type,
+        source_id=source_id,
+    ).first()
+    profile = _get_or_create_gamification_profile(student_id)
+    if existing_event:
+        return 0, profile
+
+    penalty = max(0, int(penalty_amount or 0))
+    current_xp = int(profile.xp_total or 0)
+    applied_penalty = min(penalty, current_xp)
+    delta_xp = -applied_penalty
+
+    XPEvent(
+        student_id=student_id,
+        event_type=event_type,
+        source_id=source_id,
+        xp=delta_xp,
+    ).save()
+
+    profile.xp_total = max(0, current_xp + delta_xp)
+    profile.level = _calculate_level(profile.xp_total)
+    _update_badges(profile)
+    profile.updated_at = datetime.utcnow()
+    profile.save()
+    return applied_penalty, profile
 
 
 def _avatar_text_for_user(user):
@@ -3083,8 +3114,41 @@ def take_test(test_id):
         question_ids_str=question_ids_str,
         interactive_question_ids_str=interactive_question_ids_str,
         time_limit_seconds=time_limit_seconds,
+        exit_token=secrets.token_hex(8) if selected_count else "",
         retake_source_id=retake_source_id,
         retake_mode=retake_mode,
+    )
+
+
+@student_bp.route("/tests/<test_id>/abandon", methods=["POST"])
+@login_required
+def abandon_test(test_id):
+    if (current_user.role or "").lower() != "student":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+
+    test = Test.objects(id=test_id).first()
+    if not test:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+
+    payload = request.get_json(silent=True) if request.is_json else {}
+    exit_token = (request.form.get("exit_token") or (payload or {}).get("exit_token") or "")
+    exit_token = (exit_token or "").strip()
+    if not exit_token:
+        return jsonify({"ok": False, "error": "missing_exit_token"}), 400
+
+    source_id = f"{test.id}:{exit_token}"
+    deducted_xp, profile = _apply_xp_penalty_once(
+        student_id=current_user.id,
+        event_type="test_abandon_penalty",
+        source_id=source_id,
+        penalty_amount=TEST_EXIT_XP_PENALTY,
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "deducted_xp": int(deducted_xp or 0),
+            "xp_total": int(profile.xp_total or 0),
+        }
     )
 
 
@@ -4150,6 +4214,44 @@ def custom_test_take(attempt_id):
         attempt=attempt,
         ordered_questions=ordered_questions,
         time_limit_seconds=time_limit_seconds,
+        exit_token=secrets.token_hex(8),
+    )
+
+
+@student_bp.route("/custom-tests/<attempt_id>/abandon", methods=["POST"])
+@login_required
+def custom_test_abandon(attempt_id):
+    if (current_user.role or "").lower() != "student":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+
+    attempt = CustomTestAttempt.objects(id=attempt_id).first()
+    if not attempt:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    if str(attempt.student_id.id) != str(current_user.id):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    if attempt.status != "active":
+        profile = _get_or_create_gamification_profile(current_user.id)
+        return jsonify({"ok": True, "deducted_xp": 0, "xp_total": int(profile.xp_total or 0)})
+
+    payload = request.get_json(silent=True) if request.is_json else {}
+    exit_token = (request.form.get("exit_token") or (payload or {}).get("exit_token") or "")
+    exit_token = (exit_token or "").strip()
+    if not exit_token:
+        return jsonify({"ok": False, "error": "missing_exit_token"}), 400
+
+    source_id = f"{attempt.id}:{exit_token}"
+    deducted_xp, profile = _apply_xp_penalty_once(
+        student_id=current_user.id,
+        event_type="custom_test_abandon_penalty",
+        source_id=source_id,
+        penalty_amount=TEST_EXIT_XP_PENALTY,
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "deducted_xp": int(deducted_xp or 0),
+            "xp_total": int(profile.xp_total or 0),
+        }
     )
 
 
