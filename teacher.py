@@ -3546,10 +3546,18 @@ def edit_test(test_id):
                 return _edit_redirect("import")
 
             imported = 0
+            imported_mcq = 0
+            imported_interactive = 0
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                q_text = (item.get("question") or item.get("text") or "").strip()
+                q_text = (
+                    item.get("question")
+                    or item.get("text")
+                    or item.get("question_text")
+                    or item.get("questionText")
+                    or ""
+                ).strip()
                 question_images = _normalize_images(
                     item.get("questionImages")
                     or item.get("question_images")
@@ -3562,8 +3570,69 @@ def edit_test(test_id):
                         difficulty = "medium"
                 else:
                     difficulty = import_level
+
+                raw_item_type = str(item.get("type") or item.get("question_type") or item.get("kind") or "").strip().lower()
+                explicit_interactive = raw_item_type in {"interactive", "essay", "text", "subjective", "written"}
+
+                question_image_single = _normalize_image_url(
+                    item.get("questionImage")
+                    or item.get("question_image")
+                    or item.get("questionImageUrl")
+                    or item.get("question_image_url")
+                )
+                if question_image_single:
+                    question_images = [question_image_single]
+
                 answer_options = item.get("answerOptions") or item.get("answer_options") or None
                 choices_list = item.get("choices") or item.get("options") or []
+                has_mcq_payload = (
+                    (answer_options is not None and isinstance(answer_options, list) and len(answer_options) > 0)
+                    or (isinstance(choices_list, list) and len(choices_list) > 0)
+                )
+
+                # Import interactive questions when explicitly marked, or when there is no MCQ payload
+                # but an answer body/image exists.
+                interactive_answer_text = (
+                    item.get("answerText")
+                    or item.get("answer_text")
+                    or item.get("interactive_answer_text")
+                    or item.get("solution")
+                    or ""
+                )
+                if not interactive_answer_text and not has_mcq_payload and isinstance(item.get("answer"), str):
+                    interactive_answer_text = item.get("answer")
+                interactive_answer_text = str(interactive_answer_text or "").strip() or None
+
+                interactive_answer_image = _normalize_image_url(
+                    item.get("answerImage")
+                    or item.get("answer_image")
+                    or item.get("answerImageUrl")
+                    or item.get("answer_image_url")
+                    or item.get("solutionImage")
+                    or item.get("solution_image")
+                )
+
+                question_image_for_interactive = question_images[0] if question_images else None
+
+                should_import_interactive = bool(
+                    (explicit_interactive and ((q_text or question_image_for_interactive) and (interactive_answer_text or interactive_answer_image)))
+                    or ((not has_mcq_payload) and ((q_text or question_image_for_interactive) and (interactive_answer_text or interactive_answer_image)))
+                )
+
+                if should_import_interactive:
+                    TestInteractiveQuestion(
+                        test_id=test.id,
+                        question_text=q_text or None,
+                        question_image_url=question_image_for_interactive,
+                        answer_text=interactive_answer_text,
+                        answer_image_url=interactive_answer_image,
+                        difficulty=difficulty,
+                        correct_value=True,
+                    ).save()
+                    imported += 1
+                    imported_interactive += 1
+                    continue
+
                 if not q_text:
                     continue
                 if answer_options is None and (not isinstance(choices_list, list) or len(choices_list) == 0):
@@ -3657,7 +3726,9 @@ def edit_test(test_id):
                 q.save()
                 imported += 1
 
-            flash(f"تم استيراد {imported} سؤال.", "success")
+                imported_mcq += 1
+
+            flash(f"تم استيراد {imported} سؤال (اختيار: {imported_mcq}، تحريري: {imported_interactive}).", "success")
             return _edit_redirect("import")
     elif request.method == "GET":
         form.title.data = test.title
