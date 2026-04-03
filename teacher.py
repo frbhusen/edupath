@@ -3180,13 +3180,19 @@ def edit_test(test_id):
     lessons = Lesson.objects(section_id=section.id).all()
     form.lesson_id.choices = [(str(l.id), l.title) for l in lessons]
     form.lesson_id.choices.insert(0, ("", "بدون درس (اختبار شامل)"))
+    active_tab = request.args.get("tab") or "settings"
+    if active_tab not in {"settings", "mcq", "interactive", "import"}:
+        active_tab = "settings"
+
+    def _edit_redirect(tab_name="settings"):
+        return redirect(url_for("teacher.edit_test", test_id=test.id, tab=tab_name))
     
     if request.method == "POST":
         form_name = request.form.get("form_name")
 
         if is_question_editor(current_user) and form_name not in question_editor_allowed_forms:
             flash("ليس لديك صلاحية لتنفيذ هذا الإجراء.", "error")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
+            return _edit_redirect(active_tab)
 
         if form_name == "update_test":
             if form.validate_on_submit():
@@ -3232,11 +3238,11 @@ def edit_test(test_id):
 
             if not text:
                 flash("نص السؤال مطلوب.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+                return _edit_redirect("mcq")
 
             if not choices:
                 flash("يجب إضافة خيار واحد على الأقل.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+                return _edit_redirect("mcq")
 
             if not any(c.is_correct for c in choices):
                 choices[0].is_correct = True
@@ -3269,7 +3275,7 @@ def edit_test(test_id):
                 question.save()
                 flash("تمت إضافة السؤال.", "success")
 
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
+            return _edit_redirect("mcq")
 
         elif form_name == "delete_question":
             question_id = request.form.get("question_id")
@@ -3278,7 +3284,7 @@ def edit_test(test_id):
                 if q:
                     q.delete()
                     flash("تم حذف السؤال.", "success")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
+            return _edit_redirect("mcq")
 
         elif form_name == "batch_delete_questions":
             raw_ids = request.form.get("question_ids") or ""
@@ -3288,7 +3294,7 @@ def edit_test(test_id):
                 flash(f"تم حذف {deleted} سؤال.", "success")
             else:
                 flash("لم يتم اختيار أي سؤال.", "warning")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
+            return _edit_redirect("mcq")
 
         elif form_name == "upsert_interactive_question":
             interactive_question_id = request.form.get("interactive_question_id")
@@ -3302,10 +3308,10 @@ def edit_test(test_id):
 
             if not q_text and not q_img:
                 flash("أدخل نص السؤال التفاعلي أو رابط صورته على الأقل.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+                return _edit_redirect("interactive")
             if not a_text and not a_img:
                 flash("أدخل نص الإجابة التفاعلية أو رابط صورتها على الأقل.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+                return _edit_redirect("interactive")
 
             row = None
             if interactive_question_id:
@@ -3332,7 +3338,7 @@ def edit_test(test_id):
                 ).save()
                 flash("تمت إضافة سؤال تفاعلي.", "success")
 
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
+            return _edit_redirect("interactive")
 
         elif form_name == "delete_interactive_question":
             interactive_question_id = request.form.get("interactive_question_id")
@@ -3341,7 +3347,7 @@ def edit_test(test_id):
                 if iq:
                     iq.delete()
                     flash("تم حذف السؤال التفاعلي.", "success")
-            return redirect(url_for("teacher.edit_test", test_id=test.id))
+            return _edit_redirect("interactive")
 
         elif form_name == "import_json":
             def _to_bool(val):
@@ -3375,11 +3381,11 @@ def edit_test(test_id):
                 payload = json.loads(raw_json) if raw_json.strip() else None
             except Exception as exc:
                 flash(f"JSON غير صحيح: {exc}", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+                return _edit_redirect("import")
 
             if not payload:
                 flash("لا يوجد JSON صالح للاستيراد.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+                return _edit_redirect("import")
 
             items = payload
             if isinstance(payload, dict):
@@ -3387,7 +3393,7 @@ def edit_test(test_id):
 
             if not isinstance(items, list):
                 flash("تنسيق JSON غير مدعوم.", "error")
-                return redirect(url_for("teacher.edit_test", test_id=test.id))
+                return _edit_redirect("import")
 
             imported = 0
             for item in items:
@@ -3502,7 +3508,7 @@ def edit_test(test_id):
                 imported += 1
 
             flash(f"تم استيراد {imported} سؤال.", "success")
-            return redirect(url_for("teacher.edit_test", test_id=test.id, draft="refresh"))
+            return _edit_redirect("import")
     elif request.method == "GET":
         form.title.data = test.title
         form.description.data = test.description
@@ -3524,6 +3530,7 @@ def edit_test(test_id):
         meta_form=form,
         test=test,
         interactive_questions=interactive_questions,
+        active_tab=active_tab,
     )
 
 

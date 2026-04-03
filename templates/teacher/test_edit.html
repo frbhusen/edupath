@@ -117,6 +117,7 @@
 
 <div class="row justify-content-center">
   <div class="col-12 col-xl-11">
+    <div id="editorState" data-active-tab="{{ active_tab }}" class="d-none"></div>
     <div class="editor-shell mb-3">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
@@ -876,7 +877,9 @@
   seedDefaultChoices();
   bindChoiceListeners();
   fillFormFromOption(selectEl.selectedOptions[0]);
-  switchWorkspace('settings');
+  const editorState = document.getElementById('editorState');
+  const activeTab = (editorState && editorState.dataset.activeTab) ? editorState.dataset.activeTab : 'settings';
+  switchWorkspace(activeTab);
   updatePreview();
   updateBatchDeleteState();
 
