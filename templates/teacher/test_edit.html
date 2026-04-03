@@ -696,6 +696,13 @@
     }
     hintField.value = opt.dataset.hint || '';
     if (difficultyField) difficultyField.value = opt.dataset.difficulty || 'medium';
+    let correctIndex = null;
+    if (opt.dataset.correct && opt.dataset.correct !== '0') {
+      const parsedCorrect = Number.parseInt(opt.dataset.correct, 10);
+      if (!Number.isNaN(parsedCorrect) && parsedCorrect > 0) {
+        correctIndex = parsedCorrect;
+      }
+    }
     let choicesData = [];
     if (opt.dataset.choices) {
       try {
@@ -706,10 +713,10 @@
     }
     if (choicesData.length === 0) {
       const fallback = [
-        { text: opt.dataset.choice1 || '', image_url: opt.dataset.choice1img || '', is_correct: false },
-        { text: opt.dataset.choice2 || '', image_url: opt.dataset.choice2img || '', is_correct: false },
-        { text: opt.dataset.choice3 || '', image_url: opt.dataset.choice3img || '', is_correct: false },
-        { text: opt.dataset.choice4 || '', image_url: opt.dataset.choice4img || '', is_correct: false }
+        { text: opt.dataset.choice1 || '', image_url: opt.dataset.choice1img || '', is_correct: correctIndex === 1 },
+        { text: opt.dataset.choice2 || '', image_url: opt.dataset.choice2img || '', is_correct: correctIndex === 2 },
+        { text: opt.dataset.choice3 || '', image_url: opt.dataset.choice3img || '', is_correct: correctIndex === 3 },
+        { text: opt.dataset.choice4 || '', image_url: opt.dataset.choice4img || '', is_correct: correctIndex === 4 }
       ].filter(c => c.text);
       choicesData = fallback;
     }
@@ -718,7 +725,7 @@
       seedDefaultChoices();
     } else {
       choicesData.forEach((choice, idx) => {
-        createChoiceRow(idx + 1, choice.text, choice.image_url, choice.is_correct);
+        createChoiceRow(idx + 1, choice.text, choice.image_url, Boolean(choice.is_correct || correctIndex === idx + 1));
       });
       const rows = document.querySelectorAll('.choice-row');
       if (rows.length < 2) {
@@ -726,6 +733,12 @@
           createChoiceRow(i, '', '', false);
         }
       }
+    }
+    const radios = getCorrectRadios();
+    if (correctIndex && radios[correctIndex - 1]) {
+      radios[correctIndex - 1].checked = true;
+    } else if (radios.length && !radios.some(radio => radio.checked)) {
+      radios[0].checked = true;
     }
     deleteBtn.disabled = false;
     updatePreview();
