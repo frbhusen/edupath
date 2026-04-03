@@ -24,6 +24,16 @@
             {% endif %}
             <div class="small text-muted mb-1">القسم: {{ s.section_id.title if s.section_id else '-' }}</div>
             <div class="small text-muted mb-3">الدرس: {{ s.lesson_id.title if s.lesson_id else '-' }}</div>
+            {% if not s.section_id and not s.lesson_id and (s.link_url or s.link_url_2) %}
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                {% if s.link_url %}
+                  <a class="btn btn-outline-primary btn-sm" href="{{ s.link_url }}" target="_blank" rel="noopener noreferrer">{{ s.link_label or 'المورد 1' }}</a>
+                {% endif %}
+                {% if s.link_url_2 %}
+                  <a class="btn btn-outline-secondary btn-sm" href="{{ s.link_url_2 }}" target="_blank" rel="noopener noreferrer">{{ s.link_label_2 or 'المورد 2' }}</a>
+                {% endif %}
+              </div>
+            {% endif %}
             <div class="mt-auto d-flex justify-content-end">
               <a class="btn btn-cta btn-sm" href="{{ url_for('student.course_take', course_set_id=s.id) }}">ابدأ</a>
             </div>

@@ -3839,14 +3839,30 @@ def custom_test_new():
     if selected_lesson_id and not ObjectId.is_valid(str(selected_lesson_id)):
         selected_lesson_id = None
 
-    if current_user.role == "student":
+    selected_lesson = None
+    forced_selection_mode = None
+    if current_user.role == "student" and selected_lesson_id:
+        selected_lesson = Lesson.objects(id=selected_lesson_id).first()
+        if not selected_lesson:
+            flash("الدرس المحدد غير موجود.", "error")
+            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id) if selected_subject_id else url_for("student.custom_test_new"))
+
+        access = AccessContext(selected_lesson.section, current_user.id)
+        if not access.lesson_open(selected_lesson):
+            flash("لا يمكنك الوصول إلى هذا الدرس حالياً.", "warning")
+            return redirect(url_for("student.lesson_detail", lesson_id=selected_lesson.id))
+
+        if not bool(getattr(selected_lesson, "allow_full_lesson_test", False)):
+            flash("هذا الدرس لا يدعم Full lesson test حالياً.", "warning")
+            return redirect(url_for("student.lesson_detail", lesson_id=selected_lesson.id))
+
+        unlocked_lessons = [selected_lesson]
+    elif current_user.role == "student":
         unlocked_lessons = get_unlocked_lessons(current_user.id)
     else:
         unlocked_lessons = list(Lesson.objects().all())
 
-    selected_lesson = None
-    forced_selection_mode = None
-    if selected_lesson_id:
+    if selected_lesson_id and not selected_lesson:
         selected_lesson = Lesson.objects(id=selected_lesson_id).first()
         if not selected_lesson:
             flash("الدرس المحدد غير موجود.", "error")
@@ -3862,6 +3878,7 @@ def custom_test_new():
                 flash("لا يمكنك الوصول إلى هذا الدرس حالياً.", "warning")
                 return redirect(url_for("student.lesson_detail", lesson_id=selected_lesson.id))
 
+    if selected_lesson:
         if selected_lesson.section and selected_lesson.section.subject_id:
             selected_subject_id = str(selected_lesson.section.subject_id.id)
         # Full lesson test should always allocate by tests inside the lesson.
@@ -4055,29 +4072,77 @@ def custom_test_new():
             flash("يمكنك اختيار حتى 50 سؤالًا للاختبار المخصص.", "error")
             return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
 
-        # Build question pool (MCQ + interactive)
-        selected_items = []
+        # Build question pool (MCQ + interactive) using batched, lightweight queries.
+        selection_test_ids = {}
+        needed_test_ids = set()
         for sel in selections:
-            if sel.get('scope_type') == 'test':
-                test_ids = [sel.get('scope_id')] if ObjectId.is_valid(sel.get('scope_id')) else []
-            else:
-                lesson_id = sel.get('scope_id')
-                tests = Test.objects(lesson_id=lesson_id).all() if ObjectId.is_valid(str(lesson_id)) else []
-                test_ids = [t.id for t in tests]
+            scope_type = sel.get("scope_type")
+            scope_id = sel.get("scope_id")
+            test_ids = []
 
-            mcq_pool = list(Question.objects(test_id__in=test_ids)) if test_ids else []
-            interactive_pool = list(TestInteractiveQuestion.objects(test_id__in=test_ids)) if test_ids else []
-            combined_pool = [('mcq', q) for q in mcq_pool] + [('interactive', iq) for iq in interactive_pool]
+            if scope_type == "test":
+                if ObjectId.is_valid(str(scope_id)):
+                    test_ids = [ObjectId(str(scope_id))]
+            else:
+                lesson_oid = ObjectId(str(scope_id)) if ObjectId.is_valid(str(scope_id)) else None
+                if lesson_oid:
+                    test_ids = [t.id for t in tests_by_lesson.get(lesson_oid, [])]
+                    if not test_ids:
+                        test_ids = [t.id for t in Test.objects(lesson_id=lesson_oid).only("id").all()]
+
+            selection_test_ids[(scope_type, str(scope_id))] = test_ids
+            needed_test_ids.update(test_ids)
+
+        test_ids_list = list(needed_test_ids)
+
+        mcq_light = list(
+            Question.objects(test_id__in=test_ids_list)
+            .only("id", "test_id", "difficulty")
+            .all()
+        ) if test_ids_list else []
+        interactive_light = list(
+            TestInteractiveQuestion.objects(test_id__in=test_ids_list)
+            .only("id", "test_id", "difficulty")
+            .all()
+        ) if test_ids_list else []
+
+        mcq_by_test = {}
+        interactive_by_test = {}
+
+        for q in mcq_light:
+            tid = getattr(getattr(q, "test_id", None), "id", getattr(q, "test_id", None))
+            if isinstance(tid, DBRef):
+                tid = tid.id
+            if not tid:
+                continue
+            mcq_by_test.setdefault(tid, []).append(q)
+
+        for iq in interactive_light:
+            tid = getattr(getattr(iq, "test_id", None), "id", getattr(iq, "test_id", None))
+            if isinstance(tid, DBRef):
+                tid = tid.id
+            if not tid:
+                continue
+            interactive_by_test.setdefault(tid, []).append(iq)
+
+        selected_items = []  # tuples: (item_type, item_id)
+        for sel in selections:
+            scope_key = (sel.get("scope_type"), str(sel.get("scope_id")))
+            test_ids = selection_test_ids.get(scope_key, [])
+
+            combined_pool = []  # tuples: (item_type, item_id, difficulty)
+            for tid in test_ids:
+                for q in mcq_by_test.get(tid, []):
+                    combined_pool.append(("mcq", q.id, _normalize_difficulty(getattr(q, "difficulty", "medium"))))
+                for iq in interactive_by_test.get(tid, []):
+                    combined_pool.append(("interactive", iq.id, _normalize_difficulty(getattr(iq, "difficulty", "medium"))))
 
             if "difficulty" in sel:
                 diff_spec = sel["difficulty"]
                 level_map = {"easy": [], "medium": [], "hard": []}
 
-                for item_type, obj in combined_pool:
-                    diff = (getattr(obj, "difficulty", "medium") or "medium").lower()
-                    if diff not in level_map:
-                        diff = "medium"
-                    level_map[diff].append((item_type, obj))
+                for item_type, item_id, diff in combined_pool:
+                    level_map[diff].append((item_type, item_id))
 
                 picked = []
                 if diff_spec["easy"] > 0:
@@ -4102,22 +4167,29 @@ def custom_test_new():
                     flash("لا توجد أسئلة كافية لإنشاء الاختبار.", "error")
                     return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id, lesson_id=selected_lesson_id) if selected_lesson_id else url_for("student.custom_test_new", subject_id=selected_subject_id))
                 picked = random.sample(combined_pool, sel["count"])
-                selected_items.extend(picked)
+                selected_items.extend((item_type, item_id) for item_type, item_id, _ in picked)
 
         # Ensure no duplicates for mixed item types.
         dedup = {}
-        for item_type, obj in selected_items:
-            dedup[_pack_custom_item_token(item_type, obj.id)] = (item_type, obj)
+        for item_type, item_id in selected_items:
+            dedup[_pack_custom_item_token(item_type, item_id)] = (item_type, item_id)
         selected_items = list(dedup.values())
 
         random.shuffle(selected_items)
-        question_order = [_pack_custom_item_token(item_type, obj.id) for item_type, obj in selected_items]
+        question_order = [_pack_custom_item_token(item_type, item_id) for item_type, item_id in selected_items]
+
+        selected_mcq_ids = [item_id for item_type, item_id in selected_items if item_type == "mcq"]
+        selected_mcq_rows = list(Question.objects(id__in=selected_mcq_ids).only("id", "choices").all()) if selected_mcq_ids else []
+        selected_mcq_by_id = {str(q.id): q for q in selected_mcq_rows}
 
         answer_order = {}
-        for token, (item_type, obj) in zip(question_order, selected_items):
+        for token, (item_type, item_id) in zip(question_order, selected_items):
             if item_type != 'mcq':
                 continue
-            choices = list(obj.choices)
+            q_obj = selected_mcq_by_id.get(str(item_id))
+            if not q_obj:
+                continue
+            choices = list(q_obj.choices)
             random.shuffle(choices)
             answer_order[token] = [str(c.choice_id) for c in choices]
 

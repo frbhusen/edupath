@@ -2469,6 +2469,10 @@ def course_set_new(subject_id):
 
     title = (request.form.get("title") or "").strip()
     description = (request.form.get("description") or "").strip() or None
+    link_label = (request.form.get("link_label") or "").strip() or None
+    link_url = (request.form.get("link_url") or "").strip() or None
+    link_label_2 = (request.form.get("link_label_2") or "").strip() or None
+    link_url_2 = (request.form.get("link_url_2") or "").strip() or None
     xp_per_question_raw = (request.form.get("xp_per_question") or "").strip()
     section_id = (request.form.get("section_id") or "").strip()
     lesson_id = (request.form.get("lesson_id") or "").strip()
@@ -2512,6 +2516,10 @@ def course_set_new(subject_id):
         lesson_id=lesson.id if lesson else None,
         title=title,
         description=description,
+        link_label=link_label,
+        link_url=link_url,
+        link_label_2=link_label_2,
+        link_url_2=link_url_2,
         xp_per_question=xp_per_question,
         created_by=current_user.id,
         is_active=is_active,
@@ -2545,6 +2553,10 @@ def course_set_edit(course_set_id):
         if action == "update_set":
             title = (request.form.get("title") or "").strip()
             description = (request.form.get("description") or "").strip() or None
+            link_label = (request.form.get("link_label") or "").strip() or None
+            link_url = (request.form.get("link_url") or "").strip() or None
+            link_label_2 = (request.form.get("link_label_2") or "").strip() or None
+            link_url_2 = (request.form.get("link_url_2") or "").strip() or None
             xp_per_question_raw = (request.form.get("xp_per_question") or "").strip()
             section_id = (request.form.get("section_id") or "").strip()
             lesson_id = (request.form.get("lesson_id") or "").strip()
@@ -2584,6 +2596,10 @@ def course_set_edit(course_set_id):
 
             course_set.title = title
             course_set.description = description
+            course_set.link_label = link_label
+            course_set.link_url = link_url
+            course_set.link_label_2 = link_label_2
+            course_set.link_url_2 = link_url_2
             course_set.xp_per_question = xp_per_question
             course_set.section_id = section.id if section else None
             course_set.lesson_id = lesson.id if lesson else None

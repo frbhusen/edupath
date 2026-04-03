@@ -88,6 +88,22 @@
         <label class="form-label">الوصف (اختياري)</label>
         <input class="form-control" name="description" value="{{ course_set.description or '' }}">
       </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">اسم رابط المورد 1 (اختياري)</label>
+        <input class="form-control" name="link_label" value="{{ course_set.link_label or '' }}" placeholder="مثال: اختبار أتمتة">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">رابط المورد 1 (اختياري)</label>
+        <input class="form-control" name="link_url" value="{{ course_set.link_url or '' }}" placeholder="https://...">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">اسم رابط المورد 2 (اختياري)</label>
+        <input class="form-control" name="link_label_2" value="{{ course_set.link_label_2 or '' }}" placeholder="مثال: تحميل ملفات الموارد">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">رابط المورد 2 (اختياري)</label>
+        <input class="form-control" name="link_url_2" value="{{ course_set.link_url_2 or '' }}" placeholder="https://...">
+      </div>
       <div class="col-12 col-md-3">
         <label class="form-label">XP لكل سؤال</label>
         <input class="form-control" type="number" name="xp_per_question" min="1" value="{{ course_set.xp_per_question|default(1) }}" required>
