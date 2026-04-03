@@ -186,6 +186,43 @@
                 {{ meta_form.description.label(class="form-label") }}
                 {{ meta_form.description(class="form-control", rows=3) }}
               </div>
+              <div class="col-12">
+                <label class="form-label">موارد الاختبار (اختياري)</label>
+                <div id="testResourceRows" class="d-flex flex-column gap-2">
+                  {% set test_resources = test.resources %}
+                  {% if test_resources %}
+                    {% for res in test_resources %}
+                      <div class="row g-2 resource-row">
+                        <div class="col-12 col-md-4">
+                          <input class="form-control" name="resource_label[]" value="{{ res.label }}" placeholder="اسم المورد">
+                        </div>
+                        <div class="col-12 col-md-6">
+                          <input class="form-control" name="resource_url[]" value="{{ res.url }}" placeholder="https://...">
+                        </div>
+                        <div class="col-12 col-md-2">
+                          <input class="form-control" name="resource_type[]" value="{{ res.resource_type or '' }}" placeholder="type">
+                        </div>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <div class="row g-2 resource-row">
+                      <div class="col-12 col-md-4">
+                        <input class="form-control" name="resource_label[]" placeholder="اسم المورد">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <input class="form-control" name="resource_url[]" placeholder="https://...">
+                      </div>
+                      <div class="col-12 col-md-2">
+                        <input class="form-control" name="resource_type[]" placeholder="type">
+                      </div>
+                    </div>
+                  {% endif %}
+                </div>
+                <div class="mt-2 d-flex gap-2">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="addTestResourceBtn">إضافة مورد</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="removeTestResourceBtn">حذف مورد</button>
+                </div>
+              </div>
               <div class="col-12 col-md-4 ms-auto">
                 {{ meta_form.submit(class="btn btn-cta w-100") }}
               </div>
@@ -924,6 +961,28 @@
         const text = item.dataset.qtext || '';
         item.classList.toggle('d-none', q && !text.includes(q));
       });
+    });
+  }
+
+  const testResourceRows = document.getElementById('testResourceRows');
+  const addTestResourceBtn = document.getElementById('addTestResourceBtn');
+  const removeTestResourceBtn = document.getElementById('removeTestResourceBtn');
+  if (testResourceRows && addTestResourceBtn && removeTestResourceBtn) {
+    addTestResourceBtn.addEventListener('click', () => {
+      const row = document.createElement('div');
+      row.className = 'row g-2 resource-row';
+      row.innerHTML = `
+        <div class="col-12 col-md-4"><input class="form-control" name="resource_label[]" placeholder="اسم المورد"></div>
+        <div class="col-12 col-md-6"><input class="form-control" name="resource_url[]" placeholder="https://..."></div>
+        <div class="col-12 col-md-2"><input class="form-control" name="resource_type[]" placeholder="type"></div>
+      `;
+      testResourceRows.appendChild(row);
+    });
+    removeTestResourceBtn.addEventListener('click', () => {
+      const rows = testResourceRows.querySelectorAll('.resource-row');
+      if (rows.length > 1) {
+        rows[rows.length - 1].remove();
+      }
     });
   }
 </script>

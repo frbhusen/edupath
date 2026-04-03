@@ -291,6 +291,28 @@ class Test(Document):
     def questions(self):
         return Question.objects(test_id=self).all()
 
+    @property
+    def resources(self):
+        return TestResource.objects(test_id=self).order_by('position').all()
+
+
+class TestResource(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    test_id = ReferenceField(Test, required=True)
+    label = StringField(required=True, max_length=120)
+    url = StringField(required=True, max_length=500)
+    resource_type = StringField(max_length=40, null=True)
+    position = IntField(default=0, required=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'test_resources',
+        'indexes': [
+            'test_id',
+            ('test_id', 'position')
+        ]
+    }
+
 
 class Choice(EmbeddedDocument):
     choice_id = ObjectIdField(default=ObjectId)

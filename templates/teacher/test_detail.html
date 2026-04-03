@@ -20,6 +20,13 @@
       <p>{{ test.description }}</p>
     {% endif %}
     <div class="text-muted small">يتطلب كود: {{ 'نعم' if test.requires_code else 'لا' }}</div>
+    {% if test_resources %}
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        {% for res in test_resources %}
+          <a class="btn btn-outline-secondary btn-sm" href="{{ res.url }}" target="_blank" rel="noopener">{{ res.label }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
   </div>
 </div>
 

@@ -138,6 +138,14 @@
               {% if test.lesson %} مرتبط بالدرس: {{ test.lesson.title }} {% else
               %} اختبار على مستوى القسم {% endif %}
             </div>
+            {% set resources = test._resources|default([]) %}
+            {% if resources %}
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              {% for res in resources %}
+              <a class="btn btn-outline-primary btn-sm" href="{{ res.url }}" target="_blank" rel="noopener">{{ res.label }}</a>
+              {% endfor %}
+            </div>
+            {% endif %}
             <div
               class="mt-auto d-flex justify-content-between align-items-center"
             >

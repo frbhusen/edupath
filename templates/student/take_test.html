@@ -109,6 +109,13 @@
   <div>
     <h1 class="h4 mb-1">{{ test.title }}</h1>
     <p class="mb-0">{{ test.description or 'أجب عن جميع الأسئلة أدناه.' }}</p>
+    {% if test_resources %}
+      <div class="d-flex flex-wrap gap-2 mt-2">
+        {% for res in test_resources %}
+          <a class="btn btn-outline-primary btn-sm" href="{{ res.url }}" target="_blank" rel="noopener">{{ res.label }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
   </div>
 </div>
 

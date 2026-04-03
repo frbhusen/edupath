@@ -75,6 +75,26 @@
             <label class="form-check-label" for="test_requires_code">يتطلب رمز تفعيل</label>
             <div class="form-text">فعله عند الحاجة للتحكم الكامل بمن يمكنه فتح الاختبار.</div>
           </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">موارد الاختبار (اختياري)</label>
+            <div id="testResourceRows" class="d-flex flex-column gap-2">
+              <div class="row g-2 resource-row">
+                <div class="col-12 col-md-4">
+                  <input class="form-control" name="resource_label[]" placeholder="اسم المورد (مثال: ملف PDF)">
+                </div>
+                <div class="col-12 col-md-6">
+                  <input class="form-control" name="resource_url[]" placeholder="https://...">
+                </div>
+                <div class="col-12 col-md-2">
+                  <input class="form-control" name="resource_type[]" placeholder="type">
+                </div>
+              </div>
+            </div>
+            <div class="mt-2 d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="addTestResourceBtn">إضافة مورد</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="removeTestResourceBtn">حذف مورد</button>
+            </div>
+          </div>
         </div>
         <div class="col-12 col-lg-4">
           <div class="test-form-help">
@@ -99,4 +119,32 @@
     </form>
   </div>
 </div>
+
+<script>
+  (function () {
+    const rowsWrap = document.getElementById('testResourceRows');
+    const addBtn = document.getElementById('addTestResourceBtn');
+    const removeBtn = document.getElementById('removeTestResourceBtn');
+    if (!rowsWrap || !addBtn || !removeBtn) return;
+
+    function makeRow() {
+      const row = document.createElement('div');
+      row.className = 'row g-2 resource-row';
+      row.innerHTML = `
+        <div class="col-12 col-md-4"><input class="form-control" name="resource_label[]" placeholder="اسم المورد (مثال: ملف PDF)"></div>
+        <div class="col-12 col-md-6"><input class="form-control" name="resource_url[]" placeholder="https://..."></div>
+        <div class="col-12 col-md-2"><input class="form-control" name="resource_type[]" placeholder="type"></div>
+      `;
+      rowsWrap.appendChild(row);
+    }
+
+    addBtn.addEventListener('click', makeRow);
+    removeBtn.addEventListener('click', function () {
+      const rows = rowsWrap.querySelectorAll('.resource-row');
+      if (rows.length > 1) {
+        rows[rows.length - 1].remove();
+      }
+    });
+  })();
+</script>
 {% endblock %}

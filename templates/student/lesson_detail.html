@@ -69,6 +69,14 @@
                 </div>
               </div>
               <p class="text-muted small mb-1">{{ test.description or '' }}</p>
+              {% set resources = test._resources|default([]) %}
+              {% if resources %}
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                  {% for res in resources %}
+                    <a class="btn btn-outline-primary btn-sm" href="{{ res.url }}" target="_blank" rel="noopener">{{ res.label }}</a>
+                  {% endfor %}
+                </div>
+              {% endif %}
               <div class="mt-auto d-flex justify-content-end">
                 {% if locked %}
                   {% if section.subject.requires_code and not subject_open %}

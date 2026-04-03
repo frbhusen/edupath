@@ -14,7 +14,7 @@ except Exception:  # pragma: no cover
     FPDF = None
 
 from .models import (
-    User, Subject, Section, Lesson, LessonResource, Test, Question, Choice, 
+    User, Subject, Section, Lesson, LessonResource, Test, TestResource, Question, Choice, 
     ActivationCode, SectionActivation, LessonActivation, LessonActivationCode,
     SubjectActivation, SubjectActivationCode, Attempt, AttemptAnswer, CustomTestAttempt, CustomTestAnswer,
     StudentGamification, XPEvent, Assignment, AssignmentSubmission, LessonCompletion,
@@ -3175,6 +3175,24 @@ def new_test(section_id):
             requires_code=form.requires_code.data,
         )
         test.save()
+
+        resource_labels = request.form.getlist("resource_label[]")
+        resource_urls = request.form.getlist("resource_url[]")
+        resource_types = request.form.getlist("resource_type[]")
+        resources = [
+            ((lbl or "").strip(), (url or "").strip(), (rtype or "").strip() or None)
+            for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
+            if (lbl or "").strip() and (url or "").strip()
+        ]
+        for idx, (label, url, rtype) in enumerate(resources):
+            TestResource(
+                test_id=test.id,
+                label=label,
+                url=url,
+                resource_type=rtype,
+                position=idx,
+            ).save()
+
         flash("تم إنشاء الاختبار بنجاح.", "success")
         return redirect(url_for("teacher.test_detail", test_id=test.id))
     return render_template("teacher/test_form.html", form=form, section=section)
@@ -3253,11 +3271,13 @@ def test_detail(test_id):
         return scope_response
     questions = list(Question.objects(test_id=test.id).order_by('created_at').all())
     interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
+    test_resources = list(TestResource.objects(test_id=test.id).order_by('position').all())
     return render_template(
         "teacher/test_detail.html",
         test=test,
         questions=questions,
         interactive_questions=interactive_questions,
+        test_resources=test_resources,
     )
 
 
@@ -3312,6 +3332,26 @@ def edit_test(test_id):
                 else:
                     test.lesson_id = None
                 test.save()
+
+                resource_labels = request.form.getlist("resource_label[]")
+                resource_urls = request.form.getlist("resource_url[]")
+                resource_types = request.form.getlist("resource_type[]")
+                resources = [
+                    ((lbl or "").strip(), (url or "").strip(), (rtype or "").strip() or None)
+                    for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
+                    if (lbl or "").strip() and (url or "").strip()
+                ]
+
+                TestResource.objects(test_id=test.id).delete()
+                for idx, (label, url, rtype) in enumerate(resources):
+                    TestResource(
+                        test_id=test.id,
+                        label=label,
+                        url=url,
+                        resource_type=rtype,
+                        position=idx,
+                    ).save()
+
                 flash("تم تحديث الاختبار بنجاح.", "success")
                 return redirect(url_for("teacher.test_detail", test_id=test.id))
 
@@ -3656,6 +3696,7 @@ def delete_test(test_id):
         return scope_response
     section_id = test.section_id.id if test.section_id else None
     lesson_id = test.lesson_id.id if test.lesson_id else None
+    TestResource.objects(test_id=test.id).delete()
     test.delete()
     flash("تم حذف الاختبار بنجاح.", "success")
     if lesson_id:

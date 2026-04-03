@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from bson import ObjectId
 from bson.dbref import DBRef
 
-from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer, StudentFavoriteQuestion
+from .models import User, Subject, Section, Lesson, Test, TestResource, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer, StudentFavoriteQuestion
 from .forms import ActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation
 from .extensions import cache
@@ -1650,7 +1650,9 @@ def section_detail(section_id):
         test_ids = [t.id for t in tests]
         questions = list(Question.objects(test_id__in=test_ids).only('test_id').all())
         interactive_questions = list(TestInteractiveQuestion.objects(test_id__in=test_ids).only('test_id').all())
+        test_resources_rows = list(TestResource.objects(test_id__in=test_ids).order_by('position').all())
         question_counts = {}
+        resources_by_test = {}
         for q in questions:
             test_id = q.test_id.id
             question_counts[test_id] = question_counts.get(test_id, 0) + 1
@@ -1659,10 +1661,16 @@ def section_detail(section_id):
                 continue
             test_id = iq.test_id.id
             question_counts[test_id] = question_counts.get(test_id, 0) + 1
+        for res in test_resources_rows:
+            if not res.test_id:
+                continue
+            test_id = res.test_id.id
+            resources_by_test.setdefault(test_id, []).append(res)
         
         # Attach counts to tests
         for test in tests:
             test._question_count = question_counts.get(test.id, 0)
+            test._resources = resources_by_test.get(test.id, [])
     
     if current_user.role == "student":
         access = AccessContext(section, current_user.id)
@@ -1804,7 +1812,9 @@ def lesson_detail(lesson_id):
         test_ids = [t.id for t in tests]
         questions = list(Question.objects(test_id__in=test_ids).only('test_id').all())
         interactive_questions = list(TestInteractiveQuestion.objects(test_id__in=test_ids).only('test_id').all())
+        test_resources_rows = list(TestResource.objects(test_id__in=test_ids).order_by('position').all())
         question_counts = {}
+        resources_by_test = {}
         for q in questions:
             test_id = q.test_id.id
             question_counts[test_id] = question_counts.get(test_id, 0) + 1
@@ -1813,9 +1823,15 @@ def lesson_detail(lesson_id):
                 continue
             test_id = iq.test_id.id
             question_counts[test_id] = question_counts.get(test_id, 0) + 1
+        for res in test_resources_rows:
+            if not res.test_id:
+                continue
+            test_id = res.test_id.id
+            resources_by_test.setdefault(test_id, []).append(res)
         
         for test in tests:
             test._question_count = question_counts.get(test.id, 0)
+            test._resources = resources_by_test.get(test.id, [])
     
     is_completed = False
     lesson_full_custom_test_enabled = bool(getattr(lesson, "allow_full_lesson_test", False))
@@ -2881,6 +2897,7 @@ def take_test(test_id):
                 return redirect(url_for("student.activate_section", section_id=test.section_id))
 
     interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
+    test_resources = list(TestResource.objects(test_id=test.id).order_by('position').all())
     total_questions_available = len(test.questions) + len(interactive_questions)
     min_select = 10 if total_questions_available >= 10 else total_questions_available
     max_select = min(50, total_questions_available)
@@ -3114,6 +3131,7 @@ def take_test(test_id):
         question_ids_str=question_ids_str,
         interactive_question_ids_str=interactive_question_ids_str,
         time_limit_seconds=time_limit_seconds,
+        test_resources=test_resources,
         exit_token=secrets.token_hex(8) if selected_count else "",
         retake_source_id=retake_source_id,
         retake_mode=retake_mode,
