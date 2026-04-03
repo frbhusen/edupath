@@ -2,11 +2,16 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, PasswordField, SelectField, SubmitField, IntegerField, BooleanField
 from wtforms.validators import DataRequired, Length, EqualTo, Optional, Regexp, ValidationError
 
+
+def _strip_edges(value):
+    return value.strip() if isinstance(value, str) else value
+
 class RegisterForm(FlaskForm):
-    first_name = StringField("الاسم الأول", validators=[DataRequired(), Length(min=3, max=20)])
-    last_name = StringField("اسم العائلة", validators=[DataRequired(), Length(min=2, max=20)])
+    first_name = StringField("الاسم الأول", filters=[_strip_edges], validators=[DataRequired(), Length(min=3, max=20)])
+    last_name = StringField("اسم العائلة", filters=[_strip_edges], validators=[DataRequired(), Length(min=2, max=20)])
     username = StringField(
         "اسم المستخدم (بالإنجليزية فقط)", 
+        filters=[_strip_edges],
         validators=[
             DataRequired(), 
             Length(min=3, max=80),
@@ -26,7 +31,7 @@ class RegisterForm(FlaskForm):
     submit = SubmitField("تسجيل")
 
 class LoginForm(FlaskForm):
-    username_or_phone = StringField("اسم المستخدم أو رقم الهاتف", validators=[DataRequired()])
+    username_or_phone = StringField("اسم المستخدم أو رقم الهاتف", filters=[_strip_edges], validators=[DataRequired()])
     password = PasswordField("كلمة المرور", validators=[DataRequired()])
     submit = SubmitField("تسجيل الدخول")
 

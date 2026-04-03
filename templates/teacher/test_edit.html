@@ -108,8 +108,11 @@
   <div class="col-12">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
-        <li class="breadcrumb-item"><a href="{{ url_for('teacher.dashboard') }}">لوحة التحكم</a></li>
-        <li class="breadcrumb-item active">تعديل الاختبار</li>
+        {% if current_user.role == 'question_editor' %}
+        <li class="breadcrumb-item"><a href="{{ url_for('teacher.question_editor_dashboard') }}"> / لوحة التحكم / </a></li>
+        {% else %}
+        <li class="breadcrumb-item"><a href="{{ url_for('teacher.dashboard') }}"> / لوحة التحكم / </a></li>
+        <li class="breadcrumb-item active"> تعديل الاختبار </li>
       </ol>
     </nav>
   </div>
