@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+  <div>
+    <h1 class="h4 mb-1">الأسئلة المفضلة</h1>
+    <p class="mb-0">راجع أسئلتك المحفوظة مع الخيارات والإجابة الصحيحة.</p>
+  </div>
+  <a class="btn btn-light btn-sm" href="{{ url_for('student.results') }}">العودة للنتائج</a>
+</div>
+
+{% if favorites %}
+  <div class="vstack gap-3">
+    {% for item in favorites %}
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <div>
+              <span class="badge {% if item.question_type == 'interactive' %}text-bg-info{% else %}text-bg-primary{% endif %}">
+                {% if item.question_type == 'interactive' %}تفاعلي{% else %}اختيار من متعدد{% endif %}
+              </span>
+              <span class="badge text-bg-light">{{ item.difficulty or 'medium' }}</span>
+            </div>
+            <form method="post" action="{{ url_for('student.remove_favorite', favorite_id=item.id) }}">
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <button type="submit" class="btn btn-outline-danger btn-sm">حذف من المفضلة</button>
+            </form>
+          </div>
+
+          {% if item.question_text %}
+            <div class="fw-semibold preserve-format mb-2">{{ item.question_text }}</div>
+          {% endif %}
+
+          {% if item.question_images %}
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              {% for img in item.question_images %}
+                <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 220px;">
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if item.question_type == 'mcq' %}
+            {% if item.choices %}
+              <div class="list-group mb-2">
+                {% for c in item.choices %}
+                  <div class="list-group-item">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                      <span class="badge {% if c.is_correct %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+                        {% if c.is_correct %}صحيح{% else %}خيار{% endif %}
+                      </span>
+                      <span class="preserve-format">{{ c.text }}</span>
+                      {% if c.image_url %}
+                        <img src="{{ c.image_url }}" alt="صورة الخيار" class="img-fluid rounded border" style="max-height: 140px;">
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="small">
+              <span class="text-muted">الإجابة الصحيحة:</span>
+              <span class="fw-semibold text-success preserve-format">{{ item.correct_answer_text or 'غير محدد' }}</span>
+            </div>
+            {% if item.correct_answer_image_url %}
+              <div class="mt-2">
+                <img src="{{ item.correct_answer_image_url }}" alt="صورة الإجابة الصحيحة" class="img-fluid rounded border" style="max-height: 180px;">
+              </div>
+            {% endif %}
+          {% else %}
+            <div class="small text-muted">الإجابة النموذجية</div>
+            {% if item.correct_answer_text %}
+              <div class="border rounded p-2 my-2 preserve-format">{{ item.correct_answer_text }}</div>
+            {% endif %}
+            {% if item.correct_answer_image_url %}
+              <img src="{{ item.correct_answer_image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 220px;">
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-info mb-0">لا توجد أسئلة في المفضلة حتى الآن.</div>
+{% endif %}
+{% endblock %}

@@ -64,6 +64,14 @@
                   <div>
                     {% if item.question_type == 'interactive' %}
                       <div class="fw-semibold">س{{ loop.index }}.</div>
+                      {% if current_user.role == 'student' %}
+                        <form method="post" action="{{ url_for('student.add_favorite') }}" class="my-2">
+                          <input type="hidden" name="question_type" value="interactive">
+                          <input type="hidden" name="question_id" value="{{ item.question.id }}">
+                          <input type="hidden" name="next" value="{{ request.path }}">
+                          <button type="submit" class="btn btn-outline-warning btn-sm">إضافة إلى المفضلة</button>
+                        </form>
+                      {% endif %}
                       {% if item.question.question_text %}
                         <div class="border rounded p-2 my-2 math-content preserve-format">{{ item.question.question_text }}</div>
                       {% endif %}
@@ -89,6 +97,14 @@
                       </div>
                     {% else %}
                       <div class="fw-semibold">س{{ loop.index }}. {{ item.question.text }}</div>
+                      {% if current_user.role == 'student' %}
+                        <form method="post" action="{{ url_for('student.add_favorite') }}" class="my-2">
+                          <input type="hidden" name="question_type" value="mcq">
+                          <input type="hidden" name="question_id" value="{{ item.question.id }}">
+                          <input type="hidden" name="next" value="{{ request.path }}">
+                          <button type="submit" class="btn btn-outline-warning btn-sm">إضافة إلى المفضلة</button>
+                        </form>
+                      {% endif %}
                       {% if item.question.question_images %}
                         <div class="d-flex flex-wrap gap-2 my-2">
                           {% for img in item.question.question_images %}

@@ -1041,3 +1041,33 @@ class SubjectActivationCode(Document):
             'is_used'
         ]
     }
+
+
+class StudentFavoriteQuestion(Document):
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    student_id = ReferenceField(User, required=True)
+    question_type = StringField(required=True, choices=["mcq", "interactive"])
+
+    # Keep references when available.
+    question_id = ReferenceField(Question, null=True)
+    interactive_question_id = ReferenceField(TestInteractiveQuestion, null=True)
+
+    # Snapshot for stable rendering even if original question changes/deletes.
+    question_text = StringField(null=True)
+    question_images = ListField(StringField(max_length=500), default=list)
+    choices = ListField(EmbeddedDocumentField(Choice), default=list)
+    correct_answer_text = StringField(null=True)
+    correct_answer_image_url = StringField(max_length=500, null=True)
+    difficulty = StringField(default="medium", choices=["easy", "medium", "hard"])
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'student_favorite_questions',
+        'indexes': [
+            'student_id',
+            'question_type',
+            'question_id',
+            'interactive_question_id',
+            'created_at',
+        ]
+    }

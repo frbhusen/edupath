@@ -36,6 +36,7 @@ from .models import (
     CourseQuestion,
     CourseAttempt,
     CourseAnswer,
+    StudentFavoriteQuestion,
     Notification,
     NotificationRecipient,
 )
@@ -151,7 +152,10 @@ def delete_user_with_related_data(user: User) -> dict:
         NotificationRecipient.objects(notification_id__in=created_notification_ids).delete()
         Notification.objects(id__in=created_notification_ids).delete()
 
-    # 11) Finally delete the user.
+    # 11) Favorites saved by student.
+    StudentFavoriteQuestion.objects(student_id=uid).delete()
+
+    # 12) Finally delete the user.
     user.delete()
     summary["deleted_user"] = True
     return summary

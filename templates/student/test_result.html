@@ -67,6 +67,14 @@
 								<div class="d-flex justify-content-between align-items-start">
 									<div>
 										<div class="fw-semibold preserve-format">س{{ loop.index }}. {{ item.question.text }}</div>
+										{% if current_user.role == 'student' %}
+										<form method="post" action="{{ url_for('student.add_favorite') }}" class="my-2">
+											<input type="hidden" name="question_type" value="mcq">
+											<input type="hidden" name="question_id" value="{{ item.question.id }}">
+											<input type="hidden" name="next" value="{{ request.path }}">
+											<button type="submit" class="btn btn-outline-warning btn-sm">إضافة إلى المفضلة</button>
+										</form>
+										{% endif %}
 										{% if item.question.question_images %}
 											<div class="d-flex flex-wrap gap-2 my-2">
 												{% for img in item.question.question_images %}
@@ -123,6 +131,14 @@
 										<span class="badge text-bg-danger">خطأ</span>
 									{% endif %}
 								</div>
+								{% if current_user.role == 'student' %}
+								<form method="post" action="{{ url_for('student.add_favorite') }}" class="mb-2">
+									<input type="hidden" name="question_type" value="interactive">
+									<input type="hidden" name="question_id" value="{{ item.question.id }}">
+									<input type="hidden" name="next" value="{{ request.path }}">
+									<button type="submit" class="btn btn-outline-warning btn-sm">إضافة إلى المفضلة</button>
+								</form>
+								{% endif %}
 								<div class="row g-2">
 									<div class="col-12 col-md-6">
 										<div class="small text-muted mb-1">السؤال</div>

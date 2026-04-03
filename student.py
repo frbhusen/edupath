@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from bson import ObjectId
 from bson.dbref import DBRef
 
-from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
+from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer, StudentFavoriteQuestion
 from .forms import ActivationForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation
 from .extensions import cache
@@ -22,6 +22,125 @@ DUEL_SAME_OPPONENT_COOLDOWN_SECONDS = 180
 DUEL_PENDING_LIMIT_PER_CHALLENGER = 3
 DUEL_WAITING_JOIN_TIMEOUT_SECONDS = 300
 DUEL_PAIR_RECENT_LOCK_SECONDS = 45
+
+
+def _redirect_to_next_or(default_endpoint, **default_kwargs):
+    next_path = (request.form.get("next") or "").strip()
+    if next_path.startswith("/"):
+        return redirect(next_path)
+    return redirect(url_for(default_endpoint, **default_kwargs))
+
+
+@student_bp.route("/favorites", methods=["GET"])
+@login_required
+def favorites():
+    if (current_user.role or "").lower() != "student":
+        flash("غير مسموح.", "error")
+        return redirect(url_for("index"))
+
+    favorites_rows = list(
+        StudentFavoriteQuestion.objects(student_id=current_user.id)
+        .order_by("-created_at")
+        .all()
+    )
+    return render_template("student/favorites.html", favorites=favorites_rows)
+
+
+@student_bp.route("/favorites/add", methods=["POST"])
+@login_required
+def add_favorite():
+    if (current_user.role or "").lower() != "student":
+        flash("غير مسموح.", "error")
+        return _redirect_to_next_or("index")
+
+    question_type = (request.form.get("question_type") or "").strip().lower()
+    item_id = (request.form.get("question_id") or "").strip()
+    if question_type not in {"mcq", "interactive"} or not ObjectId.is_valid(item_id):
+        flash("بيانات السؤال غير صحيحة.", "error")
+        return _redirect_to_next_or("student.favorites")
+
+    if question_type == "mcq":
+        question = Question.objects(id=item_id).first()
+        if not question:
+            flash("السؤال غير موجود.", "error")
+            return _redirect_to_next_or("student.favorites")
+
+        exists = StudentFavoriteQuestion.objects(
+            student_id=current_user.id,
+            question_type="mcq",
+            question_id=question.id,
+        ).first()
+        if exists:
+            flash("السؤال موجود بالفعل في المفضلة.", "info")
+            return _redirect_to_next_or("student.favorites")
+
+        correct_choice = next((c for c in question.choices if c.is_correct), None)
+        snapshot_choices = [
+            Choice(text=c.text, image_url=c.image_url, is_correct=bool(c.is_correct))
+            for c in question.choices
+        ]
+        StudentFavoriteQuestion(
+            student_id=current_user.id,
+            question_type="mcq",
+            question_id=question.id,
+            question_text=question.text,
+            question_images=list(question.question_images or []),
+            choices=snapshot_choices,
+            correct_answer_text=correct_choice.text if correct_choice else None,
+            correct_answer_image_url=correct_choice.image_url if correct_choice else None,
+            difficulty=(question.difficulty or "medium"),
+        ).save()
+        flash("تمت إضافة السؤال إلى المفضلة.", "success")
+        return _redirect_to_next_or("student.favorites")
+
+    interactive_question = TestInteractiveQuestion.objects(id=item_id).first()
+    if not interactive_question:
+        flash("السؤال التفاعلي غير موجود.", "error")
+        return _redirect_to_next_or("student.favorites")
+
+    exists = StudentFavoriteQuestion.objects(
+        student_id=current_user.id,
+        question_type="interactive",
+        interactive_question_id=interactive_question.id,
+    ).first()
+    if exists:
+        flash("السؤال التفاعلي موجود بالفعل في المفضلة.", "info")
+        return _redirect_to_next_or("student.favorites")
+
+    StudentFavoriteQuestion(
+        student_id=current_user.id,
+        question_type="interactive",
+        interactive_question_id=interactive_question.id,
+        question_text=interactive_question.question_text,
+        question_images=[interactive_question.question_image_url] if interactive_question.question_image_url else [],
+        choices=[],
+        correct_answer_text=interactive_question.answer_text,
+        correct_answer_image_url=interactive_question.answer_image_url,
+        difficulty=(interactive_question.difficulty or "medium"),
+    ).save()
+    flash("تمت إضافة السؤال التفاعلي إلى المفضلة.", "success")
+    return _redirect_to_next_or("student.favorites")
+
+
+@student_bp.route("/favorites/<favorite_id>/delete", methods=["POST"])
+@login_required
+def remove_favorite(favorite_id):
+    if (current_user.role or "").lower() != "student":
+        flash("غير مسموح.", "error")
+        return _redirect_to_next_or("index")
+
+    if not ObjectId.is_valid(favorite_id):
+        flash("العنصر غير موجود.", "error")
+        return _redirect_to_next_or("student.favorites")
+
+    row = StudentFavoriteQuestion.objects(id=favorite_id, student_id=current_user.id).first()
+    if not row:
+        flash("العنصر غير موجود.", "error")
+        return _redirect_to_next_or("student.favorites")
+
+    row.delete()
+    flash("تم حذف السؤال من المفضلة.", "success")
+    return _redirect_to_next_or("student.favorites")
 
 
 class AccessContext:
