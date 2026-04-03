@@ -1,6 +1,37 @@
 
   {% extends 'base.html' %}
   {% block content %}
+  <style>
+    .edit-shell {
+      background: linear-gradient(145deg, #f8fbff 0%, #edf4ff 100%);
+      border: 1px solid #dce7fb;
+      border-radius: 16px;
+      padding: 0.9rem;
+    }
+    .edit-chip {
+      border: 1px solid #c8d9ff;
+      background: #fff;
+      color: #2854a3;
+      border-radius: 999px;
+      padding: 0.22rem 0.72rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .edit-card {
+      border: 1px solid #e7ecf5;
+      border-radius: 14px;
+      box-shadow: 0 8px 22px rgba(34, 51, 84, 0.06);
+    }
+    .edit-card .card-title {
+      font-weight: 700;
+    }
+    .section-caption {
+      color: #5a6a88;
+      font-size: 0.9rem;
+    }
+  </style>
+
   <div class="row mb-3">
     <div class="col-12">
       <nav aria-label="breadcrumb">
@@ -14,7 +45,21 @@
 
   <div class="row justify-content-center">
     <div class="col-12 col-xl-11">
-      <div class="card shadow-sm">
+      <div class="edit-shell mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <h4 class="mb-1">إدارة الاختبار والأسئلة</h4>
+            <div class="section-caption">واجهة منظمة لإنشاء وتحديث أسئلة الاختبار بسرعة ودقة.</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <a class="edit-chip" href="#test-settings">إعدادات الاختبار</a>
+            <a class="edit-chip" href="#mcq-editor">أسئلة الاختيار</a>
+            <a class="edit-chip" href="#interactive-editor">الأسئلة التفاعلية</a>
+            <a class="edit-chip" href="#json-import">استيراد JSON</a>
+          </div>
+        </div>
+      </div>
+      <div class="card edit-card">
         <div class="card-header bg-primary text-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
           <div>
             <h4 class="mb-1">تعديل الاختبار</h4>
@@ -26,12 +71,13 @@
           </div>
         </div>
         <div class="card-body">
-          <div class="card border-0 bg-light mb-4">
+          <div class="card border-0 bg-light mb-4" id="test-settings">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="card-title mb-0">إعدادات الاختبار</h5>
                 <span class="badge text-bg-secondary">{{ test.questions|length }} سؤال</span>
               </div>
+              <p class="section-caption mb-3">حدّث بيانات الاختبار الأساسية، واربطه بدرس أو اتركه على مستوى القسم.</p>
               <form method="post">
                 {{ meta_form.hidden_tag() }}
                 <input type="hidden" name="form_name" value="update_test" />
@@ -67,12 +113,13 @@
 
           <div class="row g-4">
             <div class="col-12 col-lg-7">
-              <div class="card border-0 shadow-sm h-100">
+              <div class="card border-0 shadow-sm h-100 edit-card" id="mcq-editor">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="card-title mb-0">تحرير الأسئلة</h5>
                     <small class="text-muted">إنشاء، تعديل، وحذف</small>
                   </div>
+                  <p class="section-caption mb-3">اختر سؤالا موجودا للتعديل أو ابدأ بسؤال جديد مع دعم الصور والتلميحات ومستوى الصعوبة.</p>
 
                   <div class="mb-3">
                     <label class="form-label">اختر سؤال موجود</label>
@@ -191,7 +238,7 @@
             </div>
 
             <div class="col-12 col-lg-5">
-              <div class="card border-0 shadow-sm mb-4">
+              <div class="card border-0 shadow-sm mb-4 edit-card">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="card-title mb-0">المعاينة الحية</h6>
@@ -205,12 +252,13 @@
                 </div>
               </div>
 
-              <div class="card border-0 shadow-sm mb-4">
+              <div class="card border-0 shadow-sm mb-4 edit-card" id="interactive-editor">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="card-title mb-0">الأسئلة التفاعلية (مشابهة للدورات)</h6>
                     <span class="badge text-bg-secondary">{{ interactive_questions|length if interactive_questions else 0 }}</span>
                   </div>
+                  <p class="section-caption mb-3">أضف أسئلة تفاعلية نصية أو مصورة مع إجاباتها ومستوى الصعوبة.</p>
 
                   <form method="post" class="mb-3">
                     <input type="hidden" name="form_name" value="upsert_interactive_question" />
@@ -328,7 +376,7 @@
                 </div>
               </div>
 
-              <div class="card border-0 shadow-sm">
+              <div class="card border-0 shadow-sm edit-card">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="card-title mb-0">قائمة الأسئلة</h6>
@@ -376,7 +424,7 @@
             </div>
           </div>
 
-          <div class="card border-0 shadow-sm mt-4">
+          <div class="card border-0 shadow-sm mt-4 edit-card" id="json-import">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="card-title mb-0">استيراد الأسئلة من JSON</h5>
