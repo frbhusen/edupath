@@ -44,13 +44,13 @@
 <form method="post" id="custom-test-setup-form">
   <input type="hidden" name="subject_id" value="{{ selected_subject_id or '' }}" />
   <input type="hidden" name="lesson_id" value="{{ selected_lesson_id or '' }}" />
-  <input type="hidden" name="selection_mode" id="selection-mode-input" value="{% if selected_lesson %}lesson{% else %}{{ selection_mode if selection_mode in ['lesson', 'test'] else 'test' }}{% endif %}" />
+  <input type="hidden" name="selection_mode" id="selection-mode-input" value="{% if selected_lesson %}test{% else %}{{ selection_mode if selection_mode in ['lesson', 'test'] else 'test' }}{% endif %}" />
   {% if not selected_subject_id and not selected_lesson %}
     <div class="alert alert-info">اختر مادة لعرض الدروس المفتوحة.</div>
   {% elif lessons %}
     <div class="card shadow-sm">
       <div class="card-body">
-        <div class="alert alert-info mb-3">اختر إجمالي من 10 إلى 50 سؤال.{% if not selected_lesson %} يمكنك الاختيار حسب الدروس أو حسب الاختبارات.{% endif %}</div>
+        <div class="alert alert-info mb-3">اختر إجمالي من 10 إلى 50 سؤال.{% if selected_lesson %} في هذه الصفحة التوزيع يتم حسب اختبارات الدرس.{% else %} يمكنك الاختيار حسب الدروس أو حسب الاختبارات.{% endif %}</div>
         {% if not selected_lesson %}
         <div class="mb-3 d-flex gap-3 flex-wrap" id="selection-mode-group">
           <label class="form-check-label d-flex align-items-center gap-2">

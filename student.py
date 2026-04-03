@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import time
 from flask_login import login_required, current_user
 from bson import ObjectId
+from bson.dbref import DBRef
 
 from .models import User, Subject, Section, Lesson, Test, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer
 from .forms import ActivationForm
@@ -3661,6 +3662,7 @@ def custom_test_new():
         unlocked_lessons = list(Lesson.objects().all())
 
     selected_lesson = None
+    forced_selection_mode = None
     if selected_lesson_id:
         selected_lesson = Lesson.objects(id=selected_lesson_id).first()
         if not selected_lesson:
@@ -3679,6 +3681,8 @@ def custom_test_new():
 
         if selected_lesson.section and selected_lesson.section.subject_id:
             selected_subject_id = str(selected_lesson.section.subject_id.id)
+        # Full lesson test should always allocate by tests inside the lesson.
+        forced_selection_mode = "test"
     
     subject_filter = None
     if selected_subject_id:
@@ -3699,6 +3703,46 @@ def custom_test_new():
     test_question_counts = {}
     test_difficulty_counts = {}
 
+    def _normalize_difficulty(value):
+        level = str(value or "medium").strip().lower()
+        return level if level in {"easy", "medium", "hard"} else "medium"
+
+    def _aggregate_counts_by_test(model_cls, test_ids_list):
+        counts = {tid: 0 for tid in test_ids_list}
+        diff_counts = {tid: {"easy": 0, "medium": 0, "hard": 0} for tid in test_ids_list}
+        if not test_ids_list:
+            return counts, diff_counts
+
+        test_refs = list(test_ids_list)
+        test_refs.extend(DBRef("tests", tid) for tid in test_ids_list)
+
+        pipeline = [
+            {"$match": {"test_id": {"$in": test_refs}}},
+            {
+                "$group": {
+                    "_id": {
+                        "test_id": "$test_id",
+                        "difficulty": {"$ifNull": ["$difficulty", "medium"]},
+                    },
+                    "count": {"$sum": 1},
+                }
+            },
+        ]
+
+        for row in model_cls._get_collection().aggregate(pipeline, allowDiskUse=True):
+            key = row.get("_id") or {}
+            raw_test_id = key.get("test_id")
+            if isinstance(raw_test_id, DBRef):
+                raw_test_id = raw_test_id.id
+            if raw_test_id not in counts:
+                continue
+            level = _normalize_difficulty(key.get("difficulty"))
+            amount = int(row.get("count", 0) or 0)
+            counts[raw_test_id] += amount
+            diff_counts[raw_test_id][level] += amount
+
+        return counts, diff_counts
+
     if unlocked_lessons:
         lesson_ids = [l.id for l in unlocked_lessons]
         tests = list(Test.objects(lesson_id__in=lesson_ids).order_by('created_at').all())
@@ -3710,30 +3754,17 @@ def custom_test_new():
                 continue
             tests_by_lesson.setdefault(lesson_id, []).append(test)
 
-        mcq_pool = list(Question.objects(test_id__in=test_ids).only('id', 'test_id', 'difficulty').all()) if test_ids else []
-        interactive_pool = list(TestInteractiveQuestion.objects(test_id__in=test_ids).only('id', 'test_id', 'difficulty').all()) if test_ids else []
+        mcq_counts, mcq_diff = _aggregate_counts_by_test(Question, test_ids)
+        interactive_counts, interactive_diff = _aggregate_counts_by_test(TestInteractiveQuestion, test_ids)
 
         for test in tests:
-            test_question_counts[test.id] = 0
-            test_difficulty_counts[test.id] = {'easy': 0, 'medium': 0, 'hard': 0}
-
-        def _norm_diff(value):
-            level = (value or 'medium').lower()
-            return level if level in {'easy', 'medium', 'hard'} else 'medium'
-
-        for q in mcq_pool:
-            if not q.test_id:
-                continue
-            tid = q.test_id.id
-            test_question_counts[tid] = test_question_counts.get(tid, 0) + 1
-            test_difficulty_counts.setdefault(tid, {'easy': 0, 'medium': 0, 'hard': 0})[_norm_diff(getattr(q, 'difficulty', 'medium'))] += 1
-
-        for iq in interactive_pool:
-            if not iq.test_id:
-                continue
-            tid = iq.test_id.id
-            test_question_counts[tid] = test_question_counts.get(tid, 0) + 1
-            test_difficulty_counts.setdefault(tid, {'easy': 0, 'medium': 0, 'hard': 0})[_norm_diff(getattr(iq, 'difficulty', 'medium'))] += 1
+            tid = test.id
+            test_question_counts[tid] = mcq_counts.get(tid, 0) + interactive_counts.get(tid, 0)
+            test_difficulty_counts[tid] = {
+                'easy': mcq_diff.get(tid, {}).get('easy', 0) + interactive_diff.get(tid, {}).get('easy', 0),
+                'medium': mcq_diff.get(tid, {}).get('medium', 0) + interactive_diff.get(tid, {}).get('medium', 0),
+                'hard': mcq_diff.get(tid, {}).get('hard', 0) + interactive_diff.get(tid, {}).get('hard', 0),
+            }
 
         for lesson in unlocked_lessons:
             lesson_total = 0
@@ -3761,7 +3792,9 @@ def custom_test_new():
             flash("اختر مادة قبل إنشاء اختبار مخصص.", "error")
             return redirect(url_for("student.custom_test_new"))
 
-        selection_mode = (request.form.get('selection_mode') or 'test').strip().lower()
+        selection_mode = (request.form.get('selection_mode') or forced_selection_mode or 'test').strip().lower()
+        if forced_selection_mode:
+            selection_mode = forced_selection_mode
         if selection_mode not in {'lesson', 'test'}:
             selection_mode = 'test'
 
@@ -3929,7 +3962,10 @@ def custom_test_new():
         selected_subject_id=selected_subject_id,
         selected_lesson_id=selected_lesson_id,
         selected_lesson=selected_lesson,
-        selection_mode=request.form.get('selection_mode', 'test') if request.method == 'POST' else request.args.get('mode', 'test'),
+        selection_mode=(
+            forced_selection_mode
+            or (request.form.get('selection_mode', 'test') if request.method == 'POST' else request.args.get('mode', 'test'))
+        ),
         lessons=unlocked_lessons,
         tests_data=tests_data,
         lesson_question_counts=lesson_question_counts,
