@@ -38,6 +38,20 @@
             </select>
           </div>
 
+          <div class="mb-2 d-none" id="lesson_subject_wrap">
+            <label class="form-label">المادة</label>
+            <select id="lesson_subject_id" class="form-select">
+              <option value="">اختر المادة</option>
+            </select>
+          </div>
+
+          <div class="mb-2 d-none" id="lesson_section_wrap">
+            <label class="form-label">القسم</label>
+            <select id="lesson_section_id" class="form-select">
+              <option value="">اختر القسم</option>
+            </select>
+          </div>
+
           <div class="mb-3">
             <label class="form-label">العنصر</label>
             <select name="scope_id" id="scope_id" class="form-select" required>
@@ -176,26 +190,80 @@
   const scopeChoices = JSON.parse(String.raw`{{ scope_choices|tojson|safe }}`);
   const scopeTypeEl = document.getElementById('scope_type');
   const scopeIdEl = document.getElementById('scope_id');
+  const lessonSubjectWrapEl = document.getElementById('lesson_subject_wrap');
+  const lessonSectionWrapEl = document.getElementById('lesson_section_wrap');
+  const lessonSubjectEl = document.getElementById('lesson_subject_id');
+  const lessonSectionEl = document.getElementById('lesson_section_id');
 
-  function fillScopeOptions() {
-    const type = scopeTypeEl.value;
-    let rows = [];
-    if (type === 'lesson') rows = scopeChoices.lessons || [];
-    if (type === 'section') rows = scopeChoices.sections || [];
-    if (type === 'subject') rows = scopeChoices.subjects || [];
-
-    scopeIdEl.innerHTML = '';
+  function setSelectOptions(selectEl, rows, placeholderText) {
+    selectEl.innerHTML = '';
     const placeholder = document.createElement('option');
     placeholder.value = '';
-    placeholder.textContent = rows.length ? 'اختر العنصر' : 'لا توجد عناصر متاحة';
-    scopeIdEl.appendChild(placeholder);
+    placeholder.textContent = placeholderText;
+    selectEl.appendChild(placeholder);
 
     rows.forEach((row) => {
       const opt = document.createElement('option');
       opt.value = row.id;
       opt.textContent = row.label;
-      scopeIdEl.appendChild(opt);
+      selectEl.appendChild(opt);
     });
+  }
+
+  function getSelectedLessonGroup() {
+    const subjectId = lessonSubjectEl.value;
+    const subjectGroup = (scopeChoices.lesson_groups || []).find((item) => item.id === subjectId);
+    if (!subjectGroup) {
+      return null;
+    }
+    const sectionId = lessonSectionEl.value;
+    const sectionGroup = (subjectGroup.sections || []).find((item) => item.id === sectionId) || (subjectGroup.sections || [])[0] || null;
+    return { subjectGroup, sectionGroup };
+  }
+
+  function fillLessonSubjects() {
+    const lessonGroups = scopeChoices.lesson_groups || [];
+    setSelectOptions(lessonSubjectEl, lessonGroups, lessonGroups.length ? 'اختر المادة' : 'لا توجد مواد متاحة');
+
+    if (lessonGroups.length) {
+      lessonSubjectEl.value = lessonGroups[0].id;
+    }
+    fillLessonSections();
+  }
+
+  function fillLessonSections() {
+    const selected = getSelectedLessonGroup();
+    const sectionGroups = selected ? (selected.subjectGroup.sections || []) : [];
+    setSelectOptions(lessonSectionEl, sectionGroups, sectionGroups.length ? 'اختر القسم' : 'لا توجد أقسام متاحة');
+
+    if (sectionGroups.length) {
+      lessonSectionEl.value = sectionGroups[0].id;
+    }
+    fillLessonItems();
+  }
+
+  function fillLessonItems() {
+    const selected = getSelectedLessonGroup();
+    const rows = selected && selected.sectionGroup ? (selected.sectionGroup.lessons || []) : [];
+    setSelectOptions(scopeIdEl, rows, rows.length ? 'اختر الدرس' : 'لا توجد دروس متاحة');
+  }
+
+  function fillScopeOptions() {
+    const type = scopeTypeEl.value;
+    let rows = [];
+    lessonSubjectWrapEl.classList.add('d-none');
+    lessonSectionWrapEl.classList.add('d-none');
+
+    if (type === 'lesson') {
+      lessonSubjectWrapEl.classList.remove('d-none');
+      lessonSectionWrapEl.classList.remove('d-none');
+      fillLessonSubjects();
+      return;
+    }
+    if (type === 'section') rows = scopeChoices.sections || [];
+    if (type === 'subject') rows = scopeChoices.subjects || [];
+
+    setSelectOptions(scopeIdEl, rows, rows.length ? 'اختر العنصر' : 'لا توجد عناصر متاحة');
   }
 
   function copyShareLink(link) {
@@ -217,5 +285,9 @@
   }
 
   scopeTypeEl.addEventListener('change', fillScopeOptions);
+  lessonSubjectEl.addEventListener('change', fillLessonSections);
+  lessonSectionEl.addEventListener('change', fillLessonItems);
+
+  fillScopeOptions();
 </script>
 {% endblock %}

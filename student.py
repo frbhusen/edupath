@@ -2051,6 +2051,7 @@ def duels_home():
     telegram_share = None
 
     unlocked_lessons = get_unlocked_lessons(current_user.id)
+    lesson_groups = []
     section_ids = list({l.section_id.id for l in unlocked_lessons if l.section_id})
     subject_ids = []
     if section_ids:
@@ -2059,6 +2060,50 @@ def duels_home():
     else:
         sections = []
     subjects = list(Subject.objects(id__in=subject_ids).only("id", "name").all()) if subject_ids else []
+
+    sections_by_id = {section.id: section for section in sections}
+    subjects_by_id = {subject.id: subject for subject in subjects}
+    lessons_by_subject = {}
+    lessons_by_section = {}
+    for lesson in unlocked_lessons:
+        try:
+            section_id = lesson.section_id.id if lesson.section_id else None
+        except (DoesNotExist, AttributeError):
+            section_id = None
+        if not section_id:
+            continue
+        section = sections_by_id.get(section_id)
+        if not section or not section.subject_id:
+            continue
+        subject_id = section.subject_id.id
+        subject = subjects_by_id.get(subject_id)
+        if not subject:
+            continue
+        lessons_by_subject.setdefault(subject_id, {})
+        lessons_by_subject[subject_id].setdefault(section_id, [])
+        lessons_by_subject[subject_id][section_id].append({
+            "id": str(lesson.id),
+            "label": lesson.title,
+        })
+
+    for subject in sorted(subjects, key=lambda item: (item.name or "")):
+        section_groups = []
+        subject_sections = [section for section in sections if section.subject_id and section.subject_id.id == subject.id]
+        for section in sorted(subject_sections, key=lambda item: (item.title or "")):
+            lesson_rows = lessons_by_subject.get(subject.id, {}).get(section.id, [])
+            if not lesson_rows:
+                continue
+            section_groups.append({
+                "id": str(section.id),
+                "label": section.title,
+                "lessons": sorted(lesson_rows, key=lambda item: (item["label"] or "")),
+            })
+        if section_groups:
+            lesson_groups.append({
+                "id": str(subject.id),
+                "label": subject.name,
+                "sections": section_groups,
+            })
 
     if request.method == "POST":
         opponent_username = (request.form.get("opponent_username") or "").strip()
@@ -2180,7 +2225,7 @@ def duels_home():
     top_users_by_id = {u.id: u for u in top_users}
 
     scope_choices = {
-        "lessons": [{"id": str(l.id), "label": l.title} for l in unlocked_lessons],
+        "lesson_groups": lesson_groups,
         "sections": [{"id": str(s.id), "label": s.title} for s in sections],
         "subjects": [{"id": str(s.id), "label": s.name} for s in subjects],
     }
