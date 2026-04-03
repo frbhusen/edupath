@@ -2615,6 +2615,10 @@ def course_set_edit(course_set_id):
             return _edit_redirect("settings")
 
         if action == "add_question":
+            q_type = (request.form.get("question_type") or "interactive").strip().lower()
+            if q_type not in {"interactive", "mcq"}:
+                q_type = "interactive"
+
             q_text = (request.form.get("question_text") or "").strip() or None
             q_img = (request.form.get("question_image_url") or "").strip()
             a_text = (request.form.get("answer_text") or "").strip() or None
@@ -2623,18 +2627,54 @@ def course_set_edit(course_set_id):
             if not q_text and not q_img:
                 flash("أدخل نص السؤال أو رابط صورة السؤال على الأقل.", "error")
                 return _edit_redirect("questions")
-            if not a_text and not a_img:
-                flash("أدخل نص الإجابة أو رابط صورة الإجابة على الأقل.", "error")
-                return _edit_redirect("questions")
 
-            CourseQuestion(
-                course_set_id=course_set.id,
-                question_text=q_text,
-                question_image_url=q_img or None,
-                answer_text=a_text,
-                answer_image_url=a_img or None,
-                correct_value=True,
-            ).save()
+            if q_type == "interactive":
+                if not a_text and not a_img:
+                    flash("أدخل نص الإجابة أو رابط صورة الإجابة على الأقل.", "error")
+                    return _edit_redirect("questions")
+
+                CourseQuestion(
+                    course_set_id=course_set.id,
+                    question_type="interactive",
+                    question_text=q_text,
+                    question_image_url=q_img or None,
+                    answer_text=a_text,
+                    answer_image_url=a_img or None,
+                    choices=[],
+                    correct_choice_id=None,
+                    correct_value=True,
+                ).save()
+            else:
+                correct_choice = (request.form.get("correct_choice") or "").strip()
+                correct_index = int(correct_choice) if correct_choice.isdigit() else None
+                choices = []
+                for i in range(1, 5):
+                    choice_text = (request.form.get(f"choice_{i}") or "").strip()
+                    if not choice_text:
+                        continue
+                    is_correct = (correct_index == i)
+                    choices.append(Choice(text=choice_text, image_url=None, is_correct=is_correct))
+
+                if len(choices) < 2:
+                    flash("في سؤال الاختيار يجب إدخال خيارين على الأقل.", "error")
+                    return _edit_redirect("questions")
+
+                if not any(c.is_correct for c in choices):
+                    choices[0].is_correct = True
+
+                correct_embedded = next((c for c in choices if c.is_correct), None)
+                CourseQuestion(
+                    course_set_id=course_set.id,
+                    question_type="mcq",
+                    question_text=q_text,
+                    question_image_url=q_img or None,
+                    answer_text=None,
+                    answer_image_url=None,
+                    choices=choices,
+                    correct_choice_id=correct_embedded.choice_id if correct_embedded else None,
+                    correct_value=True,
+                ).save()
+
             flash("تمت إضافة سؤال جديد.", "success")
             return _edit_redirect("questions")
 
@@ -2645,6 +2685,10 @@ def course_set_edit(course_set_id):
                 flash("السؤال غير موجود.", "error")
                 return _edit_redirect("questions")
 
+            q_type = (request.form.get("question_type") or (q.question_type or "interactive")).strip().lower()
+            if q_type not in {"interactive", "mcq"}:
+                q_type = "interactive"
+
             q_text = (request.form.get("question_text") or "").strip() or None
             q_img = (request.form.get("question_image_url") or "").strip()
             a_text = (request.form.get("answer_text") or "").strip() or None
@@ -2653,15 +2697,44 @@ def course_set_edit(course_set_id):
             if not q_text and not q_img:
                 flash("أدخل نص السؤال أو رابط صورة السؤال على الأقل.", "error")
                 return _edit_redirect("questions")
-            if not a_text and not a_img:
-                flash("أدخل نص الإجابة أو رابط صورة الإجابة على الأقل.", "error")
-                return _edit_redirect("questions")
 
+            q.question_type = q_type
             q.question_text = q_text
-            q.question_image_url = q_img
-            q.answer_text = a_text
-            q.answer_image_url = a_img
+            q.question_image_url = q_img or None
             q.correct_value = True
+
+            if q_type == "interactive":
+                if not a_text and not a_img:
+                    flash("أدخل نص الإجابة أو رابط صورة الإجابة على الأقل.", "error")
+                    return _edit_redirect("questions")
+                q.answer_text = a_text
+                q.answer_image_url = a_img or None
+                q.choices = []
+                q.correct_choice_id = None
+            else:
+                correct_choice = (request.form.get("correct_choice") or "").strip()
+                correct_index = int(correct_choice) if correct_choice.isdigit() else None
+                choices = []
+                for i in range(1, 5):
+                    choice_text = (request.form.get(f"choice_{i}") or "").strip()
+                    if not choice_text:
+                        continue
+                    is_correct = (correct_index == i)
+                    choices.append(Choice(text=choice_text, image_url=None, is_correct=is_correct))
+
+                if len(choices) < 2:
+                    flash("في سؤال الاختيار يجب إدخال خيارين على الأقل.", "error")
+                    return _edit_redirect("questions")
+
+                if not any(c.is_correct for c in choices):
+                    choices[0].is_correct = True
+
+                correct_embedded = next((c for c in choices if c.is_correct), None)
+                q.answer_text = None
+                q.answer_image_url = None
+                q.choices = choices
+                q.correct_choice_id = correct_embedded.choice_id if correct_embedded else None
+
             q.save()
             flash("تم تحديث السؤال.", "success")
             return _edit_redirect("questions")

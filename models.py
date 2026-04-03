@@ -553,10 +553,13 @@ class CourseSet(Document):
 class CourseQuestion(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     course_set_id = ReferenceField(CourseSet, required=True)
+    question_type = StringField(default='interactive', choices=['interactive', 'mcq'], required=True)
     question_text = StringField(null=True)
     question_image_url = StringField(max_length=500, null=True)
     answer_text = StringField(null=True)
     answer_image_url = StringField(max_length=500, null=True)
+    choices = ListField(EmbeddedDocumentField(Choice), default=list)
+    correct_choice_id = ObjectIdField(null=True)
     correct_value = BooleanField(required=True, default=True)
     created_at = DateTimeField(default=datetime.utcnow)
 
@@ -594,7 +597,8 @@ class CourseAnswer(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     attempt_id = ReferenceField(CourseAttempt, required=True)
     question_id = ReferenceField(CourseQuestion, required=True)
-    selected_value = BooleanField(required=True, default=False)
+    choice_id = ObjectIdField(null=True)
+    selected_value = BooleanField(null=True)
     is_correct = BooleanField(required=True, default=False)
     created_at = DateTimeField(default=datetime.utcnow)
 

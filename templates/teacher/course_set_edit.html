@@ -209,11 +209,18 @@
           <h5 class="card-title mb-3">إضافة سؤال جديد</h5>
           <form method="post" class="row g-2 mb-4">
             <input type="hidden" name="action" value="add_question">
+            <div class="col-12 col-md-4">
+              <label class="form-label">نوع السؤال</label>
+              <select class="form-select" name="question_type" id="new-question-type">
+                <option value="interactive" selected>تحريري</option>
+                <option value="mcq">اختيار من متعدد</option>
+              </select>
+            </div>
             <div class="col-12 col-lg-6">
               <label class="form-label">نص السؤال (يدعم LaTeX)</label>
               <textarea class="form-control" name="question_text" rows="2" placeholder="اكتب السؤال نصيًا إن رغبت"></textarea>
             </div>
-            <div class="col-12 col-lg-6">
+            <div class="col-12 col-lg-6 interactive-only-group new-interactive-group">
               <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
               <textarea class="form-control" name="answer_text" rows="2" placeholder="اكتب الإجابة نصيًا إن رغبت"></textarea>
             </div>
@@ -221,9 +228,31 @@
               <label class="form-label">رابط صورة السؤال</label>
               <input class="form-control" name="question_image_url" data-preview-target="new-question-preview" placeholder="https://...">
             </div>
-            <div class="col-12 col-lg-6">
+            <div class="col-12 col-lg-6 interactive-only-group new-interactive-group">
               <label class="form-label">رابط صورة الإجابة</label>
               <input class="form-control" name="answer_image_url" data-preview-target="new-answer-preview" placeholder="https://...">
+            </div>
+            <div class="col-12 mcq-only-group new-mcq-group d-none">
+              <div class="border rounded p-2 bg-light">
+                <div class="small fw-semibold mb-2">خيارات MCQ</div>
+                <div class="row g-2">
+                  {% for i in range(1, 5) %}
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label">الخيار {{ i }}</label>
+                      <input class="form-control" name="choice_{{ i }}" placeholder="اكتب نص الخيار {{ i }}">
+                    </div>
+                  {% endfor %}
+                  <div class="col-12 col-lg-4">
+                    <label class="form-label">الخيار الصحيح</label>
+                    <select class="form-select" name="correct_choice">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="col-12 d-flex justify-content-end">
               <button class="btn btn-outline-primary" type="submit">إضافة السؤال</button>
@@ -253,15 +282,23 @@
             <div class="d-flex flex-column gap-3">
               {% for q in questions %}
                 <div class="border rounded p-3">
-                  <div class="fw-semibold mb-2">السؤال {{ loop.index }}</div>
+                  {% set q_type = (q.question_type or 'interactive') %}
+                  <div class="fw-semibold mb-2">السؤال {{ loop.index }} <span class="badge text-bg-light">{{ 'اختيار' if q_type == 'mcq' else 'تحريري' }}</span></div>
                   <form method="post" class="row g-2">
                     <input type="hidden" name="action" value="update_question">
                     <input type="hidden" name="question_id" value="{{ q.id }}">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label">نوع السؤال</label>
+                      <select class="form-select existing-question-type" name="question_type" data-target-prefix="q{{ q.id }}">
+                        <option value="interactive" {% if q_type != 'mcq' %}selected{% endif %}>تحريري</option>
+                        <option value="mcq" {% if q_type == 'mcq' %}selected{% endif %}>اختيار من متعدد</option>
+                      </select>
+                    </div>
                     <div class="col-12 col-lg-6">
                       <label class="form-label">نص السؤال</label>
                       <textarea class="form-control" name="question_text" rows="2">{{ q.question_text or '' }}</textarea>
                     </div>
-                    <div class="col-12 col-lg-6">
+                    <div class="col-12 col-lg-6 interactive-only-group q{{ q.id }}-interactive {% if q_type == 'mcq' %}d-none{% endif %}">
                       <label class="form-label">نص الإجابة</label>
                       <textarea class="form-control" name="answer_text" rows="2">{{ q.answer_text or '' }}</textarea>
                     </div>
@@ -269,9 +306,32 @@
                       <label class="form-label">صورة السؤال</label>
                       <input class="form-control" name="question_image_url" value="{{ q.question_image_url or '' }}" data-preview-target="q-preview-{{ q.id }}">
                     </div>
-                    <div class="col-12 col-lg-6">
+                    <div class="col-12 col-lg-6 interactive-only-group q{{ q.id }}-interactive {% if q_type == 'mcq' %}d-none{% endif %}">
                       <label class="form-label">صورة الإجابة</label>
                       <input class="form-control" name="answer_image_url" value="{{ q.answer_image_url or '' }}" data-preview-target="a-preview-{{ q.id }}">
+                    </div>
+                    <div class="col-12 q{{ q.id }}-mcq {% if q_type != 'mcq' %}d-none{% endif %}">
+                      <div class="border rounded p-2 bg-light">
+                        <div class="small fw-semibold mb-2">خيارات MCQ</div>
+                        <div class="row g-2">
+                          {% for i in range(1, 5) %}
+                            {% set existing_choice = q.choices[i-1] if q.choices and (q.choices|length) >= i else None %}
+                            <div class="col-12 col-lg-6">
+                              <label class="form-label">الخيار {{ i }}</label>
+                              <input class="form-control" name="choice_{{ i }}" value="{{ existing_choice.text if existing_choice else '' }}">
+                            </div>
+                          {% endfor %}
+                          <div class="col-12 col-lg-4">
+                            <label class="form-label">الخيار الصحيح</label>
+                            <select class="form-select" name="correct_choice">
+                              {% for i in range(1, 5) %}
+                                {% set existing_choice = q.choices[i-1] if q.choices and (q.choices|length) >= i else None %}
+                                <option value="{{ i }}" {% if existing_choice and existing_choice.is_correct %}selected{% endif %}>{{ i }}</option>
+                              {% endfor %}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     <div class="col-12 d-flex justify-content-end">
                       <button class="btn btn-outline-primary btn-sm" type="submit">حفظ</button>
@@ -288,8 +348,8 @@
                         <div class="preview-box">
                           <span class="label">معاينة الإجابة</span>
                           <div class="preview-frame">
-                            <img id="a-preview-{{ q.id }}" src="{{ q.answer_image_url or '' }}" alt="معاينة الإجابة" {% if not q.answer_image_url %}class="d-none"{% endif %}>
-                            <span class="preview-empty {% if q.answer_image_url %}d-none{% endif %}" id="a-preview-{{ q.id }}-empty">لا توجد صورة</span>
+                            <img id="a-preview-{{ q.id }}" src="{{ q.answer_image_url or '' }}" alt="معاينة الإجابة" {% if not q.answer_image_url or q_type == 'mcq' %}class="d-none"{% endif %}>
+                            <span class="preview-empty {% if q.answer_image_url and q_type != 'mcq' %}d-none{% endif %}" id="a-preview-{{ q.id }}-empty">لا توجد صورة</span>
                           </div>
                         </div>
                       </div>
@@ -396,6 +456,31 @@
       updatePreview();
     });
   })();
+
+  function toggleQuestionTypeGroups(typeValue, interactiveSelector, mcqSelector) {
+    const showInteractive = typeValue !== 'mcq';
+    document.querySelectorAll(interactiveSelector).forEach(el => {
+      el.classList.toggle('d-none', !showInteractive);
+    });
+    document.querySelectorAll(mcqSelector).forEach(el => {
+      el.classList.toggle('d-none', showInteractive);
+    });
+  }
+
+  const newType = document.getElementById('new-question-type');
+  if (newType) {
+    const applyNewType = () => toggleQuestionTypeGroups(newType.value, '.new-interactive-group', '.new-mcq-group');
+    newType.addEventListener('change', applyNewType);
+    applyNewType();
+  }
+
+  document.querySelectorAll('.existing-question-type').forEach((select) => {
+    const prefix = select.getAttribute('data-target-prefix');
+    if (!prefix) return;
+    const apply = () => toggleQuestionTypeGroups(select.value, `.${prefix}-interactive`, `.${prefix}-mcq`);
+    select.addEventListener('change', apply);
+    apply();
+  });
 
   const editorState = document.getElementById('editorState');
   const activeTab = (editorState && editorState.dataset.activeTab) ? editorState.dataset.activeTab : 'settings';

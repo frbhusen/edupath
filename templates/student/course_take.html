@@ -93,9 +93,38 @@
 
 <form method="post" action="{{ url_for('student.course_submit', course_set_id=course_set.id) }}">
   {% for q in questions %}
+    {% set q_type = (q.question_type or 'interactive') %}
     <div class="card qa-card mb-3">
       <div class="card-body">
-        <div class="fw-semibold text-center mb-3">السؤال {{ loop.index }}</div>
+        <div class="fw-semibold text-center mb-3">السؤال {{ loop.index }} <span class="badge text-bg-light">{{ 'اختيار من متعدد' if q_type == 'mcq' else 'تحريري' }}</span></div>
+
+        {% if q_type == 'mcq' %}
+          <div class="row g-3">
+            <div class="col-12 col-lg-7">
+              {% if q.question_text %}
+                <div class="border rounded p-2 mb-2 math-content preserve-format">{{ q.question_text }}</div>
+              {% endif %}
+              {% if q.question_image_url %}
+                <div class="img-frame mb-2">
+                  <img src="{{ q.question_image_url }}" alt="صورة السؤال">
+                </div>
+              {% endif %}
+              <div class="d-flex flex-column gap-2 mt-3">
+                {% for choice in q.choices %}
+                  <label class="border rounded p-2 d-flex gap-2 align-items-start">
+                    <input class="form-check-input mt-1" type="radio" name="question_{{ q.id }}" value="{{ choice.choice_id }}" required>
+                    <span class="flex-grow-1">
+                      <span class="d-block">{{ choice.text }}</span>
+                      {% if choice.image_url %}
+                        <img src="{{ choice.image_url }}" alt="صورة خيار" class="img-fluid rounded border mt-2" style="max-height: 150px;">
+                      {% endif %}
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% else %}
 
         <div class="qa-grid">
           <div class="img-panel">
@@ -138,6 +167,7 @@
           </div>
           <div class="small text-muted">بعد إظهار الإجابة، اختر تقييمك الذاتي.</div>
         </div>
+        {% endif %}
       </div>
     </div>
   {% endfor %}

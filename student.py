@@ -1568,6 +1568,27 @@ def course_submit(course_set_id):
     attempt.save()
 
     for q in questions:
+        q_type = (getattr(q, "question_type", "interactive") or "interactive").strip().lower()
+
+        if q_type == "mcq":
+            selected_raw = (request.form.get(f"question_{q.id}") or "").strip()
+            selected_choice = next(
+                (c for c in (q.choices or []) if str(getattr(c, "choice_id", "")) == selected_raw),
+                None,
+            )
+            is_correct = bool(selected_choice and selected_choice.is_correct)
+            if is_correct:
+                score += 1
+
+            CourseAnswer(
+                attempt_id=attempt.id,
+                question_id=q.id,
+                choice_id=(selected_choice.choice_id if selected_choice else None),
+                selected_value=None,
+                is_correct=is_correct,
+            ).save()
+            continue
+
         raw = (request.form.get(f"question_{q.id}") or "").strip().lower()
         selected_value = raw == "true"
         # Self-evaluation mode: student marks if their own solution was correct.
@@ -1578,6 +1599,7 @@ def course_submit(course_set_id):
         CourseAnswer(
             attempt_id=attempt.id,
             question_id=q.id,
+            choice_id=None,
             selected_value=selected_value,
             is_correct=is_correct,
         ).save()
