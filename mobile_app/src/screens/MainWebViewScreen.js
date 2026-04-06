@@ -71,25 +71,43 @@ export default function MainWebViewScreen() {
     );
   };
 
+  const injectedViewportFix = `
+    (function() {
+      try {
+        var viewport = document.querySelector('meta[name="viewport"]');
+        if (!viewport) {
+          viewport = document.createElement('meta');
+          viewport.name = 'viewport';
+          document.head.appendChild(viewport);
+        }
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover');
+        document.documentElement.style.webkitTextSizeAdjust = '100%';
+      } catch (e) {}
+      true;
+    })();
+  `;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.webviewContainer}>
         <WebView
           ref={webViewRef}
           source={{ uri: currentUrl }}
+          injectedJavaScriptBeforeContentLoaded={injectedViewportFix}
           onNavigationStateChange={onNavigationStateChange}
           onLoadStart={onLoadStart}
           onLoadEnd={onLoadEnd}
           onError={onError}
           startInLoadingState
+          cacheEnabled={false}
           javaScriptEnabled
           domStorageEnabled
           sharedCookiesEnabled
           thirdPartyCookiesEnabled
-          cacheEnabled
           originWhitelist={["*"]}
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
+          setSupportMultipleWindows={false}
           renderLoading={() => (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#0f172a" />
