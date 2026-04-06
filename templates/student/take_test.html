@@ -276,7 +276,7 @@
                   <div class="d-flex align-items-center gap-2 flex-wrap">
                     <input class="form-check-input me-2" type="radio" name="question_{{ q.id }}" value="{{ c.choice_id }}" required>
                     <span class="preserve-format">{{ c.text }}</span>
-                    {% if c.image_url and c.image_url|length > 0 %}
+                    {% if c.image_url and c.image_url.startswith('http') %}
                       <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;" required>
                     {% endif %}
                   </div>

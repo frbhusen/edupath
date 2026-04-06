@@ -38,7 +38,7 @@
               <span class="text-muted small">إجابتك:</span>
               {% if item.my_selected %}
                 <span class="fw-semibold {% if item.my_is_correct %}text-success{% else %}text-danger{% endif %}">{{ item.my_selected.text }}</span>
-                {% if item.my_selected.image_url and item.my_selected.image_url|length > 0 %}
+                {% if item.my_selected.image_url and item.my_selected.image_url.startswith('http') %}
                   <div class="mt-2">
                     <img src="{{ item.my_selected.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
                   </div>
@@ -52,7 +52,7 @@
               <span class="text-muted small">إجابة الخصم:</span>
               {% if item.opp_selected %}
                 <span class="fw-semibold {% if item.opp_is_correct %}text-success{% else %}text-danger{% endif %}">{{ item.opp_selected.text }}</span>
-                {% if item.opp_selected.image_url and item.opp_selected.image_url|length > 0 %}
+                {% if item.opp_selected.image_url and item.opp_selected.image_url.startswith('http') %}
                   <div class="mt-2">
                     <img src="{{ item.opp_selected.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
                   </div>
@@ -66,7 +66,7 @@
               <span class="text-muted small">الإجابة الصحيحة:</span>
               {% if item.correct_choice %}
                 <span class="fw-semibold text-success">{{ item.correct_choice.text }}</span>
-                {% if item.correct_choice.image_url and item.correct_choice.image_url|length > 0 %}
+                {% if item.correct_choice.image_url and item.correct_choice.image_url.startswith('http') %}
                   <div class="mt-2">
                     <img src="{{ item.correct_choice.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 180px;">
                   </div>
