@@ -2,16 +2,143 @@
 {% block content %}
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
-    <h1 class="h4 mb-1">Frequently Wrong</h1>
-    <p class="mb-0">الأسئلة التي أخطأت فيها مرتبة حسب تكرار الخطأ.</p>
+    <h1 class="h4 mb-1">الأخطاء المتكررة</h1>
+    <p class="mb-0">عرض هرمي حسب المادة ثم القسم ثم الدرس، مع أعلى 10 أسئلة في الأعلى دائماً.</p>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">العودة للرئيسية</a>
+  <a class="btn btn-cta btn-sm" href="{{ url_for('student.results') }}">العودة للنتائج</a>
+</div>
+
+<style>
+  .wrong-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.8rem;
+  }
+  .wrong-stat {
+    border: 1px solid var(--brand-border);
+    border-radius: 14px;
+    padding: 0.75rem 0.9rem;
+    background: #ffffff;
+  }
+  .wrong-stat .value {
+    font-weight: 800;
+    font-size: 1.2rem;
+    color: #0f3d91;
+  }
+  .wrong-top-item {
+    border: 1px solid var(--brand-border);
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0.7rem 0.8rem;
+  }
+  .wrong-top-rank {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #e8f0ff;
+    color: #1d4ed8;
+    font-weight: 800;
+    flex: 0 0 auto;
+  }
+  .wrong-question-card {
+    border: 1px solid var(--brand-border);
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0.75rem;
+  }
+  .wrong-group-head {
+    border-radius: 12px;
+    background: #f8fbff;
+    border: 1px solid #dbe8ff;
+    padding: 0.65rem 0.8rem;
+  }
+</style>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="wrong-stats-grid">
+      <div class="wrong-stat">
+        <div class="small text-muted">إجمالي الأخطاء المسجلة</div>
+        <div class="value">{{ total_wrong }}</div>
+      </div>
+      <div class="wrong-stat">
+        <div class="small text-muted">عدد الأسئلة الفريدة (بعد الفلترة)</div>
+        <div class="value">{{ rows|length }}</div>
+      </div>
+      <div class="wrong-stat">
+        <div class="small text-muted">إجمالي الأخطاء (بعد الفلترة)</div>
+        <div class="value">{{ filtered_total_wrong }}</div>
+      </div>
+      <div class="wrong-stat">
+        <div class="small text-muted">قائمة أعلى 10</div>
+        <div class="value">{{ top_rows|length }}</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="card shadow-sm mb-3">
-  <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <div class="small text-muted">إجمالي الأخطاء المسجلة: {{ total_wrong }}</div>
-    <div class="small text-muted">عدد الأسئلة الفريدة: {{ rows|length }}</div>
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h5 class="badge text-bg-danger">أعلى 10 أسئلة تكراراً للخطأ (دائماً)</h5>
+    </div>
+    {% if top_rows %}
+      <div class="d-flex flex-column gap-2">
+        {% for row in top_rows %}
+          <div class="wrong-top-item d-flex align-items-start gap-2">
+            <span class="wrong-top-rank">{{ loop.index }}</span>
+            <div class="flex-grow-1">
+              <div class="fw-semibold preserve-format">{{ row.question.text[:190] }}{% if row.question.text|length > 190 %}...{% endif %}</div>
+              <div class="small text-muted mt-1">{{ row.subject_name }} · {{ row.section_name }} · {{ row.lesson_name }}</div>
+            </div>
+            <span class="badge text-bg-danger">{{ row.frequency }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0">لا توجد بيانات كافية لحساب أعلى 10.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label small">المادة</label>
+        <select class="form-select form-select-sm" name="subject_id">
+          <option value="">كل المواد</option>
+          {% for opt in subject_options %}
+            <option value="{{ opt.id }}" {% if selected_subject_id == opt.id %}selected{% endif %}>{{ opt.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label small">القسم</label>
+        <select class="form-select form-select-sm" name="section_id">
+          <option value="">كل الأقسام</option>
+          {% for opt in section_options %}
+            <option value="{{ opt.id }}" {% if selected_section_id == opt.id %}selected{% endif %}>{{ opt.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label small">الدرس</label>
+        <select class="form-select form-select-sm" name="lesson_id">
+          <option value="">كل الدروس</option>
+          {% for opt in lesson_options %}
+            <option value="{{ opt.id }}" {% if selected_lesson_id == opt.id %}selected{% endif %}>{{ opt.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-cta btn-sm">تطبيق الفلترة</button>
+        <a href="{{ url_for('student.frequently_wrong') }}" class="btn btn-cta btn-sm">إعادة ضبط</a>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -19,39 +146,50 @@
   <div class="card-body">
     {% if rows %}
       <form method="post" action="{{ url_for('student.frequently_wrong_start_test') }}">
-        <div class="mb-3 d-flex gap-2">
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="select-all-btn">تحديد الكل</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="clear-all-btn">إلغاء الكل</button>
-          <button type="submit" class="btn btn-cta btn-sm">بدء اختبار من الأسئلة المختارة</button>
+        <div class="mb-3 d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-cta btn-sm" id="select-all-btn">تحديد الكل</button>
+          <button type="button" class="btn btn-cta btn-sm" id="clear-all-btn">إلغاء الكل</button>
+          <button type="submit" class="btn btn-cta btn-sm">بدء اختبار من المختار</button>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead>
-              <tr>
-                <th style="width:44px;"></th>
-                <th>السؤال</th>
-                <th>الاختبار</th>
-                <th class="text-end">تكرار الخطأ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in rows %}
-                <tr>
-                  <td>
-                    <input type="checkbox" class="form-check-input wrong-q" name="question_ids" value="{{ row.question.id }}" checked>
-                  </td>
-                  <td>{{ row.question.text[:180] }}{% if row.question.text|length > 180 %}...{% endif %}</td>
-                  <td class="text-muted small">{{ row.test.title if row.test else '-' }}</td>
-                  <td class="text-end"><span class="badge text-bg-danger">{{ row.frequency }}</span></td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="d-flex flex-column gap-3">
+          {% for subject in grouped_subjects %}
+            <div class="wrong-group-head">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0">{{ subject.subject_name }}</h5>
+                <span class="badge text-bg-primary">{{ subject.question_count }} سؤال</span>
+              </div>
+            </div>
+            {% for section in subject.sections %}
+              <div class="px-2">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="mb-0">{{ section.section_name }}</h6>
+                  <span class="badge text-bg-secondary">{{ section.question_count }} سؤال</span>
+                </div>
+                {% for lesson in section.lessons %}
+                  <div class="mb-2">
+                    <div class="small fw-semibold text-primary mb-2">{{ lesson.lesson_name }} ({{ lesson.question_count }})</div>
+                    <div class="d-flex flex-column gap-2">
+                      {% for row in lesson.rows %}
+                        <label class="wrong-question-card d-flex gap-2 align-items-start">
+                          <input type="checkbox" class="form-check-input wrong-q mt-1" name="question_ids" value="{{ row.question.id }}" checked>
+                          <div class="flex-grow-1">
+                            <div class="fw-semibold preserve-format">{{ row.question.text[:220] }}{% if row.question.text|length > 220 %}...{% endif %}</div>
+                            <div class="small text-muted">الاختبار: {{ row.test_title }}</div>
+                          </div>
+                          <span class="badge text-bg-danger">{{ row.frequency }}</span>
+                        </label>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          {% endfor %}
         </div>
       </form>
     {% else %}
-      <div class="alert alert-light mb-0">لا توجد أخطاء متكررة بعد. ممتاز!</div>
+      <div class="alert alert-light mb-0">لا توجد أسئلة ضمن الفلاتر الحالية.</div>
     {% endif %}
   </div>
 </div>
@@ -61,19 +199,23 @@
 {{ super() }}
 <script>
   (function () {
-    var selectAllBtn = document.getElementById('select-all-btn');
-    var clearAllBtn = document.getElementById('clear-all-btn');
-    var checks = Array.from(document.querySelectorAll('.wrong-q'));
+    var selectAllBtn = document.getElementById("select-all-btn");
+    var clearAllBtn = document.getElementById("clear-all-btn");
+    var checks = Array.from(document.querySelectorAll(".wrong-q"));
 
     if (selectAllBtn) {
-      selectAllBtn.addEventListener('click', function () {
-        checks.forEach(function (cb) { cb.checked = true; });
+      selectAllBtn.addEventListener("click", function () {
+        checks.forEach(function (cb) {
+          cb.checked = true;
+        });
       });
     }
 
     if (clearAllBtn) {
-      clearAllBtn.addEventListener('click', function () {
-        checks.forEach(function (cb) { cb.checked = false; });
+      clearAllBtn.addEventListener("click", function () {
+        checks.forEach(function (cb) {
+          cb.checked = false;
+        });
       });
     }
   })();

@@ -35,7 +35,7 @@
   <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">الواجبات المكتملة</div><div class="h4 mb-0">{{ report.assignments_completed }}</div></div></div></div>
   <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">متوسط النتائج</div><div class="h4 mb-0">{{ report.avg_score }}%</div></div></div></div>
   <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">نسبة النجاح</div><div class="h4 mb-0">{{ report.pass_rate }}%</div></div></div></div>
-  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">متوسط XP</div><div class="h4 mb-0">{{ report.avg_xp }}</div></div></div></div>
+  <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">متوسط الجواهر</div><div class="h4 mb-0">{{ report.avg_xp }}</div></div></div></div>
   <div class="col-12 col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">نسبة إنجاز الواجبات</div><div class="h4 mb-0">{{ report.assignment_completion_rate }}%</div></div></div></div>
 </div>
 
@@ -75,11 +75,11 @@
   <div class="col-12 col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h5 class="mb-3">أفضل الطلاب (XP)</h5>
+        <h5 class="mb-3">أفضل الطلاب (الجواهر)</h5>
         {% if report.top_students %}
           <div class="table-responsive">
             <table class="table table-sm align-middle">
-              <thead><tr><th>#</th><th>الطالب</th><th>XP</th><th>Level</th></tr></thead>
+              <thead><tr><th>#</th><th>الطالب</th><th>الجواهر</th><th>Level</th></tr></thead>
               <tbody>
                 {% for s in report.top_students %}
                   <tr>

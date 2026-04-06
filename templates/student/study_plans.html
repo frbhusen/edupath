@@ -5,7 +5,7 @@
     <h1 class="h4 mb-1">خطتي الدراسية</h1>
     <p class="mb-0">مهامك الأسبوعية المقترحة من المعلم.</p>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">الصفحة الرئيسية</a>
 </div>
 
 {% if plans %}
@@ -30,7 +30,7 @@
                   <div class="text-muted small">{{ it.due_at.strftime('%Y-%m-%d %H:%M') if it.due_at else 'بدون موعد' }}</div>
                 </div>
                 <form method="post" action="{{ url_for('student.toggle_study_plan_item', item_id=it.id) }}">
-                  <button class="btn btn-sm {% if it.is_done %}btn-outline-secondary{% else %}btn-cta{% endif %}" type="submit">{{ 'إلغاء الإنجاز' if it.is_done else 'تم الإنجاز (+5 XP)' }}</button>
+                  <button class="btn btn-sm {% if it.is_done %}btn-outline-secondary{% else %}btn-cta{% endif %}" type="submit">{{ 'إلغاء الإنجاز' if it.is_done else 'تم الإنجاز (+5 💎)' }}</button>
                 </form>
               </div>
             {% endfor %}

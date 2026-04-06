@@ -4,7 +4,7 @@
   <section class="leaderboard-hero shadow-sm">
     <div>
       <h1 class="h3 mb-1">لوحة الصدارة</h1>
-      <p class="mb-0 text-muted">ترتيب الطلاب حسب نقاط الخبرة XP مع تحديثات شبه لحظية.</p>
+      <p class="mb-0 text-muted">ترتيب الطلاب حسب النقاط مع تحديثات شبه لحظية.</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
       <div>
@@ -18,13 +18,13 @@
       </div>
       <span class="chip stat-chip">عدد الطلاب: {{ leaderboard.total_users }}</span>
       {% if current_user.role|lower in ['teacher', 'admin'] %}
-        <span class="chip stat-chip">وضع المشرف: متابعة ترتيب الطلاب وXP</span>
+        <span class="chip stat-chip"><i class="fa-solid fa-gem me-1"></i>وضع المشرف: متابعة ترتيب الطلاب والنقاط</span>
       {% endif %}
       {% if current_rank %}
         <span id="my-rank-chip" class="chip stat-chip success">ترتيبك: #{{ current_rank }}</span>
       {% endif %}
       {% if current_profile %}
-        <span id="my-xp-chip" class="chip stat-chip">XP ({{ scope }}): {{ current_scope_xp }}</span>
+        <span id="my-xp-chip" class="chip stat-chip"><i class="fa-solid fa-gem me-1"></i>({{ scope }}): {{ current_scope_xp }}</span>
       {% endif %}
       {% if current_user.role|lower == 'student' %}
         <span id="my-cert-chip" class="chip stat-chip">شهاداتك المعتمدة: {{ current_certificates_count }}</span>
@@ -60,7 +60,7 @@
             {% endif %}
           </div>
           <div class="xp-col">
-            <span class="xp-pill">{{ entry.xp }} XP</span>
+            <span class="xp-pill"><i class="fa-solid fa-gem me-1"></i>{{ entry.xp }}</span>
           </div>
         </article>
       {% endfor %}
@@ -259,7 +259,7 @@
             </div>
             ${entry.student_id ? `<div class="mt-1"><a class="small" href="${certificatesUrl}">عرض الشهادات</a></div>` : ''}
           </div>
-          <div class="xp-col"><span class="xp-pill">${entry.xp} XP</span></div>
+          <div class="xp-col"><span class="xp-pill"><i class="fa-solid fa-gem me-1"></i>${entry.xp}</span></div>
         </article>
       `;
     }
@@ -291,7 +291,7 @@
       }
       const xpChip = document.getElementById('my-xp-chip');
       if (xpChip && typeof payload.current_xp === 'number') {
-        xpChip.textContent = `XP (${scope}): ${payload.current_xp}`;
+        xpChip.innerHTML = `<i class="fa-solid fa-gem me-1"></i>(${scope}): ${payload.current_xp}`;
       }
       const certChip = document.getElementById('my-cert-chip');
       if (certChip && typeof payload.current_certificates_count === 'number') {

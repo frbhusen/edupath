@@ -5,7 +5,7 @@
     <h1 class="h4 mb-1">لوحة التحليلات</h1>
     <p class="mb-0">نظرة تشغيلية شاملة على الأداء، الجودة، ونشاط التعلم.</p>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">لوحة الإجراءات</a>
+  <a class="btn btn-light btn-sm" href="{{ url_for('index') }}">الصفحة الرئيسية</a>
 </div>
 
 <div class="row g-3 mb-3">
@@ -41,11 +41,11 @@
   <div class="col-12 col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h5 class="mb-3">أفضل الطلاب (XP)</h5>
+        <h5 class="mb-3">أفضل الطلاب (الجواهر)</h5>
         {% if top_students %}
           <div class="table-responsive">
             <table class="table table-sm align-middle">
-              <thead><tr><th>#</th><th>الطالب</th><th>XP</th><th>Level</th></tr></thead>
+              <thead><tr><th>#</th><th>الطالب</th><th>الجواهر</th><th>Level</th></tr></thead>
               <tbody>
                 {% for s in top_students %}
                   <tr>
@@ -59,7 +59,7 @@
             </table>
           </div>
         {% else %}
-          <div class="alert alert-light mb-0">لا توجد بيانات XP كافية بعد.</div>
+          <div class="alert alert-light mb-0">لا توجد بيانات جواهر كافية بعد.</div>
         {% endif %}
       </div>
     </div>

@@ -14,11 +14,11 @@
     </p>
   </div>
   {% if selected_lesson %}
-    <a class="btn btn-light btn-sm" href="{{ url_for('student.lesson_detail', lesson_id=selected_lesson.id) }}">رجوع</a>
+    <a class="btn btn-cta btn-sm" href="{{ url_for('student.lesson_detail', lesson_id=selected_lesson.id) }}">رجوع</a>
   {% elif selected_subject_id %}
-    <a class="btn btn-light btn-sm" href="{{ url_for('student.subject_detail', subject_id=selected_subject_id) }}">رجوع</a>
+    <a class="btn btn-cta btn-sm" href="{{ url_for('student.subject_detail', subject_id=selected_subject_id) }}">رجوع</a>
   {% else %}
-    <a class="btn btn-light btn-sm" href="{{ url_for('student.subjects') }}">رجوع</a>
+    <a class="btn btn-cta btn-sm" href="{{ url_for('student.subjects') }}">رجوع</a>
   {% endif %}
 </div>
 
@@ -31,7 +31,7 @@
           <a href="?subject_id={{ subject.id }}" class="text-decoration-none">
             <div class="card shadow-sm h-100 border-0 cursor-pointer subject-card">
               <div class="card-body text-center">
-                <h6 class="card-title mb-0">{{ subject.title }}</h6>
+                <h6 class="card-title mb-0 browse-card-title">{{ subject.title }}</h6>
               </div>
             </div>
           </a>
@@ -79,9 +79,9 @@
                 <div class="mt-3">
                   <div class="fw-semibold mb-2 small">اختر توزيع الصعوبات</div>
                   <div class="d-flex flex-wrap gap-1 mb-2">
-                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="easy">سهل</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="medium">متوسط</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="hard">صعب</button>
+                    <button type="button" class="btn btn-cta btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="easy">سهل</button>
+                    <button type="button" class="btn btn-cta btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="medium">متوسط</button>
+                    <button type="button" class="btn btn-cta btn-sm py-0 px-2 lesson-template-btn" data-lesson-id="{{ lesson.id }}" data-template="hard">صعب</button>
                   </div>
                   <div class="row g-2">
                     <div class="col-4">
@@ -169,9 +169,9 @@
                           <div class="mt-2">
                             <div class="fw-semibold mb-2 small">اختر توزيع الصعوبات</div>
                             <div class="d-flex flex-wrap gap-1 mb-2">
-                              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="easy">سهل</button>
-                              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="medium">متوسط</button>
-                              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="hard">صعب</button>
+                              <button type="button" class="btn btn-cta btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="easy">سهل</button>
+                              <button type="button" class="btn btn-cta btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="medium">متوسط</button>
+                              <button type="button" class="btn btn-cta btn-sm py-0 px-2 test-template-btn" data-test-id="{{ test.id }}" data-template="hard">صعب</button>
                             </div>
                             <div class="row g-2">
                               <div class="col-4">

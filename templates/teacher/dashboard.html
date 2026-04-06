@@ -121,7 +121,7 @@
     <a class="btn btn-light btn-sm" href="{{ url_for('teacher.assignments_manage') }}">الواجبات</a>
     {% if current_user.role == 'admin' %}
     <a class="btn btn-light btn-sm" href="{{ url_for('teacher.reports_dashboard') }}">التقارير</a>
-    <a class="btn btn-info btn-sm" href="{{ url_for('teacher.gamification_admin') }}">إدارة XP</a>
+    <a class="btn btn-info btn-sm" href="{{ url_for('teacher.gamification_admin') }}"><i class="fa-solid fa-gem me-1"></i>إدارة الجواهر</a>
     <a class="btn btn-warning btn-sm" href="{{ url_for('admin.dashboard') }}">قاعدة البيانات</a>
     {% endif %}
   </div>
@@ -154,7 +154,7 @@
               {% if subject.requires_code %}تعطيل التفعيل{% else %}تفعيل بكود{% endif %}
             </button>
           </form>
-          <a class="btn btn-sm btn-outline-dark" href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">الدورات التفاعلية</a>
+          <a class="btn btn-sm btn-outline-dark" href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">الدورات</a>
           <a class="btn btn-sm btn-outline-info" href="{{ url_for('teacher.manage_subject_access', subject_id=subject.id) }}">الوصول</a>
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('teacher.new_section', subject_id=subject.id) }}">إضافة قسم</a>
           <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('teacher.edit_subject', subject_id=subject.id) }}">تعديل</a>

@@ -5,12 +5,12 @@
     <h1 class="h4 mb-1">{{ subject.name }}</h1>
   </div>
   <div class="d-flex gap-2 align-items-center">
-    <a class="btn btn-light btn-sm" href="{{ url_for('student.subjects') }}">كل المواد</a>
+    <a class="btn btn-cta btn-sm" href="{{ url_for('student.subjects') }}">كل المواد</a>
     {% if current_user.role == 'student' %}
       {% set subject_active = subject_activation and subject_activation.active %}
       {% if subject_requires_code %}
         {% if not subject_active %}
-          <a class="btn btn-warning btn-sm" href="{{ url_for('student.activate_subject', subject_id=subject.id) }}">
+          <a class="btn btn-cta btn-sm" href="{{ url_for('student.activate_subject', subject_id=subject.id) }}">
             🔓 تفعيل المادة
           </a>
           <span class="badge text-bg-warning">مقفلة</span>
@@ -35,12 +35,12 @@
     {% for item in sections_data %}
       {% set section = item.section %}
       {% set locked = not item.is_open %}
-      <div class="col-12 col-md-6 col-lg-4">
+      <div class="col-6 col-md-6 col-lg-4">
         <div class="card h-100">
           <div class="card-body d-flex flex-column">
-            <div class="d-flex justify-content-between align-items-start mb-1">
-              <h5 class="card-title mb-0">{{ section.title }}</h5>
-              <div class="d-flex align-items-center gap-2">
+            <div class="browse-card-header mb-1">
+              <h5 class="card-title browse-card-title">{{ section.title }}</h5>
+              <div class="browse-card-meta">
                 <span class="badge text-bg-secondary">{{ item.lesson_count }} {{ "دروس" if item.lesson_count != 1 else "درس" }}</span>
                 {% if locked %}
                   <span class="text-muted small">&#128274;</span>
@@ -49,14 +49,16 @@
                 {% endif %}
               </div>
             </div>
-            <p class="text-muted">{{ section.description or 'لا يوجد وصف' }}</p>
-            <div class="mt-auto d-flex justify-content-between align-items-center">
+            {% if section.description and section.description|trim %}
+              <p class="text-muted">{{ section.description }}</p>
+            {% endif %}
+            <div class="mt-auto d-flex justify-content-start align-items-center gap-2">
               {% if locked and item.requires_code and current_user.role == 'student' %}
-                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_section', section_id=section.id) }}">تفعيل القسم</a>
+                <a class="btn btn-cta btn-sm" href="{{ url_for('student.activate_section', section_id=section.id) }}">تفعيل القسم</a>
               {% else %}
                 <span class="text-muted small">&nbsp;</span>
               {% endif %}
-              <a class="btn btn-cta btn-sm" href="{{ url_for('student.section_detail', section_id=section.id) }}">عرض</a>
+              <a class="btn btn-cta btn-sm btn-cta-uniform" href="{{ url_for('student.section_detail', section_id=section.id) }}">عرض</a>
             </div>
           </div>
         </div>
@@ -71,13 +73,13 @@
   <div class="col-12 col-md-6 col-lg-4">
     <div class="card h-100 shadow-sm">
       <div class="card-body d-flex flex-column">
-        <div class="d-flex justify-content-between align-items-start mb-1">
-          <h5 class="card-title mb-0">اختبار مخصص</h5>
+        <div class="browse-card-header mb-1">
+          <h5 class="card-title browse-card-title">اختبار مخصص</h5>
           <span class="badge text-bg-secondary">10-50 أسئلة</span>
         </div>
         <p class="text-muted small mb-1">أنشئ اختبار مختلط من دروس المادة المفتوحة.</p>
         <div class="text-muted small mb-2">اختبار مخصص على مستوى المادة</div>
-        <div class="mt-auto d-flex justify-content-between align-items-center">
+        <div class="mt-auto d-flex justify-content-start align-items-center">
           <a class="btn btn-cta btn-sm" href="{{ url_for('student.custom_test_new', subject_id=subject.id) }}">ابدأ</a>
         </div>
       </div>
@@ -86,13 +88,13 @@
   <div class="col-12 col-md-6 col-lg-4">
     <div class="card h-100 shadow-sm">
       <div class="card-body d-flex flex-column">
-        <div class="d-flex justify-content-between align-items-start mb-1">
-          <h5 class="card-title mb-0">أسئلة الدورات</h5>
+        <div class="browse-card-header mb-1">
+          <h5 class="card-title browse-card-title">أسئلة الدورات</h5>
           <span class="badge text-bg-secondary">صح/خطأ</span>
         </div>
         <p class="text-muted small mb-1">دورات بصور أسئلة وصور إجابات مع زر إظهار الإجابة.</p>
         <div class="text-muted small mb-2">مجموعات يحددها المعلم لكل مادة</div>
-        <div class="mt-auto d-flex justify-content-between align-items-center">
+        <div class="mt-auto d-flex justify-content-start align-items-center">
           <a class="btn btn-cta btn-sm" href="{{ url_for('student.subject_courses', subject_id=subject.id) }}">ابدأ</a>
         </div>
       </div>

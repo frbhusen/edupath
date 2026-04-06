@@ -91,6 +91,32 @@ class StudentEditForm(FlaskForm):
     submit = SubmitField("حفظ")
 
 
+class StudentProfileForm(FlaskForm):
+    first_name = StringField("الاسم الأول", filters=[_strip_edges], validators=[DataRequired(), Length(min=2, max=80)])
+    last_name = StringField("اسم العائلة", filters=[_strip_edges], validators=[DataRequired(), Length(min=2, max=80)])
+    username = StringField(
+        "اسم المستخدم (بالإنجليزية فقط)",
+        filters=[_strip_edges],
+        validators=[
+            DataRequired(),
+            Length(min=3, max=80),
+            Regexp(r'^[A-Za-z0-9_ ]+$', message="اسم المستخدم يجب أن يكون بالإنجليزية فقط (حروف/أرقام/_)")
+        ]
+    )
+    phone = StringField(
+        "رقم الهاتف (10 أرقام يبدأ ب 09)",
+        validators=[
+            DataRequired(),
+            Length(min=10, max=10),
+            Regexp(r'^09\d{8}$', message="يجب أن يكون رقم الهاتف 10 أرقام ويبدأ ب 09")
+        ]
+    )
+    current_password = PasswordField("كلمة المرور الحالية", validators=[Optional()])
+    new_password = PasswordField("كلمة المرور الجديدة", validators=[Optional(), Length(min=6)])
+    confirm_new_password = PasswordField("تأكيد كلمة المرور الجديدة", validators=[Optional(), EqualTo("new_password")])
+    submit = SubmitField("حفظ التعديلات")
+
+
 class ActivationForm(FlaskForm):
     code = StringField("رمز التفعيل", validators=[DataRequired(), Length(min=6, max=6)])
     submit = SubmitField("تفعيل")

@@ -109,7 +109,7 @@
   <div class="col-12">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
-        <li class="breadcrumb-item"><a href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">الدورات التفاعلية</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}">الدورات</a></li>
         <li class="breadcrumb-item active">تعديل الدورة</li>
       </ol>
     </nav>
@@ -164,7 +164,7 @@
               <input class="form-control" name="description" value="{{ course_set.description or '' }}">
             </div>
             <div class="col-12 col-md-3">
-              <label class="form-label">XP لكل سؤال</label>
+              <label class="form-label">جواهر لكل سؤال</label>
               <input class="form-control" type="number" name="xp_per_question" min="1" value="{{ course_set.xp_per_question|default(1) }}" required>
             </div>
             <div class="col-12 col-md-4">

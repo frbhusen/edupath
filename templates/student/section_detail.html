@@ -15,13 +15,13 @@
         {% elif subject_requires_code and not subject_open and not section_open
         %}
         <a
-          class="btn btn-warning btn-sm"
+          class="btn btn-cta btn-sm"
           href="{{ url_for('student.activate_section', section_id=section.id) }}"
           >تفعيل القسم</a
         >
         {% endif %}
         <a
-          class="btn btn-outline-primary btn-sm"
+          class="btn btn-cta btn-sm"
           href="{{ url_for('student.subject_detail', subject_id=section.subject.id) }}"
           >كل أقسام المادة</a
         >
@@ -58,14 +58,14 @@
     <div class="row g-3">
       {% for item in lessons_data %} {% set lesson = item.lesson %} {% set
       locked = not item.is_open %} {% set completed = item.is_completed %}
-      <div class="col-12 col-md-6 col-lg-4">
+      <div class="col-6 col-md-6 col-lg-4">
         <div class="card h-100 shadow-sm">
           <div
             class="card-body d-flex flex-column {% if locked %}opacity-50{% endif %}"
           >
-            <div class="d-flex justify-content-between align-items-start mb-1">
-              <h5 class="card-title mb-0">{{ lesson.title }}</h5>
-              <div class="d-flex gap-1 align-items-center">
+            <div class="browse-card-header mb-1">
+              <h5 class="card-title browse-card-title">{{ lesson.title }}</h5>
+              <div class="browse-card-meta">
                 {% if locked %}
                 <span class="text-muted small">&#128274;</span>
                 {% else %}
@@ -76,12 +76,10 @@
               </div>
             </div>
             <div class="text-muted small mb-2">درس</div>
-            <div
-              class="mt-auto d-flex justify-content-between align-items-center"
-            >
+            <div class="mt-auto d-flex justify-content-start align-items-center">
               {% if locked %}
               <a
-                class="btn btn-outline-secondary btn-sm"
+                class="btn btn-cta btn-sm"
                 href="{{ url_for('student.activate_section', section_id=section.id) }}"
                 >تفعيل القسم</a
               >
@@ -121,9 +119,9 @@
           <div
             class="card-body d-flex flex-column {% if locked %}opacity-50{% endif %}"
           >
-            <div class="d-flex justify-content-between align-items-start mb-1">
-              <h5 class="card-title mb-0">{{ test.title }}</h5>
-              <div class="d-flex align-items-center gap-2">
+            <div class="browse-card-header mb-1">
+              <h5 class="card-title browse-card-title">{{ test.title }}</h5>
+              <div class="browse-card-meta">
                 <span class="badge text-bg-secondary"
                   >{{ test._question_count|default(0) }} أسئلة</span
                 >
@@ -131,9 +129,9 @@
                 endif %}
               </div>
             </div>
-            <p class="text-muted small mb-1">
-              {{ test.description or '' }}
-            </p>
+            {% if test.description and test.description|trim %}
+              <p class="text-muted small mb-1">{{ test.description }}</p>
+            {% endif %}
             <div class="text-muted small mb-2">
               {% if test.lesson %} مرتبط بالدرس: {{ test.lesson.title }} {% else
               %} اختبار على مستوى القسم {% endif %}
@@ -142,17 +140,15 @@
             {% if resources %}
             <div class="d-flex flex-wrap gap-2 mb-2">
               {% for res in resources %}
-              <a class="btn btn-outline-primary btn-sm" href="{{ res.url }}" target="_blank" rel="noopener">{{ res.label }}</a>
+              <a class="btn btn-cta btn-sm" href="{{ res.url }}" target="_blank" rel="noopener">{{ res.label }}</a>
               {% endfor %}
             </div>
             {% endif %}
-            <div
-              class="mt-auto d-flex justify-content-between align-items-center"
-            >
+            <div class="mt-auto d-flex justify-content-start align-items-center gap-2">
               <span class="chip">MCQ</span>
               {% if locked %}
               <a
-                class="btn btn-outline-secondary btn-sm"
+                class="btn btn-cta btn-sm"
                 href="{{ url_for('student.activate_section', section_id=section.id) }}"
                 >تفعيل القسم</a
               >

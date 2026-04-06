@@ -6,7 +6,7 @@
     <p class="text-muted mb-0">كل الإشعارات المرسلة إليك.</p>
   </div>
   <form method="post" action="{{ url_for('notifications_mark_all_read') }}">
-    <button class="btn btn-outline-secondary btn-sm" type="submit">تعيين الكل كمقروء</button>
+    <button class="btn btn-outline-secondary btn-sm notification-mark-all-btn" type="submit">تعيين الكل كمقروء</button>
   </form>
 </div>
 
@@ -25,11 +25,11 @@
               </div>
               <div>{{ n.body if n else '' }}</div>
             </div>
-            <div class="d-flex flex-column align-items-end gap-2">
+            <div class="d-flex flex-column align-items-end gap-2 notification-item-actions">
               {% if not row.is_read %}
                 <span class="badge text-bg-primary">جديد</span>
                 <form method="post" action="{{ url_for('notifications_mark_read', recipient_id=row.id) }}">
-                  <button class="btn btn-outline-primary btn-sm" type="submit">تعيين كمقروء</button>
+                  <button class="btn btn-outline-primary btn-sm notification-read-btn" type="submit">تعيين كمقروءة</button>
                 </form>
               {% else %}
                 <span class="badge text-bg-secondary">مقروء</span>

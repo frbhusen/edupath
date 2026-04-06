@@ -2,7 +2,7 @@
 {% block content %}
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
-    <h1 class="h4 mb-1">الدورات التفاعلية - {{ subject.name }}</h1>
+    <h1 class="h4 mb-1">الدورات - {{ subject.name }}</h1>
     <p class="mb-0">إنشاء مجموعات أسئلة بصيغة صحيح/خطأ مع صور السؤال والإجابة.</p>
   </div>
   <a class="btn btn-light btn-sm" href="{{ url_for('teacher.subject_detail', subject_id=subject.id) }}">رجوع للمادة</a>
@@ -37,7 +37,7 @@
         <input class="form-control" name="link_url_2" placeholder="https://...">
       </div>
       <div class="col-12 col-md-3">
-        <label class="form-label">XP لكل سؤال</label>
+        <label class="form-label">جواهر لكل سؤال</label>
         <input class="form-control" type="number" name="xp_per_question" min="1" value="1" required>
       </div>
       <div class="col-12 col-md-4">
@@ -73,7 +73,7 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <h5 class="card-title">الدورات التفاعلية الحالية</h5>
+    <h5 class="card-title">الدورات الحالية</h5>
     {% if sets %}
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
@@ -98,7 +98,7 @@
                 <td>
                   <div class="small">القسم: {{ item.section_id.title if item.section_id else '-' }}</div>
                   <div class="small">الدرس: {{ item.lesson_id.title if item.lesson_id else '-' }}</div>
-                  <div class="small">XP لكل سؤال: {{ item.xp_per_question|default(1) }}</div>
+                  <div class="small">جواهر لكل سؤال: {{ item.xp_per_question|default(1) }}</div>
                   <div class="small">روابط الموارد: {{ 1 if item.link_url else 0 }} + {{ 1 if item.link_url_2 else 0 }}</div>
                 </td>
                 <td>{{ question_counts.get(item.id, 0) }}</td>

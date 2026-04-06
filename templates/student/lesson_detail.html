@@ -5,27 +5,27 @@
     <h1 class="h4 mb-1">{{ lesson.title }}</h1>
     <p class="mb-0">درس</p>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('student.section_detail', section_id=section.id) }}">العودة للقسم</a>
+  <a class="btn btn-cta btn-sm" href="{{ url_for('student.section_detail', section_id=section.id) }}">العودة للقسم</a>
 </div>
 
 <div class="card shadow-sm">
   <div class="card-body">
     <div class="text-muted small mb-2">القسم: {{ section.title }}</div>
-    <div class="d-flex gap-2 flex-wrap mb-3">
-      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.lesson_discussion', lesson_id=lesson.id) }}">Discussion / Q&A</a>
+    <div class="d-flex justify-content-start gap-2 flex-wrap mb-3">
+      <a class="btn btn-cta btn-sm" href="{{ url_for('student.lesson_discussion', lesson_id=lesson.id) }}">Discussion / Q&A</a>
       {% if current_user.role == 'student' and certificate %}
-        <a class="btn btn-outline-success btn-sm" href="{{ url_for('student.download_certificate', certificate_id=certificate.id) }}">تحميل الشهادة</a>
+        <a class="btn btn-cta btn-sm" href="{{ url_for('student.download_certificate', certificate_id=certificate.id) }}">تحميل الشهادة</a>
       {% endif %}
     </div>
     {% if current_user.role == 'student' %}
       <div class="d-flex align-items-center justify-content-between mb-3 p-2 rounded border bg-light">
         {% if is_completed %}
           <span class="badge text-bg-success">تم إنهاء الدرس</span>
-          <span class="text-muted small">تم احتساب XP مسبقاً</span>
+          <span class="text-muted small">تم احتساب النقاط مسبقاً</span>
         {% else %}
-          <span class="text-muted small">عند إنهاء الدرس ستحصل على {{ lesson_completion_xp }} XP</span>
+          <span class="text-muted small"><i class="fa-solid fa-gem me-1"></i>عند إنهاء الدرس ستحصل على {{ lesson_completion_xp }}</span>
           <form method="post" action="{{ url_for('student.complete_lesson', lesson_id=lesson.id) }}" class="m-0">
-            <button type="submit" class="btn btn-success btn-sm">إنهاء الدرس</button>
+            <button type="submit" class="btn btn-cta btn-sm">إنهاء الدرس</button>
           </form>
         {% endif %}
       </div>
@@ -42,7 +42,7 @@
         <a class="btn btn-cta btn-sm" href="{{ lesson.link_url }}" target="_blank" rel="noopener">{{ lesson.link_label }}</a>
       {% endif %}
       {% if lesson.link_label_2 and lesson.link_url_2 %}
-        <a class="btn btn-outline-primary btn-sm" href="{{ lesson.link_url_2 }}" target="_blank" rel="noopener">{{ lesson.link_label_2 }}</a>
+        <a class="btn btn-cta btn-sm" href="{{ lesson.link_url_2 }}" target="_blank" rel="noopener">{{ lesson.link_label_2 }}</a>
       {% endif %}
     </div>
   </div>
@@ -61,28 +61,30 @@
         <div class="col-12 col-md-6 col-lg-4">
           <div class="card h-100 shadow-sm">
             <div class="card-body d-flex flex-column {% if locked %}opacity-50{% endif %}">
-              <div class="d-flex justify-content-between align-items-start mb-1">
+              <div class="browse-card-header mb-1">
                 <h5 class="card-title mb-0">{{ test.title }}</h5>
-                <div class="d-flex align-items-center gap-2">
+                <div class="browse-card-meta">
                   <span class="badge text-bg-secondary">{{ test._question_count|default(0) }} أسئلة</span>
                   {% if locked %}<span class="text-muted small">&#128274;</span>{% endif %}
                 </div>
               </div>
-              <p class="text-muted small mb-1">{{ test.description or '' }}</p>
+              {% if test.description and test.description|trim %}
+                <p class="text-muted small mb-1">{{ test.description }}</p>
+              {% endif %}
               {% set resources = test._resources|default([]) %}
               {% if resources %}
                 <div class="d-flex flex-wrap gap-2 mb-2">
                   {% for res in resources %}
-                    <a class="btn btn-outline-primary btn-sm" href="{{ res.url }}" target="_blank" rel="noopener">{{ res.label }}</a>
+                    <a class="btn btn-cta btn-sm" href="{{ res.url }}" target="_blank" rel="noopener">{{ res.label }}</a>
                   {% endfor %}
                 </div>
               {% endif %}
-              <div class="mt-auto d-flex justify-content-end">
+              <div class="mt-auto d-flex justify-content-start">
                 {% if locked %}
                   {% if section.subject.requires_code and not subject_open %}
-                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_subject', subject_id=section.subject.id) }}">تفعيل المادة</a>
+                    <a class="btn btn-cta btn-sm" href="{{ url_for('student.activate_subject', subject_id=section.subject.id) }}">تفعيل المادة</a>
                   {% else %}
-                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('student.activate_section', section_id=section.id) }}">تفعيل القسم</a>
+                    <a class="btn btn-cta btn-sm" href="{{ url_for('student.activate_section', section_id=section.id) }}">تفعيل القسم</a>
                   {% endif %}
                 {% else %}
                   <a class="btn btn-cta btn-sm" href="{{ url_for('student.take_test', test_id=test.id) }}">ابدأ</a>
@@ -99,7 +101,7 @@
 {% if current_user.role == 'student' and lesson_full_custom_test_enabled %}
   <div class="mt-4">
     <div class="card shadow-sm border-0">
-      <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="card-body d-flex flex-wrap justify-content-start align-items-center gap-2">
         <div>
           <h5 class="mb-1">اختبار شامل للدرس</h5>
           <div class="text-muted small">يمكنك دمج كل اختبارات هذا الدرس وتحديد عدد الأسئلة والصعوبات.</div>

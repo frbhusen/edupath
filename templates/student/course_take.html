@@ -86,7 +86,7 @@
   <div>
     <h1 class="h4 mb-1">{{ course_set.title }}</h1>
     <p class="mb-0">اختر صحيح أو خطأ لكل سؤال، ويمكنك إظهار صورة الإجابة.</p>
-    <div class="small text-muted">XP لكل سؤال: {{ course_set.xp_per_question|default(1) }} | الدرجة الكاملة = مضاعفة XP</div>
+    <div class="small text-muted"><i class="fa-solid fa-gem me-1"></i>{{ course_set.xp_per_question|default(1) }} لكل سؤال | الدرجة الكاملة = مضاعفة <i class="fa-solid fa-gem mx-1"></i></div>
   </div>
   <a class="btn btn-light btn-sm" href="{{ url_for('student.subject_courses', subject_id=course_set.subject_id.id) }}">رجوع</a>
 </div>

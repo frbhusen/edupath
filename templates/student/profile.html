@@ -1,0 +1,107 @@
+{% extends 'base.html' %} {% block content %}
+<div
+  class="dashboard-hero mb-3 d-flex justify-content-between align-items-center"
+>
+  <div>
+    <h1 class="h4 mb-1">الملف الشخصي</h1>
+    <p class="mb-0">راجع بياناتك الشخصية وعدلها عند الحاجة.</p>
+  </div>
+  <a class="btn btn-cta btn-sm" href="{{ url_for('student.subjects') }}"
+    >العودة للمواد</a
+  >
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">بيانات الحساب</h5>
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              {{ form.first_name.label(class="form-label") }} {{
+              form.first_name(class="form-control", placeholder="الاسم الأول")
+              }}
+            </div>
+            <div class="col-12 col-md-6">
+              {{ form.last_name.label(class="form-label") }} {{
+              form.last_name(class="form-control", placeholder="اسم العائلة") }}
+            </div>
+            <div class="col-12 col-md-6">
+              {{ form.username.label(class="form-label") }} {{
+              form.username(class="form-control", placeholder="اسم المستخدم") }}
+            </div>
+            <div class="col-12 col-md-6">
+              {{ form.phone.label(class="form-label") }} {{
+              form.phone(class="form-control", placeholder="09XXXXXXXX") }}
+            </div>
+          </div>
+
+          <hr class="my-4" />
+          <h6 class="mb-2">تغيير كلمة المرور</h6>
+          <p class="text-muted small mb-3">
+            لن تتغير كلمة المرور إلا إذا أدخلت كلمة المرور الحالية وكلمة مرور
+            جديدة.
+          </p>
+
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              {{ form.current_password.label(class="form-label") }} {{
+              form.current_password(class="form-control",
+              autocomplete="current-password") }}
+            </div>
+            <div class="col-12 col-md-4">
+              {{ form.new_password.label(class="form-label") }} {{
+              form.new_password(class="form-control",
+              autocomplete="new-password") }}
+            </div>
+            <div class="col-12 col-md-4">
+              {{ form.confirm_new_password.label(class="form-label") }} {{
+              form.confirm_new_password(class="form-control",
+              autocomplete="new-password") }}
+            </div>
+          </div>
+
+          <div class="mt-4 d-flex justify-content-end">
+            {{ form.submit(class="btn btn-cta") }}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title mb-3">المواد المفعلة</h5>
+        {% if activated_subjects %}
+        <ul class="list-group list-group-flush">
+          {% for row in activated_subjects %}
+          <li
+            class="list-group-item d-flex justify-content-between align-items-start px-0"
+          >
+            <div>
+              <div class="fw-semibold">{{ row.subject.name }}</div>
+              <div class="small text-muted">
+                {{ row.activated_at.strftime('%Y-%m-%d %H:%M') if
+                row.activated_at else '—' }}
+              </div>
+            </div>
+            <a
+              class="btn btn-cta btn-sm"
+              href="{{ url_for('student.subject_detail', subject_id=row.subject.id) }}"
+              >فتح</a
+            >
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="alert alert-light mb-0">لا توجد مواد مفعلة حالياً.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

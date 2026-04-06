@@ -64,7 +64,7 @@
     transition: all 0.2s ease;
 }
 .custom-footer .social-icons a:hover {
-    background: #3b82f6;
+    background: #ff0000;
     transform: translateY(-1px);
 }
 .custom-footer .footer-2 {

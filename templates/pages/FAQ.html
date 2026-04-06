@@ -1,27 +1,24 @@
-{% extends 'base.html' %} {% block content %}
+{% extends 'base.html' %}
+{% block content %}
 <style>
   @import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap");
 
   .faq-shell {
-    --faq-bg-1: #f5efe5;
-    --faq-bg-2: #cfe2dc;
-    --faq-ink: #102a2b;
-    --faq-muted: #50696a;
-    --faq-accent: #0f766e;
-    --faq-accent-soft: #d7f0ec;
+    --faq-bg-1: #f3f8ff;
+    --faq-bg-2: #d6e6ff;
+    --faq-ink: #0f2742;
+    --faq-muted: #4a617a;
+    --faq-accent: #1c4fb6;
+    --faq-accent-soft: #e7efff;
     --faq-card: #ffffff;
     font-family: "Tajawal", sans-serif;
     color: var(--faq-ink);
-    border-radius: 1.5rem;
+    border-radius: 1.4rem;
     background:
-      radial-gradient(
-        circle at 85% 15%,
-        rgba(255, 255, 255, 0.65) 0%,
-        rgba(255, 255, 255, 0) 35%
-      ),
+      radial-gradient(circle at 82% 12%, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 36%),
       linear-gradient(135deg, var(--faq-bg-1), var(--faq-bg-2));
-    padding: 2rem;
-    box-shadow: 0 14px 40px rgba(16, 42, 43, 0.08);
+    padding: 1.8rem;
+    box-shadow: 0 14px 36px rgba(15, 39, 66, 0.1);
   }
 
   .faq-headline {
@@ -31,27 +28,27 @@
 
   .faq-subtitle {
     color: var(--faq-muted);
-    max-width: 720px;
+    max-width: 760px;
     margin: 0 auto;
-    font-size: 1.04rem;
+    font-size: 1.03rem;
   }
 
   .faq-search {
-    max-width: 560px;
-    margin: 1.5rem auto 0;
+    max-width: 600px;
+    margin: 1.3rem auto 0;
     position: relative;
   }
 
   .faq-search .form-control {
     border-radius: 999px;
-    border: 1px solid rgba(15, 118, 110, 0.24);
-    padding: 0.8rem 1rem 0.8rem 2.8rem;
-    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(28, 79, 182, 0.24);
+    padding: 0.78rem 1rem 0.78rem 2.7rem;
+    background: rgba(255, 255, 255, 0.95);
   }
 
   .faq-search i {
     position: absolute;
-    left: 1rem;
+    left: 0.95rem;
     top: 50%;
     transform: translateY(-50%);
     color: var(--faq-accent);
@@ -60,27 +57,37 @@
   .faq-stats {
     display: flex;
     justify-content: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
-  }
-
-  .faq-controls {
-    display: flex;
-    justify-content: center;
     gap: 0.55rem;
     flex-wrap: wrap;
     margin-top: 1rem;
   }
 
-  .faq-control-btn {
-    border: 1px solid rgba(15, 118, 110, 0.35);
+  .faq-chip {
+    border: 1px solid rgba(28, 79, 182, 0.28);
     background: rgba(255, 255, 255, 0.9);
+    border-radius: 999px;
+    padding: 0.32rem 0.72rem;
+    font-size: 0.84rem;
+    color: var(--faq-accent);
+    font-weight: 700;
+  }
+
+  .faq-controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.95rem;
+  }
+
+  .faq-control-btn {
+    border: 1px solid rgba(28, 79, 182, 0.32);
+    background: rgba(255, 255, 255, 0.95);
     color: var(--faq-accent);
     border-radius: 999px;
-    padding: 0.38rem 0.9rem;
+    padding: 0.36rem 0.88rem;
     font-weight: 700;
-    font-size: 0.86rem;
+    font-size: 0.85rem;
     transition: all 0.2s ease;
   }
 
@@ -89,18 +96,8 @@
     transform: translateY(-1px);
   }
 
-  .faq-chip {
-    border: 1px solid rgba(15, 118, 110, 0.28);
-    background: rgba(255, 255, 255, 0.85);
-    border-radius: 999px;
-    padding: 0.34rem 0.75rem;
-    font-size: 0.86rem;
-    color: var(--faq-accent);
-    font-weight: 700;
-  }
-
   .faq-grid {
-    margin-top: 1.7rem;
+    margin-top: 1.5rem;
   }
 
   .faq-item {
@@ -108,39 +105,8 @@
     background: var(--faq-card);
     border-radius: 1rem !important;
     overflow: hidden;
-    box-shadow: 0 10px 24px rgba(16, 42, 43, 0.06);
-    margin-bottom: 0.9rem;
-    opacity: 0;
-    transform: translateY(8px);
-    animation: faqRise 0.45s ease forwards;
-  }
-
-  .faq-item:nth-child(2) {
-    animation-delay: 0.04s;
-  }
-  .faq-item:nth-child(3) {
-    animation-delay: 0.08s;
-  }
-  .faq-item:nth-child(4) {
-    animation-delay: 0.12s;
-  }
-  .faq-item:nth-child(5) {
-    animation-delay: 0.16s;
-  }
-  .faq-item:nth-child(6) {
-    animation-delay: 0.2s;
-  }
-  .faq-item:nth-child(7) {
-    animation-delay: 0.24s;
-  }
-  .faq-item:nth-child(8) {
-    animation-delay: 0.28s;
-  }
-  .faq-item:nth-child(9) {
-    animation-delay: 0.32s;
-  }
-  .faq-item:nth-child(10) {
-    animation-delay: 0.36s;
+    box-shadow: 0 8px 22px rgba(15, 39, 66, 0.08);
+    margin-bottom: 0.82rem;
   }
 
   .faq-button {
@@ -148,7 +114,7 @@
     color: var(--faq-ink);
     font-weight: 700;
     line-height: 1.5;
-    padding: 1rem 1.1rem;
+    padding: 0.92rem 1rem;
     box-shadow: none !important;
     cursor: pointer;
   }
@@ -160,8 +126,8 @@
 
   .faq-answer {
     color: var(--faq-muted);
-    font-size: 0.98rem;
-    line-height: 1.85;
+    font-size: 0.97rem;
+    line-height: 1.8;
     margin: 0;
     white-space: pre-line;
   }
@@ -169,41 +135,34 @@
   .faq-empty {
     display: none;
     text-align: center;
-    margin-top: 1.4rem;
-    padding: 1.1rem;
+    margin-top: 1.2rem;
+    padding: 1rem;
     border-radius: 0.9rem;
-    border: 1px dashed rgba(15, 118, 110, 0.35);
-    background: rgba(255, 255, 255, 0.6);
+    border: 1px dashed rgba(28, 79, 182, 0.35);
+    background: rgba(255, 255, 255, 0.72);
     color: var(--faq-muted);
     font-weight: 600;
   }
 
-  @keyframes faqRise {
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   @media (max-width: 768px) {
     .faq-shell {
-      padding: 1.2rem;
+      padding: 1.15rem;
       border-radius: 1rem;
     }
 
     .faq-button {
       font-size: 0.95rem;
-      padding: 0.82rem 0.9rem;
+      padding: 0.8rem 0.88rem;
     }
   }
 </style>
 
 <div class="faq-shell">
   <div class="text-center">
-    <h1 class="faq-headline mb-2">الأسئلة الشائعة</h1>
+    <h1 class="faq-headline mb-2">الأسئلة الشائعة للطلاب</h1>
     <p class="faq-subtitle">
-      كل ما تحتاج معرفته حول استخدام المنصة: التفعيل، الاختبارات، النتائج،
-      وإعادة المحاولات.
+      دليل سريع لاستخدام المنصة للطلاب فقط: من الدخول للمحتوى حتى الاختبارات
+      والنتائج والمراجعة.
     </p>
   </div>
 
@@ -213,534 +172,211 @@
       id="faqSearchInput"
       type="text"
       class="form-control"
-      placeholder="ابحث في الأسئلة... مثال: إعادة الاختبار"
+      placeholder="ابحث في الأسئلة... مثال: المفضلة أو إعادة الاختبار"
       aria-label="بحث في الأسئلة الشائعة"
     />
   </div>
 
   <div class="faq-stats">
-    <span class="faq-chip">طلاب</span>
-    <span class="faq-chip">معلمون</span>
-    <span class="faq-chip">اختبارات مخصصة</span>
-    <span class="faq-chip">أكواد التفعيل</span>
-    <span class="faq-chip">تحديات ودية</span>
-    <span class="faq-chip">واجبات</span>
-    <span class="faq-chip">شهادات</span>
-    <span class="faq-chip">لوحات الصدارة</span>
+    <span class="faq-chip">طلاب فقط</span>
+    <span class="faq-chip">اختبارات</span>
+    <span class="faq-chip">نتائج ومراجعة</span>
+    <span class="faq-chip">تحديات</span>
+    <span class="faq-chip">إشعارات</span>
   </div>
 
   <div class="faq-controls">
-    <button id="faqExpandAll" type="button" class="faq-control-btn">
-      فتح الكل
-    </button>
-    <button id="faqCollapseAll" type="button" class="faq-control-btn">
-      إغلاق الكل
-    </button>
+    <button id="faqExpandAll" type="button" class="faq-control-btn">فتح الكل</button>
+    <button id="faqCollapseAll" type="button" class="faq-control-btn">إغلاق الكل</button>
   </div>
 
   <div class="accordion faq-grid" id="faqAccordion">
-    <div
-      class="accordion-item faq-item"
-      data-faq="ما هي منصة الدراسة teacher student مواد اختبارات"
-    >
+    <div class="accordion-item faq-item" data-faq="ما هي المنصة الطالب دراسة">
       <h2 class="accordion-header" id="faq-h1">
-        <button
-          class="accordion-button faq-button"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c1"
-          aria-expanded="true"
-          aria-controls="faq-c1"
-        >
-          ما هي منصة EduPath؟
+        <button class="accordion-button faq-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c1" aria-expanded="true" aria-controls="faq-c1">
+          1) ما هي منصة EduPath للطالب؟
         </button>
       </h2>
-      <div
-        id="faq-c1"
-        class="accordion-collapse collapse show"
-        aria-labelledby="faq-h1"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            منصة تعليمية تتيح للطالب المواد المختلفة والقيام باختبارات مؤتمتة
-            بشكل تلقائي. المنصة مخدمة بأحدث تقنيات الذكاء الاصطناعي لتوفير أفضل
-            الشروحات والملخصات والاختبارات
-          </p>
-        </div>
+      <div id="faq-c1" class="accordion-collapse collapse show" aria-labelledby="faq-h1" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">منصة تعليمية تتيح لك دراسة المواد، التدرّب عبر اختبارات، ومتابعة تقدّمك من نفس الحساب.
+كل ما تحتاجه موجود في واجهة الطالب دون الحاجة إلى أدوات خارجية.</p></div>
       </div>
     </div>
 
-    <div class="accordion-item faq-item" data-faq="تفعيل مادة قسم درس code">
+    <div class="accordion-item faq-item" data-faq="تسجيل دخول خروج حساب">
       <h2 class="accordion-header" id="faq-h2">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c2"
-          aria-expanded="false"
-          aria-controls="faq-c2"
-        >
-          ما الفرق بين تفعيل المادة وتفعيل القسم وتفعيل الدرس؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c2" aria-expanded="false" aria-controls="faq-c2">
+          2) كيف أنشئ حساباً وأدخل إلى المنصة؟
         </button>
       </h2>
-      <div
-        id="faq-c2"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h2"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            تفعيل المادة: يفتح كل المحتوى داخل المادة. تفعيل القسم: يفتح محتوى
-            ذلك القسم. تفعيل الدرس: يفتح هذا الدرس فقط واختباراته المرتبطة به.
-          </p>
-        </div>
+      <div id="faq-c2" class="accordion-collapse collapse" aria-labelledby="faq-h2" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">من الصفحة الرئيسية اختر إنشاء حساب، ثم سجّل بياناتك.
+بعدها استخدم تسجيل الدخول للوصول لحسابك، ويمكنك تسجيل الخروج في أي وقت من الشريط العلوي.</p></div>
       </div>
     </div>
 
-    <div
-      class="accordion-item faq-item"
-      data-faq="كود التفعيل لا يعمل used invalid"
-    >
+    <div class="accordion-item faq-item" data-faq="مواد أقسام دروس تصفح">
       <h2 class="accordion-header" id="faq-h3">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c3"
-          aria-expanded="false"
-          aria-controls="faq-c3"
-        >
-          أدخلت كود التفعيل ولم يفتح المحتوى، لماذا؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c3" aria-expanded="false" aria-controls="faq-c3">
+          3) كيف أتنقّل بين المواد والأقسام والدروس؟
         </button>
       </h2>
-      <div
-        id="faq-c3"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h3"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            غالبًا أحد الأسباب التالية: الكود غير صحيح. الكود مستخدم مسبقًا.
-            الكود يخص مادة/قسم/درس مختلف.
-          </p>
-        </div>
+      <div id="faq-c3" class="accordion-collapse collapse" aria-labelledby="faq-h3" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">ابدأ من صفحة المواد، ثم افتح المادة المطلوبة.
+داخل المادة ستجد الأقسام، وداخل كل قسم الدروس والاختبارات المرتبطة بها.</p></div>
       </div>
     </div>
 
-    <div
-      class="accordion-item faq-item"
-      data-faq="اختبار مخصص custom test easy medium hard"
-    >
+    <div class="accordion-item faq-item" data-faq="تفعيل كود مادة قسم">
       <h2 class="accordion-header" id="faq-h4">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c4"
-          aria-expanded="false"
-          aria-controls="faq-c4"
-        >
-          ما هو الاختبار المخصص؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c4" aria-expanded="false" aria-controls="faq-c4">
+          4) ما هي أكواد التفعيل المتاحة للطالب؟
         </button>
       </h2>
-      <div
-        id="faq-c4"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h4"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            اختبار ينشئه الطالب من الدروس المفتوحة، مع تحديد عدد الأسئلة وتوزيع
-            الصعوبة (سهل/متوسط/صعب) ضمن الحد المسموح.
-          </p>
-        </div>
+      <div id="faq-c4" class="accordion-collapse collapse" aria-labelledby="faq-h4" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">في النظام الحالي التفعيل يكون على مستوى المادة والقسم فقط.
+لا يوجد تفعيل مستقل للدروس أو الاختبارات عبر أكواد منفصلة.</p></div>
       </div>
     </div>
 
-    <div
-      class="accordion-item faq-item"
-      data-faq="retake إعادة نفس الأسئلة new questions"
-    >
+    <div class="accordion-item faq-item" data-faq="كود التفعيل لا يعمل">
       <h2 class="accordion-header" id="faq-h5">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c5"
-          aria-expanded="false"
-          aria-controls="faq-c5"
-        >
-          هل يمكن إعادة الاختبار بعد الانتهاء؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c5" aria-expanded="false" aria-controls="faq-c5">
+          5) أدخلت كود التفعيل ولم يعمل، ماذا أفعل؟
         </button>
       </h2>
-      <div
-        id="faq-c5"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h5"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            نعم. يمكنك الإعادة بطريقتين: إعادة بنفس الأسئلة. إعادة بأسئلة جديدة
-            لكن بنفس الإعدادات.
-          </p>
-        </div>
+      <div id="faq-c5" class="accordion-collapse collapse" aria-labelledby="faq-h5" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">تأكد من كتابة الكود كما هو تماماً، ثم تأكد أنه مخصص لنفس المادة/القسم الذي تحاول فتحه.
+إذا استمرت المشكلة تواصل مع القسم التقني.</p></div>
       </div>
     </div>
 
-    <div
-      class="accordion-item faq-item"
-      data-faq="النتائج حفظ المحاولات badge إعادة"
-    >
+    <div class="accordion-item faq-item" data-faq="اختبار عادي بدء حل">
       <h2 class="accordion-header" id="faq-h6">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c6"
-          aria-expanded="false"
-          aria-controls="faq-c6"
-        >
-          هل تُحفظ النتائج عند إعادة الاختبار؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c6" aria-expanded="false" aria-controls="faq-c6">
+          6) كيف أبدأ اختباراً عادياً؟
         </button>
       </h2>
-      <div
-        id="faq-c6"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h6"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            نعم. كل محاولة تُحفظ كسجل منفصل، وتظهر محاولات الإعادة مع شارة توضح
-            أنها إعادة.
-          </p>
-        </div>
+      <div id="faq-c6" class="accordion-collapse collapse" aria-labelledby="faq-h6" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">افتح القسم ثم اختر الاختبار واضغط ابدأ.
+بعد الإرسال ستظهر لك النتيجة مع مراجعة الإجابات.</p></div>
       </div>
     </div>
 
-    <div
-      class="accordion-item faq-item"
-      data-faq="زر إنشاء اختبار مخصص disabled 50"
-    >
+    <div class="accordion-item faq-item" data-faq="اختبار مخصص">
       <h2 class="accordion-header" id="faq-h7">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c7"
-          aria-expanded="false"
-          aria-controls="faq-c7"
-        >
-          لماذا زر إنشاء اختبار مخصص يتعطل أحيانًا؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c7" aria-expanded="false" aria-controls="faq-c7">
+          7) ما هو الاختبار المخصص؟
         </button>
       </h2>
-      <div
-        id="faq-c7"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h7"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            إذا تجاوز مجموع الأسئلة 50، يتم تعطيل الزر تلقائيًا حتى تعود للمدى
-            المسموح (10 إلى 50).
-          </p>
-        </div>
+      <div id="faq-c7" class="accordion-collapse collapse" aria-labelledby="faq-h7" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">اختبار تنشئه أنت من الأسئلة المتاحة في المحتوى المفتوح لك.
+يمكنك تحديد العدد وتوزيع الصعوبة قبل البدء.</p></div>
       </div>
     </div>
 
-    <div class="accordion-item faq-item" data-faq="نتائج الطالب teacher admin">
+    <div class="accordion-item faq-item" data-faq="إعادة الاختبار نفس أسئلة أسئلة جديدة">
       <h2 class="accordion-header" id="faq-h8">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c8"
-          aria-expanded="false"
-          aria-controls="faq-c8"
-        >
-          هل يمكن للمعلم متابعة نتائج الطلاب؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c8" aria-expanded="false" aria-controls="faq-c8">
+          8) هل يمكن إعادة الاختبار؟
         </button>
       </h2>
-      <div
-        id="faq-c8"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h8"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">أي. 😁كامشين كل حركاتك</p>
-        </div>
+      <div id="faq-c8" class="accordion-collapse collapse" aria-labelledby="faq-h8" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">نعم، لديك خياران: إعادة بنفس الأسئلة أو إعادة بأسئلة جديدة.
+كل محاولة تحفظ كسجل مستقل في النتائج.</p></div>
       </div>
     </div>
 
-    <div class="accordion-item faq-item" data-faq="خطأ 500 support">
+    <div class="accordion-item faq-item" data-faq="نتائج مراجعة إجابات">
+      <h2 class="accordion-header" id="faq-h9">
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c9" aria-expanded="false" aria-controls="faq-c9">
+          9) أين أرى النتائج ومراجعة الإجابات؟
+        </button>
+      </h2>
+      <div id="faq-c9" class="accordion-collapse collapse" aria-labelledby="faq-h9" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">من صفحة النتائج ستجد جميع المحاولات.
+عند فتح أي محاولة يمكنك مراجعة إجابتك والإجابة الصحيحة مباشرة.</p></div>
+      </div>
+    </div>
+
+    <div class="accordion-item faq-item" data-faq="مفضلة نجمة">
       <h2 class="accordion-header" id="faq-h10">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c10"
-          aria-expanded="false"
-          aria-controls="faq-c10"
-        >
-          ماذا أفعل إذا ظهر خطأ 500؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c10" aria-expanded="false" aria-controls="faq-c10">
+          10) ما فائدة النجمة (المفضلة) داخل المراجعة؟
         </button>
       </h2>
-      <div
-        id="faq-c10"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h10"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            حدّث الصفحة، ثم جرّب تسجيل الخروج والدخول. إذا استمر الخطأ، أرسل
-            صورة الخطأ ووقت حدوثه للمسؤول التقني.
-          </p>
-        </div>
+      <div id="faq-c10" class="accordion-collapse collapse" aria-labelledby="faq-h10" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">تقدر تميّز السؤال بنجمة ليُضاف إلى قائمة المفضلة.
+بهذا ترجع له بسرعة لاحقاً بدون البحث بين كل المحاولات.</p></div>
       </div>
     </div>
 
-    <div class="accordion-item faq-item" data-faq="كيف أتواصل الدعم feedback">
+    <div class="accordion-item faq-item" data-faq="الأخطاء المتكررة اختبار من الأخطاء">
       <h2 class="accordion-header" id="faq-h11">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c11"
-          aria-expanded="false"
-          aria-controls="faq-c11"
-        >
-          كيف أتواصل الدعم؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c11" aria-expanded="false" aria-controls="faq-c11">
+          11) ما صفحة "الأخطاء المتكررة"؟
         </button>
       </h2>
-      <div
-        id="faq-c11"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h11"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            يمكنك التواصل مع الدعم التقني أو العلمي عبر الصفحة "اتصل بنا" في أسفل الموقع.
-          </p>
-        </div>
+      <div id="faq-c11" class="accordion-collapse collapse" aria-labelledby="faq-h11" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">تعرض الأسئلة التي تكررت فيها أخطاؤك، مع إمكانية اختيارها وبناء اختبار مراجعة منها.
+هذه أسرع طريقة للتركيز على نقاط الضعف.</p></div>
       </div>
     </div>
 
-    <div class="accordion-item faq-item" data-faq="تحدي ودي duel مزامنة timer join live">
+    <div class="accordion-item faq-item" data-faq="دورات تفاعلية صح خطأ">
       <h2 class="accordion-header" id="faq-h12">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c12"
-          aria-expanded="false"
-          aria-controls="faq-c12"
-        >
-          كيف تعمل مزامنة التحديات الودية؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c12" aria-expanded="false" aria-controls="faq-c12">
+          12) كيف تعمل الدورات (صح/خطأ)؟
         </button>
       </h2>
-      <div
-        id="faq-c12"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h12"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            يبدأ التحدي فقط بعد انضمام اللاعبين. عند انضمام الطرفين يتم الانتقال
-            تلقائياً إلى واجهة الأسئلة مع مؤقتات متزامنة، وعند إنهاء أحد اللاعبين
-            تظهر نافذة تنبيه للطرف الآخر مباشرة.
-          </p>
-        </div>
+      <div id="faq-c12" class="accordion-collapse collapse" aria-labelledby="faq-h12" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">تفتح الدورة وتجيب على أسئلة الصور بنمط صح/خطأ.
+بعد إنهاء المحاولة تظهر لك النتيجة والمراجعة مثل باقي الأنماط.</p></div>
       </div>
     </div>
 
-    <div class="accordion-item faq-item" data-faq="xp 100% bonus minute refund review popup">
+    <div class="accordion-item faq-item" data-faq="مناقشة درس سؤال جواب">
       <h2 class="accordion-header" id="faq-h13">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c13"
-          aria-expanded="false"
-          aria-controls="faq-c13"
-        >
-          ما هي مكافآت XP الجديدة في التحديات؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c13" aria-expanded="false" aria-controls="faq-c13">
+          13) كيف أستخدم مناقشات الدرس (Q&A)؟
         </button>
       </h2>
-      <div
-        id="faq-c13"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h13"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            إذا أنهى أول لاعب التحدي بنسبة 100% يحصل على +5 XP إضافية ويتم خصم
-            دقيقة كاملة من وقت اللاعب الآخر مع تنبيه واضح. وإذا أنهى اللاعب
-            الثاني أيضاً بنسبة 100% بعد الخصم، يسترجع رسوم الدخول (+20 XP) ويحصل
-            على +3 XP إضافية. بعد نهاية المباراة تظهر نافذة تعرض تغير XP مع
-            تفصيل البنود، ويمكن مراجعة كل الأسئلة والإجابات من صفحة المراجعة.
-          </p>
-        </div>
+      <div id="faq-c13" class="accordion-collapse collapse" aria-labelledby="faq-h13" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">من صفحة الدرس يمكنك الدخول إلى قسم المناقشة.
+استخدمه لقراءة الأسئلة الموجودة أو إضافة سؤالك حول نفس الدرس.</p></div>
       </div>
     </div>
 
-    <div class="accordion-item faq-item" data-faq="certificates شهادة تحقق تنزيل انجاز">
+    <div class="accordion-item faq-item" data-faq="لوحة الصدارة جواهر gems level streak">
       <h2 class="accordion-header" id="faq-h14">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c14"
-          aria-expanded="false"
-          aria-controls="faq-c14"
-        >
-          كيف تعمل الشهادات داخل المنصة؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c14" aria-expanded="false" aria-controls="faq-c14">
+          14) ما معنى الجواهر والمستوى وStreak في لوحة الصدارة؟
         </button>
       </h2>
-      <div
-        id="faq-c14"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h14"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            عند تحقيق شروط الإنجاز يمكن للطالب الحصول على شهادة رقمية. كما توفر
-            المنصة صفحة للتحقق من صحة الشهادات وإدارتها من قبل المعلم.
-          </p>
-        </div>
+      <div id="faq-c14" class="accordion-collapse collapse" aria-labelledby="faq-h14" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">الجواهر هي نقاط التقدم التي تجمعها من نشاطك، والمستوى يعكس نموك مع الوقت.
+Streak تمثل الاستمرارية في الإنجاز، ولوحة الصدارة تعرض ترتيب الطلاب حسب هذه المؤشرات.</p></div>
       </div>
     </div>
 
-    <div class="accordion-item faq-item" data-faq="leaderboard لوحة صدارة xp duels ranking">
+    <div class="accordion-item faq-item" data-faq="إشعارات تحدي ودي دعم واتساب">
       <h2 class="accordion-header" id="faq-h15">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c15"
-          aria-expanded="false"
-          aria-controls="faq-c15"
-        >
-          ما الفرق بين لوحات الصدارة المتاحة؟
+        <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq-c15" aria-expanded="false" aria-controls="faq-c15">
+          15) كيف أتابع الإشعارات والتحديات الودية؟ وكيف أتواصل عند مشكلة؟
         </button>
       </h2>
-      <div
-        id="faq-c15"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h15"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            توجد لوحات صدارة عامة مرتبطة بنقاط XP، ولوحة صدارة خاصة بالتحديات
-            الودية تعتمد على عدد الانتصارات وسلاسل الفوز. الهدف منها تحفيز
-            الاستمرارية والتقدم.
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="accordion-item faq-item" data-faq="frequently wrong أخطاء شائعة مراجعة">
-      <h2 class="accordion-header" id="faq-h16">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c16"
-          aria-expanded="false"
-          aria-controls="faq-c16"
-        >
-          ما فائدة صفحة "الأسئلة الأكثر خطأ"؟
-        </button>
-      </h2>
-      <div
-        id="faq-c16"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h16"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            هذه الصفحة تجمع الأسئلة التي يخطئ فيها الطالب بشكل متكرر، لتوفير
-            مراجعة مركزة على نقاط الضعف بدل إعادة كل المحتوى من البداية.
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="accordion-item faq-item" data-faq="pinned q&a الأسئلة والأجوبة المثبتة مناقشات">
-      <h2 class="accordion-header" id="faq-h17">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c17"
-          aria-expanded="false"
-          aria-controls="faq-c17"
-        >
-          ما هو قسم "الأسئلة والأجوبة المثبتة"؟
-        </button>
-      </h2>
-      <div
-        id="faq-c17"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h17"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            "الأسئلة والأجوبة المثبتة" (Pinned Q&A) هو قسم يجمع أهم المناقشات
-            التي يثبتها المعلم لتكون مرجعاً سريعاً للطلاب داخل الدرس.
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="accordion-item faq-item" data-faq="assignments واجبات تسليم تقييم">
-      <h2 class="accordion-header" id="faq-h18">
-        <button
-          class="accordion-button faq-button collapsed"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#faq-c18"
-          aria-expanded="false"
-          aria-controls="faq-c18"
-        >
-          كيف أتابع الواجبات وأسلّمها؟
-        </button>
-      </h2>
-      <div
-        id="faq-c18"
-        class="accordion-collapse collapse"
-        aria-labelledby="faq-h18"
-        data-bs-parent="#faqAccordion"
-      >
-        <div class="accordion-body">
-          <p class="faq-answer">
-            يمكن للطالب فتح صفحة الواجبات، حل كل واجب ضمن الوقت المتاح، ثم
-            التسليم ومتابعة حالة التقييم لاحقاً من نفس الصفحة.
-          </p>
-        </div>
+      <div id="faq-c15" class="accordion-collapse collapse" aria-labelledby="faq-h15" data-bs-parent="#faqAccordion">
+        <div class="accordion-body"><p class="faq-answer">من صندوق الإشعارات تتابع التنبيهات الجديدة، ومنها إشعارات التحديات الودية.
+لأي مشكلة تقنية: تواصل عبر الاتصال بالقسم التقني على واتساب.</p></div>
       </div>
     </div>
   </div>
 
-  <div id="faqEmpty" class="faq-empty">
-    لا توجد نتائج مطابقة لبحثك. جرّب كلمات مختلفة.
-  </div>
+  <div id="faqEmpty" class="faq-empty">لا توجد نتائج مطابقة لبحثك. جرّب كلمات مختلفة.</div>
 </div>
-{% endblock %} {% block scripts %}
+{% endblock %}
+
+{% block scripts %}
 <script>
   (function () {
     const input = document.getElementById("faqSearchInput");
@@ -761,10 +397,7 @@
       let visible = 0;
 
       items.forEach((item) => {
-        const searchable =
-          normalize(item.getAttribute("data-faq")) +
-          " " +
-          normalize(item.textContent);
+        const searchable = normalize(item.getAttribute("data-faq")) + " " + normalize(item.textContent);
         const show = !q || searchable.includes(q);
         item.style.display = show ? "" : "none";
         if (show) visible += 1;
@@ -788,7 +421,6 @@
       collapse.classList.toggle("show", expanded);
     }
 
-    // Fallback toggling in case Bootstrap collapse doesn't initialize.
     document.querySelectorAll(".faq-button").forEach((button) => {
       button.addEventListener("click", function () {
         if (window.bootstrap && window.bootstrap.Collapse) {
@@ -799,11 +431,9 @@
         const willOpen = !collapse.classList.contains("show");
 
         if (accordionRoot && willOpen) {
-          accordionRoot
-            .querySelectorAll(".accordion-collapse.show")
-            .forEach((openEl) => {
-              openEl.classList.remove("show");
-            });
+          accordionRoot.querySelectorAll(".accordion-collapse.show").forEach((openEl) => {
+            openEl.classList.remove("show");
+          });
           accordionRoot.querySelectorAll(".faq-button").forEach((btn) => {
             btn.classList.add("collapsed");
             btn.setAttribute("aria-expanded", "false");

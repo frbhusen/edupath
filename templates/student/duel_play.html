@@ -102,17 +102,17 @@
       {% set second_slot = 'opponent' if first_slot == 'challenger' else ('challenger' if first_slot == 'opponent' else None) %}
       <div class="d-flex flex-wrap gap-2 mt-3">
         {% if duel.first_submitter_perfect and first_slot == slot %}
-          <span class="badge text-bg-success">مكافأة 100% (المنهي الأول): +5 XP</span>
+          <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>مكافأة 100% (المنهي الأول): +5</span>
         {% elif duel.first_submitter_perfect and first_slot and first_slot != slot %}
-          <span class="badge text-bg-info">الخصم حصل على مكافأة 100% الأولى: +5 XP</span>
+          <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم حصل على مكافأة 100% الأولى: +5</span>
         {% endif %}
 
         {% if duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot == slot %}
-          <span class="badge text-bg-success">استرجاع رسوم الدخول: +20 XP</span>
-          <span class="badge text-bg-success">مكافأة 100% (المنهي الثاني): +3 XP</span>
+          <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>استرجاع رسوم الدخول: +20</span>
+          <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>مكافأة 100% (المنهي الثاني): +3</span>
         {% elif duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot and second_slot != slot %}
-          <span class="badge text-bg-info">الخصم استرجع الرسوم: +20 XP</span>
-          <span class="badge text-bg-info">الخصم حصل على مكافأة المنهي الثاني: +3 XP</span>
+          <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم استرجع الرسوم: +20</span>
+          <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم حصل على مكافأة المنهي الثاني: +3</span>
         {% endif %}
       </div>
 
@@ -135,8 +135,8 @@
 
 <div id="duelXpOverlay" class="duel-finish-overlay d-none" aria-hidden="true">
   <div class="duel-xp-popup shadow-lg" role="dialog" aria-live="polite" aria-modal="true">
-    <div class="duel-xp-title">تغيّر نقاط XP بعد التحدي</div>
-    <div id="duelXpDelta" class="duel-xp-delta">0 XP</div>
+    <div class="duel-xp-title">تغيّر النقاط بعد التحدي</div>
+    <div id="duelXpDelta" class="duel-xp-delta">0 💎</div>
     <div id="duelXpTotals" class="small text-muted mb-3"></div>
     <div id="duelXpBreakdown" class="duel-xp-breakdown"></div>
     <button id="duelXpOverlayBtn" type="button" class="btn btn-cta mt-3">ممتاز</button>
@@ -337,13 +337,13 @@
       const sign = total > 0 ? '+' : '';
 
       if (xpDeltaEl) {
-        xpDeltaEl.textContent = sign + String(total) + ' XP';
+        xpDeltaEl.textContent = sign + String(total) + ' 💎';
         xpDeltaEl.classList.remove('positive', 'negative', 'neutral');
         xpDeltaEl.classList.add(total > 0 ? 'positive' : (total < 0 ? 'negative' : 'neutral'));
       }
 
       if (xpTotalsEl) {
-        xpTotalsEl.textContent = 'إجمالي XP: ' + String(xpSummary.before_total) + ' → ' + String(xpSummary.after_total);
+        xpTotalsEl.textContent = 'إجمالي: ' + String(xpSummary.before_total) + ' → ' + String(xpSummary.after_total);
       }
 
       if (xpBreakdownEl) {
@@ -354,7 +354,7 @@
           row.className = 'duel-xp-item';
 
           const label = document.createElement('div');
-          label.textContent = String(item.label || 'XP');
+          label.textContent = String(item.label || '💎');
 
           const deltaWrap = document.createElement('div');
           deltaWrap.className = 'duel-xp-item-value';

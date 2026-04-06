@@ -1002,7 +1002,7 @@ def certificates_verification():
                 certificate_id=cert.id,
             )
             if xp_awarded > 0:
-                flash(f"تم اعتماد الشهادة وإضافة {xp_awarded} XP للطالب.", "success")
+                flash(f"تم اعتماد الشهادة وإضافة {xp_awarded} جوهرة للطالب.", "success")
             else:
                 flash("تم اعتماد الشهادة.", "success")
             return redirect(url_for("teacher.certificates_verification"))
@@ -1658,7 +1658,7 @@ def reports_download_pdf():
         ("الواجبات المكتملة", report["assignments_completed"]),
         ("متوسط النتائج", f"{report['avg_score']}%"),
         ("نسبة النجاح", f"{report['pass_rate']}%"),
-        ("متوسط XP", report["avg_xp"]),
+        ("متوسط الجواهر", report["avg_xp"]),
         ("نسبة إنجاز الواجبات", f"{report['assignment_completion_rate']}%"),
         ("عدد المواد", report["subjects_count"]),
         ("عدد الأقسام", report["sections_count"]),
@@ -1687,11 +1687,11 @@ def reports_download_pdf():
     if report.get("top_students"):
         pdf.ln(1)
         pdf.set_font(title_font, "B", 13)
-        top_title = _shape_arabic_text("أفضل الطلاب (XP)") if using_ar_font else "Top Students (XP)"
+        top_title = _shape_arabic_text("أفضل الطلاب (الجواهر)") if using_ar_font else "Top Students (Gems)"
         pdf.cell(0, 8, top_title, ln=1, align="R" if using_ar_font else "L")
         pdf.set_font(body_font, "", 10)
         for st in report["top_students"][:5]:
-            line = _shape_arabic_text(f"#{st['rank']} - {st['name']} | XP: {st['xp']} | Level: {st['level']}") if using_ar_font else f"#{st['rank']} - {st['name']} | XP: {st['xp']} | Level: {st['level']}"
+            line = _shape_arabic_text(f"#{st['rank']} - {st['name']} | جواهر: {st['xp']} | Level: {st['level']}") if using_ar_font else f"#{st['rank']} - {st['name']} | Gems: {st['xp']} | Level: {st['level']}"
             pdf.cell(0, 6, line, ln=1, align="R" if using_ar_font else "L")
 
     out = pdf.output(dest="S")
@@ -1994,12 +1994,12 @@ def gamification_admin():
                 target_xp = max(0, int(request.form.get("target_xp") or 0))
                 delta = target_xp - int(profile.xp_total or 0)
                 applied = _apply_xp_delta(profile, delta, actor_label=f"set_xp:{current_user.id}")
-                flash(f"تم تحديث XP للطالب {student.full_name} (Δ {applied}).", "success")
+                flash(f"تم تحديث الجواهر للطالب {student.full_name} (Δ {applied}).", "success")
 
             elif action == "adjust_student_xp":
                 delta = int(request.form.get("xp_delta") or 0)
                 applied = _apply_xp_delta(profile, delta, actor_label=f"delta_xp:{current_user.id}")
-                flash(f"تم تعديل XP للطالب {student.full_name} (Δ {applied}).", "success")
+                flash(f"تم تعديل الجواهر للطالب {student.full_name} (Δ {applied}).", "success")
 
             elif action == "set_student_rank":
                 requested_rank = max(1, int(request.form.get("target_rank") or 1))
@@ -2022,7 +2022,7 @@ def gamification_admin():
                 delta = desired_xp - int(profile.xp_total or 0)
                 applied = _apply_xp_delta(profile, delta, actor_label=f"set_rank:{current_user.id}")
                 flash(
-                    f"تم ضبط XP للطالب {student.full_name} لمحاولة الوصول للرتبة {requested_rank} (Δ {applied}).",
+                    f"تم ضبط الجواهر للطالب {student.full_name} لمحاولة الوصول للرتبة {requested_rank} (Δ {applied}).",
                     "success",
                 )
 
@@ -2040,7 +2040,7 @@ def gamification_admin():
             lesson.xp_reward = lesson_xp
             lesson.save()
             cache.clear()
-            flash(f"تم تحديث XP للدرس {lesson.title} إلى {lesson_xp}.", "success")
+            flash(f"تم تحديث جواهر الدرس {lesson.title} إلى {lesson_xp}.", "success")
             return redirect(url_for("teacher.gamification_admin"))
 
     ranked_students = _rebuild_ranked_students()
@@ -2485,7 +2485,7 @@ def course_set_new(subject_id):
     try:
         xp_per_question = max(1, int(xp_per_question_raw or "1"))
     except Exception:
-        flash("قيمة XP لكل سؤال غير صالحة.", "error")
+        flash("قيمة الجواهر لكل سؤال غير صالحة.", "error")
         return redirect(url_for("teacher.courses_manage", subject_id=subject.id))
 
     section = None
@@ -2575,7 +2575,7 @@ def course_set_edit(course_set_id):
             try:
                 xp_per_question = max(1, int(xp_per_question_raw or "1"))
             except Exception:
-                flash("قيمة XP لكل سؤال غير صالحة.", "error")
+                flash("قيمة الجواهر لكل سؤال غير صالحة.", "error")
                 return _edit_redirect("settings")
 
             section = None

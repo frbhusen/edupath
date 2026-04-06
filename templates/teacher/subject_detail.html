@@ -9,7 +9,7 @@
       <a
         class="btn btn-outline-dark btn-sm"
         href="{{ url_for('teacher.courses_manage', subject_id=subject.id) }}"
-        >الدورات التفاعلية</a
+        >الدورات</a
       >
       <a
         class="btn btn-outline-primary btn-sm"
@@ -31,10 +31,8 @@
     </div>
   </div>
   <div class="card-body">
-    {% if subject.description %}
-    <p class="mb-0">{{ subject.description }}</p>
-    {% else %}
-    <p class="text-muted mb-0">لا يوجد وصف للمادة.</p>
+    {% if subject.description and subject.description|trim %}
+      <p class="mb-0">{{ subject.description }}</p>
     {% endif %}
   </div>
 </div>

@@ -1,9 +1,9 @@
-{% extends 'base.html' %} {% block content %}
-<div
-  class="dashboard-hero mb-4 d-flex justify-content-between align-items-center"
->
+{% extends 'base.html' %} {% block content %} {# Hero header shown to all
+visitors with role-aware greeting/actions #}
+<div class="dashboard-hero mb-4 d-flex justify-content-between align-items-center">
   <div>
-    {% if current_user.is_authenticated and current_user.role == 'student' %}
+    {# Greeting text depends on current user role #} {% if
+    current_user.is_authenticated and current_user.role == 'student' %}
     <h1 class="h4 mb-1">مرحباً {{ current_user.first_name }} في EduPath</h1>
     <p class="mb-0">
       لوحة التحكم الرئيسية للطالب: تعلم، اختبر نفسك، وتابع تقدمك.
@@ -17,12 +17,11 @@
     <p class="mb-0">تعلم من خلال دروس منظمة، نفذ الاختبارات، وتتبع تقدمك.</p>
     {% endif %}
   </div>
+
   <div class="d-flex gap-2">
-    {% if current_user.is_authenticated %} {% if current_user.role in
-    ['teacher', 'admin'] %}
-    <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.dashboard') }}"
-      >الذهاب إلى لوحة التحكم</a
-    >
+    {# Hero action buttons: dashboard links for staff, login/register for guests#}
+    {% if current_user.is_authenticated %} {% if current_user.role in ['teacher', 'admin'] %}
+    <a class="btn btn-cta btn-sm" href="{{ url_for('teacher.dashboard') }}">الذهاب إلى لوحة التحكم</a>
     {% elif current_user.role == 'question_editor' %}
     <a
       class="btn btn-cta btn-sm"
@@ -40,14 +39,15 @@
   </div>
 </div>
 
-{% if current_user.is_authenticated %}
-<div class="action-hub mb-4">
+{% if current_user.is_authenticated %} {# Main quick-action hub (role-based
+shortcuts) #}
+<div class="action-hub mb-5 mb-lg-2">
   <div class="action-hub-head">
     <h2 class="h5 mb-1">الصفحة الرئيسية</h2>
     <p class="mb-0 text-muted">كل الأدوات المهمة في مكان واحد.</p>
   </div>
-  <div class="action-grid">
-    {% if current_user.role == 'student' %}
+  <div class="action-grid col-12">
+    {# Student shortcuts #} {% if current_user.role == 'student' %}
     <a class="action-card" href="{{ url_for('student.subjects') }}"
       ><span class="icon">📚</span><span>المواد</span></a
     >
@@ -62,7 +62,7 @@
     >
     <a class="action-card" href="{{ url_for('student.results') }}"
       ><span class="icon">📊</span><span>النتائج</span></a
-    > 
+    >
     <a class="action-card" href="{{ url_for('student.leaderboard') }}"
       ><span class="icon">🏆</span><span>لوحة الصدارة</span></a
     >
@@ -72,19 +72,23 @@
     <a class="action-card" href="{{ url_for('notifications_inbox') }}"
       ><span class="icon">🔔</span><span>الإشعارات</span></a
     >
-    {% elif current_user.role == 'teacher' %}
+    {% elif current_user.role == 'teacher' %} {# Teacher shortcuts #}
     <a class="action-card" href="{{ url_for('teacher.my_students') }}"
       ><span class="icon">👥</span><span>Students</span></a
     >
     <a class="action-card" href="{{ url_for('student.subjects') }}"
       ><span class="icon">📚</span><span>المواد</span></a
     >
-    {% if teacher_home_subjects %}
+    {% if teacher_home_subjects %} {# Teacher's own subjects list appears when
+    available #}
     <div class="w-100 mt-2">
       <div class="small text-muted mb-2">موادي</div>
       <div class="action-grid">
         {% for subject in teacher_home_subjects %}
-        <a class="action-card" href="{{ url_for('teacher.subject_detail', subject_id=subject.id) }}">
+        <a
+          class="action-card"
+          href="{{ url_for('teacher.subject_detail', subject_id=subject.id) }}"
+        >
           <span class="icon">📚</span>
           <span>{{ subject.name }}</span>
         </a>
@@ -96,7 +100,9 @@
       ><span class="icon">📚</span><span>مادتي</span></a
     >
     {% endif %}
-    <a class="action-card" href="{{ url_for('teacher.discussions_manage', pinned='1') }}"
+    <a
+      class="action-card"
+      href="{{ url_for('teacher.discussions_manage', pinned='1') }}"
       ><span class="icon">📌</span><span>الأسئلة والأجوبة المثبتة</span></a
     >
     <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}"
@@ -108,7 +114,7 @@
     <a class="action-card" href="{{ url_for('notifications_inbox') }}"
       ><span class="icon">🔔</span><span>الإشعارات</span></a
     >
-    {% elif current_user.role == 'admin' %}
+    {% elif current_user.role == 'admin' %} {# Admin shortcuts #}
     <a class="action-card" href="{{ url_for('teacher.dashboard') }}"
       ><span class="icon">🧭</span><span>لوحة المعلم</span></a
     >
@@ -145,7 +151,7 @@
       ><span class="icon">📄</span><span>التقارير</span></a
     >
     <a class="action-card" href="{{ url_for('teacher.gamification_admin') }}"
-      ><span class="icon">🎮</span><span>إدارة XP</span></a
+      ><span class="icon">💎</span><span>إدارة الجواهر</span></a
     >
     <a class="action-card" href="{{ url_for('admin.notifications_manage') }}"
       ><span class="icon">📣</span><span>إرسال إشعار</span></a
@@ -153,7 +159,8 @@
     <a class="action-card" href="{{ url_for('admin.dashboard') }}"
       ><span class="icon">⚙️</span><span>الإدارة</span></a
     >
-    {% elif current_user.role == 'question_editor' %}
+    {% elif current_user.role == 'question_editor' %} {# Question editor
+    shortcuts #}
     <a
       class="action-card"
       href="{{ url_for('teacher.question_editor_dashboard') }}"

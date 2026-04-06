@@ -8,6 +8,10 @@ try:
 except Exception:  # pragma: no cover - optional dependency in some environments
     load_dotenv = None
 
+if load_dotenv:
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    load_dotenv(dotenv_path=env_path, override=False)
+
 from .config import Config
 from .extensions import login_manager, init_mongo, cache
 from flask_login import current_user, logout_user, login_required
@@ -43,11 +47,6 @@ def _migrate_legacy_teacher_role_once(app):
 
 
 def create_app():
-    # Load workspace-level .env for local development before config resolution.
-    if load_dotenv:
-        env_path = Path(__file__).resolve().parent.parent / ".env"
-        load_dotenv(dotenv_path=env_path, override=False)
-
     app = Flask(__name__)
     app.config.from_object(Config)
     try:

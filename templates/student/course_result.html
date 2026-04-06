@@ -12,10 +12,10 @@
   <div class="card-body text-center">
     <div class="display-6 fw-bold">{{ attempt.score }} / {{ attempt.total }}</div>
     <div class="d-flex justify-content-center gap-2 mt-2 flex-wrap">
-      <span class="badge text-bg-info">+{{ attempt.xp_earned|default(0) }} XP</span>
+      <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>+{{ attempt.xp_earned|default(0) }}</span>
       {% if gamification %}
         <span class="badge text-bg-secondary">المستوى {{ gamification.level }}</span>
-        <span class="badge text-bg-dark">إجمالي XP: {{ gamification.xp_total }}</span>
+        <span class="badge text-bg-dark"><i class="fa-solid fa-gem me-1"></i>إجمالي: {{ gamification.xp_total }}</span>
       {% endif %}
     </div>
     {% set pct = (attempt.score / attempt.total * 100) if attempt.total else 0 %}

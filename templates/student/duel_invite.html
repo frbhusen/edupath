@@ -21,7 +21,7 @@
   <div class="card-body">
     <p class="mb-2"><strong>المُرسل:</strong> {{ challenger_name }}</p>
     <p class="mb-2"><strong>عدد الأسئلة:</strong> {{ duel.question_count }} | <strong>الوقت:</strong> 9 دقائق</p>
-    <p class="mb-3"><strong>رسوم الدخول:</strong> {{ duel.entry_fee_xp }} XP لكل لاعب</p>
+    <p class="mb-3"><strong>رسوم الدخول:</strong> <i class="fa-solid fa-gem me-1"></i>{{ duel.entry_fee_xp }} لكل لاعب</p>
 
     {% if duel.status == 'pending' and slot == 'opponent' %}
       <form method="post" action="{{ url_for('student.duel_respond', duel_id=duel.id) }}" class="d-flex gap-2">

@@ -11,7 +11,7 @@ from bson import ObjectId
 from bson.dbref import DBRef
 
 from .models import User, Subject, Section, Lesson, Test, TestResource, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer, StudentFavoriteQuestion
-from .forms import ActivationForm
+from .forms import ActivationForm, StudentProfileForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation
 from .extensions import cache
 
@@ -142,6 +142,80 @@ def remove_favorite(favorite_id):
     row.delete()
     flash("تم حذف السؤال من المفضلة.", "success")
     return _redirect_to_next_or("student.favorites")
+
+
+@student_bp.route("/favorites/toggle", methods=["POST"])
+@login_required
+def toggle_favorite():
+    if (current_user.role or "").lower() != "student":
+        return jsonify({"ok": False, "message": "غير مسموح."}), 403
+
+    payload = request.get_json(silent=True) or {}
+    question_type = (payload.get("question_type") or request.form.get("question_type") or "").strip().lower()
+    item_id = (payload.get("question_id") or request.form.get("question_id") or "").strip()
+
+    if question_type not in {"mcq", "interactive"} or not ObjectId.is_valid(item_id):
+        return jsonify({"ok": False, "message": "بيانات السؤال غير صحيحة."}), 400
+
+    if question_type == "mcq":
+        exists = StudentFavoriteQuestion.objects(
+            student_id=current_user.id,
+            question_type="mcq",
+            question_id=item_id,
+        ).first()
+        if exists:
+            exists.delete()
+            return jsonify({"ok": True, "is_favorite": False, "favorite_id": None})
+
+        question = Question.objects(id=item_id).first()
+        if not question:
+            return jsonify({"ok": False, "message": "السؤال غير موجود."}), 404
+
+        correct_choice = next((c for c in question.choices if c.is_correct), None)
+        snapshot_choices = [
+            Choice(text=c.text, image_url=c.image_url, is_correct=bool(c.is_correct))
+            for c in question.choices
+        ]
+        favorite = StudentFavoriteQuestion(
+            student_id=current_user.id,
+            question_type="mcq",
+            question_id=question.id,
+            question_text=question.text,
+            question_images=list(question.question_images or []),
+            choices=snapshot_choices,
+            correct_answer_text=correct_choice.text if correct_choice else None,
+            correct_answer_image_url=correct_choice.image_url if correct_choice else None,
+            difficulty=(question.difficulty or "medium"),
+        )
+        favorite.save()
+        return jsonify({"ok": True, "is_favorite": True, "favorite_id": str(favorite.id)})
+
+    exists = StudentFavoriteQuestion.objects(
+        student_id=current_user.id,
+        question_type="interactive",
+        interactive_question_id=item_id,
+    ).first()
+    if exists:
+        exists.delete()
+        return jsonify({"ok": True, "is_favorite": False, "favorite_id": None})
+
+    interactive_question = TestInteractiveQuestion.objects(id=item_id).first()
+    if not interactive_question:
+        return jsonify({"ok": False, "message": "السؤال التفاعلي غير موجود."}), 404
+
+    favorite = StudentFavoriteQuestion(
+        student_id=current_user.id,
+        question_type="interactive",
+        interactive_question_id=interactive_question.id,
+        question_text=interactive_question.question_text,
+        question_images=[interactive_question.question_image_url] if interactive_question.question_image_url else [],
+        choices=[],
+        correct_answer_text=interactive_question.answer_text,
+        correct_answer_image_url=interactive_question.answer_image_url,
+        difficulty=(interactive_question.difficulty or "medium"),
+    )
+    favorite.save()
+    return jsonify({"ok": True, "is_favorite": True, "favorite_id": str(favorite.id)})
 
 
 class AccessContext:
@@ -1045,7 +1119,7 @@ def _duel_get_xp_change_summary(duel, student_id):
     labels = {
         "duel_entry_fee": "رسوم دخول التحدي",
         "duel_win": "مكافأة الفوز",
-        "duel_loss": "XP نتيجة الخسارة",
+        "duel_loss": "الجواهر نتيجة الخسارة",
         "duel_streak_bonus": "مكافأة سلسلة الانتصارات",
         "duel_first_perfect_bonus": "مكافأة 100% (المنهي الأول)",
         "duel_second_perfect_refund": "استرجاع رسوم الدخول",
@@ -1059,7 +1133,7 @@ def _duel_get_xp_change_summary(duel, student_id):
         total_delta += xp
         items.append(
             {
-                "label": labels.get(getattr(row, "event_type", ""), getattr(row, "event_type", "XP")),
+                "label": labels.get(getattr(row, "event_type", ""), getattr(row, "event_type", "جواهر")),
                 "xp": xp,
             }
         )
@@ -1375,6 +1449,148 @@ def subjects():
 @login_required
 def student_root():
     return redirect(url_for("student.subjects"))
+
+
+@student_bp.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    if (current_user.role or "").lower() != "student":
+        flash("غير مسموح.", "error")
+        return redirect(url_for("index"))
+
+    form = StudentProfileForm()
+
+    def _load_activated_lists():
+        subject_activations = list(
+            SubjectActivation.objects(student_id=current_user.id, active=True)
+            .order_by("-activated_at")
+            .all()
+        )
+        activated_subjects_local = []
+        seen_subject_ids = set()
+        for row in subject_activations:
+            subject = row.subject_id
+            if not subject:
+                continue
+            sid = str(subject.id)
+            if sid in seen_subject_ids:
+                continue
+            seen_subject_ids.add(sid)
+            activated_subjects_local.append({"subject": subject, "activated_at": row.activated_at})
+
+        section_activations = list(
+            SectionActivation.objects(student_id=current_user.id, active=True)
+            .order_by("-activated_at")
+            .all()
+        )
+        activated_sections_local = []
+        seen_section_ids = set()
+        for row in section_activations:
+            section = row.section_id
+            if not section:
+                continue
+            sec_id = str(section.id)
+            if sec_id in seen_section_ids:
+                continue
+            seen_section_ids.add(sec_id)
+            activated_sections_local.append(
+                {
+                    "section": section,
+                    "subject": section.subject_id,
+                    "activated_at": row.activated_at,
+                }
+            )
+
+        return activated_subjects_local, activated_sections_local
+
+    if request.method == "GET":
+        form.first_name.data = current_user.first_name
+        form.last_name.data = current_user.last_name
+        form.username.data = current_user.username
+        form.phone.data = current_user.phone
+
+    if form.validate_on_submit():
+        existing_username = User.objects(username=form.username.data).first()
+        if existing_username and str(existing_username.id) != str(current_user.id):
+            flash("اسم المستخدم مستخدم مسبقاً.", "error")
+            activated_subjects, activated_sections = _load_activated_lists()
+            return render_template(
+                "student/profile.html",
+                form=form,
+                activated_subjects=activated_subjects,
+                activated_sections=activated_sections,
+            )
+
+        existing_phone = User.objects(phone=form.phone.data).first()
+        if existing_phone and str(existing_phone.id) != str(current_user.id):
+            flash("رقم الهاتف مستخدم مسبقاً.", "error")
+            activated_subjects, activated_sections = _load_activated_lists()
+            return render_template(
+                "student/profile.html",
+                form=form,
+                activated_subjects=activated_subjects,
+                activated_sections=activated_sections,
+            )
+
+        new_password = (form.new_password.data or "").strip()
+        current_password = form.current_password.data or ""
+        password_changed = False
+
+        if current_password and not new_password:
+            flash("أدخل كلمة مرور جديدة لتغيير كلمة المرور.", "error")
+            activated_subjects, activated_sections = _load_activated_lists()
+            return render_template(
+                "student/profile.html",
+                form=form,
+                activated_subjects=activated_subjects,
+                activated_sections=activated_sections,
+            )
+
+        if new_password:
+            if not current_password:
+                flash("للتعديل على كلمة المرور يجب إدخال كلمة المرور الحالية.", "error")
+                activated_subjects, activated_sections = _load_activated_lists()
+                return render_template(
+                    "student/profile.html",
+                    form=form,
+                    activated_subjects=activated_subjects,
+                    activated_sections=activated_sections,
+                )
+            if not current_user.check_password(current_password):
+                flash("كلمة المرور الحالية غير صحيحة.", "error")
+                activated_subjects, activated_sections = _load_activated_lists()
+                return render_template(
+                    "student/profile.html",
+                    form=form,
+                    activated_subjects=activated_subjects,
+                    activated_sections=activated_sections,
+                )
+            current_user.set_password(new_password)
+            password_changed = True
+
+        current_user.first_name = form.first_name.data
+        current_user.last_name = form.last_name.data
+        current_user.username = form.username.data
+        current_user.phone = form.phone.data
+
+        if password_changed:
+            new_token = secrets.token_hex(16)
+            current_user.current_session_token = new_token
+            session["session_token"] = new_token
+            session.modified = True
+
+        current_user.save()
+        flash("تم تحديث بياناتك بنجاح.", "success")
+        return redirect(url_for("student.profile"))
+
+    activated_subjects, activated_sections = _load_activated_lists()
+
+    return render_template(
+        "student/profile.html",
+        form=form,
+        activated_subjects=activated_subjects,
+        activated_sections=activated_sections,
+    )
 
 @student_bp.route("/subjects/<subject_id>")
 @login_required
@@ -2137,7 +2353,7 @@ def complete_lesson(lesson_id):
         amount=max(0, int(getattr(lesson, "xp_reward", 10) or 10)),
     )
 
-    flash(f"أحسنت! تم إنهاء الدرس وربحت {earned_xp} XP.", "success")
+    flash(f"أحسنت! تم إنهاء الدرس وربحت {earned_xp} جوهرة.", "success")
     return redirect(url_for("student.lesson_detail", lesson_id=lesson.id))
 
 
@@ -2362,7 +2578,7 @@ def duels_home():
         challenger_profile = _get_or_create_gamification_profile(current_user.id)
         opponent_profile = _get_or_create_gamification_profile(opponent.id)
         if int(challenger_profile.xp_total or 0) < 20 or int(opponent_profile.xp_total or 0) < 20:
-            flash("يلزم أن يمتلك كل لاعب 20 XP على الأقل لبدء التحدي.", "error")
+            flash("يلزم أن يمتلك كل لاعب 20 جوهرة على الأقل لبدء التحدي.", "error")
             return redirect(url_for("student.duels_home"))
 
         active_existing = Duel.objects(
@@ -2527,7 +2743,7 @@ def duel_respond(duel_id):
         duel.status = "declined"
         duel.ended_at = datetime.utcnow()
         duel.save()
-        flash("تم رفض الدعوة بدون أي خصم XP.", "info")
+        flash("تم رفض الدعوة بدون أي خصم جواهر.", "info")
         return redirect(url_for("student.duels_home"))
 
     if action != "accept":
@@ -2538,7 +2754,7 @@ def duel_respond(duel_id):
     opponent_profile = _get_or_create_gamification_profile(duel.opponent_id.id)
     fee = int(duel.entry_fee_xp or 20)
     if int(challenger_profile.xp_total or 0) < fee or int(opponent_profile.xp_total or 0) < fee:
-        flash("لا يمكن قبول الدعوة: أحد اللاعبين لا يملك XP كافٍ.", "error")
+        flash("لا يمكن قبول الدعوة: أحد اللاعبين لا يملك جواهر كافية.", "error")
         return redirect(url_for("student.duels_home"))
 
     _duel_apply_xp_delta_once(duel.challenger_id.id, "duel_entry_fee", f"{duel.id}:challenger_fee", -fee)
@@ -3574,7 +3790,7 @@ def toggle_study_plan_item(item_id):
             source_id=str(item.id),
             amount=5,
         )
-        flash("تم إنجاز المهمة (+5 XP).", "success")
+        flash("تم إنجاز المهمة (+5 جواهر).", "success")
     else:
         flash("تم إعادة المهمة إلى غير منجزة.", "info")
 
@@ -3676,31 +3892,190 @@ def frequently_wrong():
         flash("هذه الصفحة للطلاب فقط.", "warning")
         return redirect(url_for("index"))
 
+    selected_subject_id = (request.args.get("subject_id") or "").strip()
+    selected_section_id = (request.args.get("section_id") or "").strip()
+    selected_lesson_id = (request.args.get("lesson_id") or "").strip()
+
     freq_map = _frequently_wrong_question_counts(current_user.id)
     question_ids = list(freq_map.keys())
     questions = list(Question.objects(id__in=question_ids).all()) if question_ids else []
     questions_by_id = {q.id: q for q in questions}
 
-    rows = []
+    rows_all = []
     for qid, freq in freq_map.items():
         q = questions_by_id.get(qid)
         if not q:
             continue
-        rows.append(
+
+        test = q.test_id
+        lesson = None
+        section = None
+        subject = None
+        if test:
+            lesson = test.lesson
+            section = lesson.section if lesson else test.section
+            subject = section.subject if section else None
+
+        rows_all.append(
             {
                 "question": q,
                 "frequency": int(freq or 0),
-                "test": q.test_id,
+                "test": test,
+                "test_title": test.title if test else "-",
+                "subject_id": str(subject.id) if subject else "",
+                "subject_name": subject.name if subject else "غير مصنف",
+                "section_id": str(section.id) if section else "",
+                "section_name": section.title if section else "بدون قسم",
+                "lesson_id": str(lesson.id) if lesson else "",
+                "lesson_name": lesson.title if lesson else "اختبارات على مستوى القسم",
             }
         )
 
-    rows.sort(key=lambda r: r["frequency"], reverse=True)
-    total_wrong = sum(r["frequency"] for r in rows)
+    rows_all.sort(key=lambda r: r["frequency"], reverse=True)
+    top_rows = rows_all[:10]
+
+    total_wrong = sum(r["frequency"] for r in rows_all)
+
+    subject_options_map = {}
+    section_options_map = {}
+    lesson_options_map = {}
+    for row in rows_all:
+        if row["subject_id"]:
+            subject_options_map[row["subject_id"]] = row["subject_name"]
+        if row["section_id"]:
+            section_options_map[row["section_id"]] = {
+                "name": row["section_name"],
+                "subject_id": row["subject_id"],
+            }
+        if row["lesson_id"]:
+            lesson_options_map[row["lesson_id"]] = {
+                "name": row["lesson_name"],
+                "section_id": row["section_id"],
+            }
+
+    subject_options = [
+        {"id": sid, "name": sname}
+        for sid, sname in sorted(subject_options_map.items(), key=lambda x: x[1])
+    ]
+    section_options = [
+        {
+            "id": sec_id,
+            "name": payload["name"],
+            "subject_id": payload["subject_id"],
+        }
+        for sec_id, payload in sorted(section_options_map.items(), key=lambda x: x[1]["name"])
+        if not selected_subject_id or payload["subject_id"] == selected_subject_id
+    ]
+    lesson_options = [
+        {
+            "id": lesson_id,
+            "name": payload["name"],
+            "section_id": payload["section_id"],
+        }
+        for lesson_id, payload in sorted(lesson_options_map.items(), key=lambda x: x[1]["name"])
+        if not selected_section_id or payload["section_id"] == selected_section_id
+    ]
+
+    def _matches_filters(row):
+        if selected_subject_id and row["subject_id"] != selected_subject_id:
+            return False
+        if selected_section_id and row["section_id"] != selected_section_id:
+            return False
+        if selected_lesson_id and row["lesson_id"] != selected_lesson_id:
+            return False
+        return True
+
+    rows = [r for r in rows_all if _matches_filters(r)]
+    filtered_total_wrong = sum(r["frequency"] for r in rows)
+
+    grouped_map = {}
+    for row in rows:
+        subject_key = row["subject_id"] or "_none_subject"
+        section_key = row["section_id"] or "_none_section"
+        lesson_key = row["lesson_id"] or "_none_lesson"
+
+        subject_bucket = grouped_map.setdefault(
+            subject_key,
+            {
+                "subject_id": row["subject_id"],
+                "subject_name": row["subject_name"],
+                "sections": {},
+            },
+        )
+
+        section_bucket = subject_bucket["sections"].setdefault(
+            section_key,
+            {
+                "section_id": row["section_id"],
+                "section_name": row["section_name"],
+                "lessons": {},
+            },
+        )
+
+        lesson_bucket = section_bucket["lessons"].setdefault(
+            lesson_key,
+            {
+                "lesson_id": row["lesson_id"],
+                "lesson_name": row["lesson_name"],
+                "rows": [],
+            },
+        )
+        lesson_bucket["rows"].append(row)
+
+    grouped_subjects = []
+    for subject_bucket in grouped_map.values():
+        sections = []
+        subject_question_count = 0
+        for section_bucket in subject_bucket["sections"].values():
+            lessons = []
+            section_question_count = 0
+            for lesson_bucket in section_bucket["lessons"].values():
+                lesson_bucket["rows"].sort(key=lambda r: r["frequency"], reverse=True)
+                lesson_count = len(lesson_bucket["rows"])
+                section_question_count += lesson_count
+                lessons.append(
+                    {
+                        "lesson_id": lesson_bucket["lesson_id"],
+                        "lesson_name": lesson_bucket["lesson_name"],
+                        "question_count": lesson_count,
+                        "rows": lesson_bucket["rows"],
+                    }
+                )
+            lessons.sort(key=lambda l: l["lesson_name"])
+            subject_question_count += section_question_count
+            sections.append(
+                {
+                    "section_id": section_bucket["section_id"],
+                    "section_name": section_bucket["section_name"],
+                    "question_count": section_question_count,
+                    "lessons": lessons,
+                }
+            )
+        sections.sort(key=lambda s: s["section_name"])
+        grouped_subjects.append(
+            {
+                "subject_id": subject_bucket["subject_id"],
+                "subject_name": subject_bucket["subject_name"],
+                "question_count": subject_question_count,
+                "sections": sections,
+            }
+        )
+
+    grouped_subjects.sort(key=lambda s: s["subject_name"])
 
     return render_template(
         "student/frequently_wrong.html",
         rows=rows,
+        top_rows=top_rows,
+        grouped_subjects=grouped_subjects,
         total_wrong=total_wrong,
+        filtered_total_wrong=filtered_total_wrong,
+        subject_options=subject_options,
+        section_options=section_options,
+        lesson_options=lesson_options,
+        selected_subject_id=selected_subject_id,
+        selected_section_id=selected_section_id,
+        selected_lesson_id=selected_lesson_id,
     )
 
 
@@ -3761,6 +4136,17 @@ def test_result(attempt_id):
     question_ids = [a.question_id.id for a in answers if a.question_id]
     questions = Question.objects(id__in=question_ids).all()
     questions_map = {str(q.id): q for q in questions}
+
+    favorite_mcq_map = {}
+    favorite_interactive_map = {}
+    if (current_user.role or "").lower() == "student":
+        for fav in StudentFavoriteQuestion.objects(
+            student_id=current_user.id,
+            question_type="mcq",
+            question_id__in=question_ids,
+        ).only("id", "question_id"):
+            if fav.question_id:
+                favorite_mcq_map[str(fav.question_id.id)] = str(fav.id)
     
     # Build review in the order of answers
     review = []
@@ -3779,10 +4165,20 @@ def test_result(attempt_id):
             "selected_choice": selected_choice,
             "correct_choice": correct_choice,
             "is_correct": ans.is_correct,
+            "is_favorite": str(q.id) in favorite_mcq_map,
+            "favorite_id": favorite_mcq_map.get(str(q.id)),
         })
 
     interactive_answers = list(AttemptInteractiveAnswer.objects(attempt_id=attempt.id).all())
     interactive_question_ids = [ia.interactive_question_id.id for ia in interactive_answers if ia.interactive_question_id]
+    if (current_user.role or "").lower() == "student" and interactive_question_ids:
+        for fav in StudentFavoriteQuestion.objects(
+            student_id=current_user.id,
+            question_type="interactive",
+            interactive_question_id__in=interactive_question_ids,
+        ).only("id", "interactive_question_id"):
+            if fav.interactive_question_id:
+                favorite_interactive_map[str(fav.interactive_question_id.id)] = str(fav.id)
     interactive_questions_map = {
         str(iq.id): iq for iq in TestInteractiveQuestion.objects(id__in=interactive_question_ids).all()
     } if interactive_question_ids else {}
@@ -3798,6 +4194,8 @@ def test_result(attempt_id):
                 "question": iq,
                 "selected_value": ia.selected_value,
                 "is_correct": ia.is_correct,
+                "is_favorite": str(iq.id) in favorite_interactive_map,
+                "favorite_id": favorite_interactive_map.get(str(iq.id)),
             }
         )
 
@@ -4485,6 +4883,26 @@ def custom_test_result(attempt_id):
     questions_by_id = {str(q.id): q for q in questions}
     interactive_by_id = {str(iq.id): iq for iq in interactive_questions}
 
+    favorite_mcq_map = {}
+    favorite_interactive_map = {}
+    if (current_user.role or "").lower() == "student":
+        if mcq_ids:
+            for fav in StudentFavoriteQuestion.objects(
+                student_id=current_user.id,
+                question_type="mcq",
+                question_id__in=mcq_ids,
+            ).only("id", "question_id"):
+                if fav.question_id:
+                    favorite_mcq_map[str(fav.question_id.id)] = str(fav.id)
+        if interactive_ids:
+            for fav in StudentFavoriteQuestion.objects(
+                student_id=current_user.id,
+                question_type="interactive",
+                interactive_question_id__in=interactive_ids,
+            ).only("id", "interactive_question_id"):
+                if fav.interactive_question_id:
+                    favorite_interactive_map[str(fav.interactive_question_id.id)] = str(fav.id)
+
     answers = list(CustomTestAnswer.objects(attempt_id=attempt.id).all())
     answers_by_qid = {str(a.question_id.id): a for a in answers if a.question_id}
     answers_by_iqid = {str(a.interactive_question_id.id): a for a in answers if a.interactive_question_id}
@@ -4510,6 +4928,8 @@ def custom_test_result(attempt_id):
                 "selected_choice": selected_choice,
                 "correct_choice": correct_choice,
                 "is_correct": ans.is_correct if ans else False,
+                "is_favorite": item_id in favorite_mcq_map,
+                "favorite_id": favorite_mcq_map.get(item_id),
             })
         else:
             iq = interactive_by_id.get(item_id)
@@ -4521,6 +4941,8 @@ def custom_test_result(attempt_id):
                 "question": iq,
                 "selected_value": ans.selected_value if ans else False,
                 "is_correct": ans.is_correct if ans else False,
+                "is_favorite": item_id in favorite_interactive_map,
+                "favorite_id": favorite_interactive_map.get(item_id),
             })
 
     gamification = StudentGamification.objects(student_id=attempt.student_id.id).first()

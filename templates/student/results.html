@@ -6,8 +6,8 @@
     <p class="mb-0">درجاتك ودرجات الطلاب الآخرين.</p>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-warning btn-sm px-3" href="{{ url_for('student.frequently_wrong') }}">الأخطاء المتكررة</a>
-    <a class="btn btn-primary btn-sm px-3" href="{{ url_for('student.subjects') }}">← العودة للمواد</a>
+    <a class="btn btn-cta btn-sm px-3" href="{{ url_for('student.frequently_wrong') }}">الأخطاء المتكررة</a>
+    <a class="btn btn-cta btn-sm px-3" href="{{ url_for('student.subjects') }}">← العودة للمواد</a>
   </div>
 </div>
 
@@ -86,8 +86,8 @@
     {% endfor %}
   </div>
 {% endif %}
-
-<h5 class="mb-2">الطلاب الآخرون</h5>
+<br>
+<h5 class="mb-2 h2 text-center">الطلاب الآخرون</h5>
 {% if other_attempts %}
   <div class="row g-3">
     {% for attempt in other_attempts %}
@@ -127,7 +127,7 @@
           </div>
         </div>
       {% endif %}
-    {% endfor %}\n  </div>
+    {% endfor %}  </div>
 {% else %}
   <div class="alert alert-light">لا توجد محاولات من طلاب آخرين بعد.</div>
 {% endif %}

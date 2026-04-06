@@ -108,7 +108,9 @@
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
     <h1 class="h4 mb-1">{{ test.title }}</h1>
-    <p class="mb-0">{{ test.description or 'أجب عن جميع الأسئلة أدناه.' }}</p>
+    {% if test.description and test.description|trim %}
+      <p class="mb-0">{{ test.description }}</p>
+    {% endif %}
     {% if test_resources %}
       <div class="d-flex flex-wrap gap-2 mt-2">
         {% for res in test_resources %}
@@ -608,7 +610,7 @@
 
     const abandonEndpoint = "{{ url_for('student.abandon_test', test_id=test.id) }}";
     const exitToken = "{{ exit_token|default('') }}";
-    const warningMessage = "مغادرة الاختبار الآن ستخصم 25 XP. هل تريد المتابعة؟";
+    const warningMessage = "مغادرة الاختبار الآن ستخصم 25 💎. هل تريد المتابعة؟";
     let isSubmitting = false;
     let penaltySent = false;
     let popGuardEnabled = false;

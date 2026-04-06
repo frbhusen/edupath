@@ -2,8 +2,8 @@
 {% block content %}
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
-    <h1 class="h4 mb-1">إدارة الترتيب وXP</h1>
-    <p class="mb-0">تعديل XP للطلاب وإدارة XP الخاص بكل درس.</p>
+    <h1 class="h4 mb-1">إدارة الترتيب والجواهر</h1>
+    <p class="mb-0">تعديل الجواهر للطلاب وإدارة جواهر كل درس.</p>
   </div>
   <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">العودة للوحة المعلم</a>
 </div>
@@ -21,7 +21,7 @@
             <tr>
               <th>#</th>
               <th>الطالب</th>
-              <th>XP</th>
+              <th>الجواهر</th>
               <th>Level</th>
               <th>تعديل مباشر</th>
               <th>تعديل بالفرق</th>
@@ -70,7 +70,7 @@
         </table>
       </div>
     {% else %}
-      <div class="alert alert-light mb-0">لا توجد بيانات XP للطلاب بعد.</div>
+      <div class="alert alert-light mb-0">لا توجد بيانات الجواهر للطلاب بعد.</div>
     {% endif %}
   </div>
 </div>
@@ -78,7 +78,7 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="mb-0">XP لكل درس</h5>
+      <h5 class="mb-0">جواهر لكل درس</h5>
       <span class="badge text-bg-secondary">{{ lessons|length }}</span>
     </div>
     {% if lessons %}
@@ -88,8 +88,8 @@
             <tr>
               <th>المادة/القسم</th>
               <th>الدرس</th>
-              <th>XP الحالي</th>
-              <th>تحديث XP</th>
+              <th>الجواهر الحالية</th>
+              <th>تحديث الجواهر</th>
             </tr>
           </thead>
           <tbody>
