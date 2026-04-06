@@ -48,7 +48,7 @@
                         {% if c.is_correct %}صحيح{% else %}خيار{% endif %}
                       </span>
                       <span class="preserve-format">{{ c.text }}</span>
-                      {% if c.image_url %}
+                      {% if c.image_url and c.image_url|length > 0 %}
                         <img src="{{ c.image_url }}" alt="صورة الخيار" class="img-fluid rounded border" style="max-height: 140px;">
                       {% endif %}
                     </div>

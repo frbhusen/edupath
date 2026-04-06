@@ -69,7 +69,7 @@
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                   <input class="form-check-input me-2" type="radio" name="q_{{ q.id }}" value="{{ c.choice_id }}" id="q{{ q.id }}_{{ loop.index }}" {% if answers_by_qid.get(q.id|string) == c.choice_id|string %}checked{% endif %} required>
                   <span>{{ c.text }}</span>
-                  {% if c.image_url %}
+                  {% if c.image_url and c.image_url|length > 0 %}
                     <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;">
                   {% endif %}
                 </div>
