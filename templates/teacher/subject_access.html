@@ -129,12 +129,38 @@
 
 <div class="card shadow-sm mt-3">
   <div class="card-body">
-    <h5 class="mb-2">الأكواد الجماعية</h5>
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
+      <h5 class="mb-0">الأكواد الجماعية</h5>
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="codesSelectAllBtn">تحديد الكل</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="codesDeselectAllBtn">إلغاء التحديد</button>
+      </div>
+    </div>
+
+    <form method="post" id="codesBatchDeleteForm" class="d-inline">
+      <input type="hidden" name="action" value="batch_delete_codes" />
+      <input type="hidden" name="code_ids" id="batchDeleteCodeIds" />
+    </form>
+
+    <form method="post" id="codesBatchPriceForm" class="d-flex flex-wrap gap-2 align-items-end mb-2">
+      <input type="hidden" name="action" value="batch_update_code_price" />
+      <input type="hidden" name="code_ids" id="batchPriceCodeIds" />
+      <div>
+        <label class="form-label mb-1">سعر جديد (SYP)</label>
+        <input class="form-control form-control-sm" type="number" name="new_code_price_syp" id="newCodePriceInput" min="0" step="1" value="0" required>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="batchPriceUpdateBtn" disabled>تعديل سعر المحدد</button>
+        <button type="button" class="btn btn-outline-danger btn-sm" id="batchDeleteCodesBtn" disabled>حذف المحدد</button>
+      </div>
+    </form>
+
     {% if unassigned_codes %}
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
           <thead>
             <tr>
+              <th style="width: 36px;" class="text-center">تحديد</th>
               <th>الكود</th>
               <th>السعر (SYP)</th>
               <th>الحالة</th>
@@ -145,6 +171,7 @@
           <tbody>
             {% for c in unassigned_codes %}
               <tr>
+                <td class="text-center"><input class="form-check-input code-select" type="checkbox" value="{{ c.id }}" /></td>
                 <td><span class="badge {% if c.is_used %}text-bg-secondary{% else %}text-bg-info{% endif %}">{{ c.code }}</span></td>
                 <td>{{ c.code_price_syp|default(0) }}</td>
                 <td>{% if c.is_used %}مستخدم{% else %}جاهز{% endif %}</td>
@@ -166,4 +193,65 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+  (function () {
+    const checks = Array.from(document.querySelectorAll('.code-select'));
+    const selectAllBtn = document.getElementById('codesSelectAllBtn');
+    const deselectAllBtn = document.getElementById('codesDeselectAllBtn');
+    const batchDeleteBtn = document.getElementById('batchDeleteCodesBtn');
+    const batchPriceBtn = document.getElementById('batchPriceUpdateBtn');
+    const deleteIdsInput = document.getElementById('batchDeleteCodeIds');
+    const priceIdsInput = document.getElementById('batchPriceCodeIds');
+    const batchDeleteForm = document.getElementById('codesBatchDeleteForm');
+    const batchPriceForm = document.getElementById('codesBatchPriceForm');
+
+    function selectedIds() {
+      return checks.filter((c) => c.checked).map((c) => c.value);
+    }
+
+    function syncButtons() {
+      const count = selectedIds().length;
+      if (batchDeleteBtn) batchDeleteBtn.disabled = count === 0;
+      if (batchPriceBtn) batchPriceBtn.disabled = count === 0;
+    }
+
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener('click', () => {
+        checks.forEach((c) => (c.checked = true));
+        syncButtons();
+      });
+    }
+
+    if (deselectAllBtn) {
+      deselectAllBtn.addEventListener('click', () => {
+        checks.forEach((c) => (c.checked = false));
+        syncButtons();
+      });
+    }
+
+    checks.forEach((c) => c.addEventListener('change', syncButtons));
+
+    if (batchDeleteBtn) {
+      batchDeleteBtn.addEventListener('click', () => {
+        const ids = selectedIds();
+        if (!ids.length) return;
+        if (!confirm(`حذف ${ids.length} كود؟`)) return;
+        if (deleteIdsInput) deleteIdsInput.value = ids.join(',');
+        if (batchDeleteForm) batchDeleteForm.submit();
+      });
+    }
+
+    if (batchPriceBtn) {
+      batchPriceBtn.addEventListener('click', () => {
+        const ids = selectedIds();
+        if (!ids.length) return;
+        if (priceIdsInput) priceIdsInput.value = ids.join(',');
+        if (batchPriceForm) batchPriceForm.submit();
+      });
+    }
+
+    syncButtons();
+  })();
+</script>
 {% endblock %}

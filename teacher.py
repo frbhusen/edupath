@@ -2238,6 +2238,47 @@ def manage_subject_access(subject_id):
                 if ac.subject_id and str(ac.subject_id.id) == str(subject.id):
                     ac.delete()
                     flash("تم حذف الكود بنجاح.", "success")
+
+        elif action == "batch_delete_codes":
+            raw_ids = (request.form.get("code_ids") or "").strip()
+            ids = []
+            if raw_ids:
+                ids.extend([x.strip() for x in raw_ids.split(",") if x.strip()])
+            if not ids:
+                ids.extend([(x or "").strip() for x in request.form.getlist("code_ids") if (x or "").strip()])
+
+            valid_ids = [ObjectId(cid) for cid in ids if ObjectId.is_valid(cid)]
+            if not valid_ids:
+                flash("لم يتم تحديد أكواد للحذف.", "warning")
+                return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
+
+            deleted = SubjectActivationCode.objects(id__in=valid_ids, subject_id=subject.id).delete()
+            flash(f"تم حذف {deleted or 0} كود.", "success" if deleted else "warning")
+
+        elif action == "batch_update_code_price":
+            raw_ids = (request.form.get("code_ids") or "").strip()
+            ids = []
+            if raw_ids:
+                ids.extend([x.strip() for x in raw_ids.split(",") if x.strip()])
+            if not ids:
+                ids.extend([(x or "").strip() for x in request.form.getlist("code_ids") if (x or "").strip()])
+
+            valid_ids = [ObjectId(cid) for cid in ids if ObjectId.is_valid(cid)]
+            if not valid_ids:
+                flash("لم يتم تحديد أكواد للتعديل.", "warning")
+                return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
+
+            try:
+                new_price = int((request.form.get("new_code_price_syp") or "0").strip())
+            except Exception:
+                new_price = -1
+
+            if new_price < 0:
+                flash("سعر الكود غير صالح.", "error")
+                return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
+
+            updated = SubjectActivationCode.objects(id__in=valid_ids, subject_id=subject.id).update(set__code_price_syp=new_price)
+            flash(f"تم تحديث سعر {updated or 0} كود إلى {new_price} ل.س.", "success" if updated else "warning")
         return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
     
     students = User.objects(role="student").order_by('-created_at').all()

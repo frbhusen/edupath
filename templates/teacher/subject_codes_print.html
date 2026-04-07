@@ -161,6 +161,38 @@
         color: #123f63;
       }
 
+      .code-wrap {
+        display: inline-flex;
+        gap: 4px;
+        direction: ltr;
+      }
+
+      .code-char {
+        min-width: 20px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #b9cad9;
+        border-radius: 5px;
+        background: #f5faff;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 0.96rem;
+        font-weight: 800;
+        line-height: 1;
+        color: #0f3f63;
+        position: relative;
+      }
+
+      .code-char.zero::after {
+        content: "";
+        position: absolute;
+        width: 15px;
+        border-top: 2px solid #0f3f63;
+        transform: rotate(-35deg);
+        transform-origin: center;
+      }
+
       .used {
         color: #717b86;
       }
@@ -173,6 +205,12 @@
       .status-used {
         color: #7a858f;
         font-weight: 700;
+      }
+
+      .code-legend {
+        margin: 0 0 10px;
+        font-size: 0.79rem;
+        color: #5e6f82;
       }
 
       @media print {
@@ -237,6 +275,7 @@
         </div>
 
         <table>
+          <caption class="code-legend">ملاحظة: الرقم 0 يظهر بشرطة مائلة لتمييزه عن الحرف O.</caption>
           <thead>
             <tr>
               <th style="width: 20%">الكود</th>
@@ -248,7 +287,13 @@
           <tbody>
             {% for c in codes %}
             <tr>
-              <td class="code">{{ c.code }}</td>
+              <td class="code">
+                <span class="code-wrap" aria-label="{{ c.code }}">
+                  {% for ch in c.code %}
+                    <span class="code-char {% if ch == '0' %}zero{% endif %}">{{ ch }}</span>
+                  {% endfor %}
+                </span>
+              </td>
               <td>{{ subject.name }}</td>
               <td>{{ c.code_price_syp|default(0) }} ل.س</td>
               <td
