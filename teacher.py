@@ -3377,6 +3377,7 @@ def edit_test(test_id):
         "batch_delete_questions",
         "upsert_interactive_question",
         "delete_interactive_question",
+        "batch_delete_interactive_questions",
         "import_json",
     }
     
@@ -3517,10 +3518,20 @@ def edit_test(test_id):
 
         elif form_name == "batch_delete_questions":
             raw_ids = request.form.get("question_ids") or ""
-            question_ids = [qid for qid in raw_ids.split(",") if qid.strip()]
+            question_ids = []
+            for qid in raw_ids.split(","):
+                qid = qid.strip()
+                if ObjectId.is_valid(qid):
+                    question_ids.append(ObjectId(qid))
+            if not question_ids:
+                for qid in request.form.getlist("question_ids"):
+                    qid = (qid or "").strip()
+                    if ObjectId.is_valid(qid):
+                        question_ids.append(ObjectId(qid))
+            question_ids = list(dict.fromkeys(question_ids))
             if question_ids:
                 deleted = Question.objects(id__in=question_ids, test_id=test.id).delete()
-                flash(f"تم حذف {deleted} سؤال.", "success")
+                flash(f"تم حذف {deleted or 0} سؤال.", "success" if deleted else "warning")
             else:
                 flash("لم يتم اختيار أي سؤال.", "warning")
             return _edit_redirect("mcq")
@@ -3576,6 +3587,26 @@ def edit_test(test_id):
                 if iq:
                     iq.delete()
                     flash("تم حذف السؤال التفاعلي.", "success")
+            return _edit_redirect("interactive")
+
+        elif form_name == "batch_delete_interactive_questions":
+            raw_ids = request.form.get("interactive_question_ids") or ""
+            interactive_ids = []
+            for qid in raw_ids.split(","):
+                qid = qid.strip()
+                if ObjectId.is_valid(qid):
+                    interactive_ids.append(ObjectId(qid))
+            if not interactive_ids:
+                for qid in request.form.getlist("interactive_question_ids"):
+                    qid = (qid or "").strip()
+                    if ObjectId.is_valid(qid):
+                        interactive_ids.append(ObjectId(qid))
+            interactive_ids = list(dict.fromkeys(interactive_ids))
+            if interactive_ids:
+                deleted = TestInteractiveQuestion.objects(id__in=interactive_ids, test_id=test.id).delete()
+                flash(f"تم حذف {deleted or 0} سؤال تحريري.", "success" if deleted else "warning")
+            else:
+                flash("لم يتم اختيار أي سؤال تحريري.", "warning")
             return _edit_redirect("interactive")
 
         elif form_name == "import_json":
@@ -3733,7 +3764,11 @@ def edit_test(test_id):
                         correct_indices.add(int(correct.strip()))
                     else:
                         for idx, opt in enumerate(choices_list, start=1):
-                            if str(opt).strip() == correct.strip():
+                            if isinstance(opt, dict):
+                                candidate_text = str(opt.get("text", "")).strip()
+                            else:
+                                candidate_text = str(opt).strip()
+                            if candidate_text == correct.strip():
                                 correct_indices.add(idx)
 
                 choices = []
@@ -3767,6 +3802,7 @@ def edit_test(test_id):
                     for idx, opt in enumerate(choices_list, start=1):
                         if opt is None:
                             continue
+                        opt_declared_correct = False
                         if isinstance(opt, dict):
                             opt_text = str(opt.get("text", "")).strip()
                             opt_image = (
@@ -3777,12 +3813,17 @@ def edit_test(test_id):
                                 or opt.get("image_uri")
                             )
                             opt_image = _normalize_image_url(opt_image)
+                            opt_declared_correct = _to_bool(opt.get("isCorrect") if "isCorrect" in opt else opt.get("is_correct"))
                         else:
                             opt_text = str(opt).strip()
                             opt_image = None
                         if not opt_text:
                             continue
-                        is_correct = (idx in correct_indices)
+                        is_correct = bool(opt_declared_correct)
+                        if not is_correct and correct_indices:
+                            is_correct = idx in correct_indices
+                        if not is_correct and isinstance(correct, str) and correct.strip():
+                            is_correct = (opt_text == correct.strip())
                         if is_correct:
                             has_correct = True
                         choices.append(Choice(text=opt_text, image_url=opt_image, is_correct=is_correct))

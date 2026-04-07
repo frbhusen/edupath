@@ -110,6 +110,10 @@
 
       <div class="col-12">
         <label class="form-label mb-1">اختر أسئلة MCQ</label>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="select-all-questions-btn">تحديد الكل</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="deselect-all-questions-btn">إلغاء التحديد</button>
+        </div>
         <div class="border rounded p-2" style="max-height: 280px; overflow:auto;" id="custom-questions-wrap">
           {% if questions %}
             {% for q in questions %}
@@ -331,6 +335,8 @@
     var navSelectedInput = document.getElementById("nav-selected-question-ids");
     var postSelectedInput = document.getElementById("post-selected-question-ids");
     var questionCheckboxes = Array.from(document.querySelectorAll('input[name="question_ids"]'));
+    var selectAllQuestionsBtn = document.getElementById("select-all-questions-btn");
+    var deselectAllQuestionsBtn = document.getElementById("deselect-all-questions-btn");
 
     var selectedSet = new Set((postSelectedInput && postSelectedInput.value ? postSelectedInput.value.split(',') : []).filter(Boolean));
 
@@ -354,6 +360,30 @@
         syncSelectedInputs();
       });
     });
+
+    function setAllQuestionSelections(checked) {
+      questionCheckboxes.forEach(function (cb) {
+        cb.checked = checked;
+        if (checked) {
+          selectedSet.add(cb.value);
+        } else {
+          selectedSet.delete(cb.value);
+        }
+      });
+      syncSelectedInputs();
+    }
+
+    if (selectAllQuestionsBtn) {
+      selectAllQuestionsBtn.addEventListener("click", function () {
+        setAllQuestionSelections(true);
+      });
+    }
+
+    if (deselectAllQuestionsBtn) {
+      deselectAllQuestionsBtn.addEventListener("click", function () {
+        setAllQuestionSelections(false);
+      });
+    }
 
     if (lessonFilter && navForm) {
       lessonFilter.addEventListener('change', function () {

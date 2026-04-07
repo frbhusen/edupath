@@ -305,11 +305,10 @@
                       <input type="hidden" name="question_ids" id="batchQuestionIds" />
                       <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
                         <span class="small text-muted">حدد الأسئلة من الدرج الجانبي ثم اختر الإجراء.</span>
-                        <div class="dropdown">
-                          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">إجراءات</button>
-                          <ul class="dropdown-menu">
-                            <li><button type="button" class="dropdown-item text-danger" id="batchDeleteBtn" disabled>حذف الأسئلة المحددة</button></li>
-                          </ul>
+                        <div class="d-flex flex-wrap gap-2">
+                          <button type="button" class="btn btn-outline-secondary btn-sm" id="selectAllQuestionsBtn">تحديد الكل</button>
+                          <button type="button" class="btn btn-outline-secondary btn-sm" id="deselectAllQuestionsBtn">إلغاء التحديد</button>
+                          <button type="button" class="btn btn-outline-danger btn-sm" id="batchDeleteBtn" disabled>حذف الأسئلة المحددة</button>
                         </div>
                       </div>
                     </form>
@@ -504,10 +503,23 @@
           </form>
 
           {% if interactive_questions %}
+            <form method="post" id="interactiveBatchDeleteForm" class="mb-2">
+              <input type="hidden" name="form_name" value="batch_delete_interactive_questions" />
+              <input type="hidden" name="interactive_question_ids" id="interactiveBatchQuestionIds" />
+              <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                <span class="small text-muted">حدد الأسئلة التحريرية ثم اختر الإجراء.</span>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="interactiveSelectAllBtn">تحديد الكل</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="interactiveDeselectAllBtn">إلغاء التحديد</button>
+                  <button type="button" class="btn btn-outline-danger btn-sm" id="interactiveBatchDeleteBtn" disabled>حذف المحدد</button>
+                </div>
+              </div>
+            </form>
             <div class="table-responsive">
               <table class="table table-sm align-middle">
                 <thead>
                   <tr>
+                    <th class="text-center" style="width: 44px;">تحديد</th>
                     <th>#</th>
                     <th>السؤال</th>
                     <th>الإجابة</th>
@@ -518,6 +530,9 @@
                 <tbody>
                   {% for iq in interactive_questions %}
                   <tr>
+                    <td class="text-center">
+                      <input class="form-check-input interactive-question-select" type="checkbox" value="{{ iq.id }}" aria-label="Select interactive question" />
+                    </td>
                     <td class="fw-semibold">{{ loop.index }}</td>
                     <td>
                       <form method="post">
@@ -639,8 +654,14 @@
   const choicesContainer = document.getElementById('choicesContainer');
   const addChoiceBtn = document.getElementById('addChoiceBtn');
   const removeChoiceBtn = document.getElementById('removeChoiceBtn');
+  const selectAllQuestionsBtn = document.getElementById('selectAllQuestionsBtn');
+  const deselectAllQuestionsBtn = document.getElementById('deselectAllQuestionsBtn');
   const batchDeleteBtn = document.getElementById('batchDeleteBtn');
   const batchQuestionIds = document.getElementById('batchQuestionIds');
+  const interactiveSelectAllBtn = document.getElementById('interactiveSelectAllBtn');
+  const interactiveDeselectAllBtn = document.getElementById('interactiveDeselectAllBtn');
+  const interactiveBatchDeleteBtn = document.getElementById('interactiveBatchDeleteBtn');
+  const interactiveBatchQuestionIds = document.getElementById('interactiveBatchQuestionIds');
   const resetBtn = document.getElementById('resetBtn');
   const deleteBtn = document.getElementById('deleteBtn');
   const toggleHintBtn = document.getElementById('toggleHintBtn');
@@ -891,6 +912,53 @@
     return selected;
   }
 
+  function setAllQuestionSelections(checked){
+    document.querySelectorAll('.question-select').forEach((checkbox) => {
+      checkbox.checked = checked;
+    });
+    updateBatchDeleteState();
+  }
+
+  if (selectAllQuestionsBtn) {
+    selectAllQuestionsBtn.addEventListener('click', () => setAllQuestionSelections(true));
+  }
+
+  if (deselectAllQuestionsBtn) {
+    deselectAllQuestionsBtn.addEventListener('click', () => setAllQuestionSelections(false));
+  }
+
+  function updateInteractiveBatchDeleteState(){
+    if (!interactiveBatchDeleteBtn || !interactiveBatchQuestionIds) return [];
+    const selected = Array.from(document.querySelectorAll('.interactive-question-select:checked')).map(el => el.value);
+    interactiveBatchQuestionIds.value = selected.join(',');
+    interactiveBatchDeleteBtn.disabled = selected.length === 0;
+    return selected;
+  }
+
+  function setAllInteractiveQuestionSelections(checked){
+    document.querySelectorAll('.interactive-question-select').forEach((checkbox) => {
+      checkbox.checked = checked;
+    });
+    updateInteractiveBatchDeleteState();
+  }
+
+  if (interactiveSelectAllBtn) {
+    interactiveSelectAllBtn.addEventListener('click', () => setAllInteractiveQuestionSelections(true));
+  }
+
+  if (interactiveDeselectAllBtn) {
+    interactiveDeselectAllBtn.addEventListener('click', () => setAllInteractiveQuestionSelections(false));
+  }
+
+  if (interactiveBatchDeleteBtn) {
+    interactiveBatchDeleteBtn.addEventListener('click', () => {
+      if (interactiveBatchDeleteBtn.disabled) return;
+      if (!confirm('حذف الأسئلة التحريرية المحددة؟')) return;
+      updateInteractiveBatchDeleteState();
+      document.getElementById('interactiveBatchDeleteForm').submit();
+    });
+  }
+
   if (batchDeleteBtn) {
     batchDeleteBtn.addEventListener('click', () => {
       if (batchDeleteBtn.disabled) return;
@@ -936,9 +1004,13 @@
   switchWorkspace(activeTab);
   updatePreview();
   updateBatchDeleteState();
+  updateInteractiveBatchDeleteState();
 
   document.querySelectorAll('.question-select').forEach(el => {
     el.addEventListener('change', updateBatchDeleteState);
+  });
+  document.querySelectorAll('.interactive-question-select').forEach(el => {
+    el.addEventListener('change', updateInteractiveBatchDeleteState);
   });
 
   const questionSearch = document.getElementById('questionSearch');
