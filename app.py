@@ -162,8 +162,9 @@ def create_app():
         pages = [
             url_for("index", _external=True),
             url_for("latex_cheatsheet", _external=True),
-            url_for("auth.login", _external=True),
-            url_for("auth.register", _external=True),
+            url_for("pages", filename="services.html", _external=True),
+            url_for("pages", filename="FAQ.html", _external=True),
+            url_for("pages", filename="contact.html", _external=True),
         ]
 
         lastmod = datetime.utcnow().strftime("%Y-%m-%d")
