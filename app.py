@@ -140,6 +140,48 @@ def create_app():
     def latex_cheatsheet():
         return render_template("latex_cheatsheet.html")
 
+    @app.route("/robots.txt")
+    def robots_txt():
+        lines = [
+            "User-agent: *",
+            "Allow: /",
+            "Disallow: /teacher/",
+            "Disallow: /admin/",
+            "Disallow: /notifications",
+            "Disallow: /notifications/",
+            "Disallow: /subjects",
+            "Disallow: /results",
+            f"Sitemap: {url_for('sitemap_xml', _external=True)}",
+        ]
+        return app.response_class("\n".join(lines), mimetype="text/plain")
+
+    @app.route("/sitemap.xml")
+    def sitemap_xml():
+        from datetime import datetime
+
+        pages = [
+            url_for("index", _external=True),
+            url_for("latex_cheatsheet", _external=True),
+            url_for("auth.login", _external=True),
+            url_for("auth.register", _external=True),
+        ]
+
+        lastmod = datetime.utcnow().strftime("%Y-%m-%d")
+        xml_parts = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        ]
+        for page in pages:
+            xml_parts.append("  <url>")
+            xml_parts.append(f"    <loc>{page}</loc>")
+            xml_parts.append(f"    <lastmod>{lastmod}</lastmod>")
+            xml_parts.append("    <changefreq>weekly</changefreq>")
+            xml_parts.append("    <priority>0.8</priority>")
+            xml_parts.append("  </url>")
+        xml_parts.append("</urlset>")
+
+        return app.response_class("\n".join(xml_parts), mimetype="application/xml")
+
     @app.route("/notifications")
     @login_required
     def notifications_inbox():
