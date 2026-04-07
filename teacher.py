@@ -2547,7 +2547,7 @@ def course_set_edit(course_set_id):
     section_ids = [s.id for s in sections]
     lessons = list(Lesson.objects(section_id__in=section_ids).order_by("created_at").all()) if section_ids else []
     active_tab = (request.args.get("tab") or "settings").strip().lower()
-    if active_tab not in {"settings", "questions", "resources"}:
+    if active_tab not in {"settings", "questions", "import", "resources"}:
         active_tab = "settings"
 
     def _edit_redirect(tab_name="settings"):
@@ -2749,25 +2749,193 @@ def course_set_edit(course_set_id):
             flash("تم حذف السؤال.", "success")
             return _edit_redirect("questions")
 
-        if action == "batch_delete_question":
-            question_ids_str = (request.form.get("question_ids") or "").strip()
-            if not question_ids_str:
-                flash("لم يتم تحديد أسئلة للحذف.", "error")
+        if action == "import_json":
+            def _to_bool(val):
+                if isinstance(val, bool):
+                    return val
+                if isinstance(val, (int, float)):
+                    return val != 0
+                if isinstance(val, str):
+                    return val.strip().lower() in {"true", "1", "yes", "on"}
+                return False
+
+            def _normalize_url(val):
+                if val is None:
+                    return None
+                if isinstance(val, str):
+                    cleaned = val.strip()
+                    return cleaned or None
+                return str(val).strip() or None
+
+            raw_json = (request.form.get("questions_json") or "").strip()
+            upload = request.files.get("questions_file")
+            if upload and upload.filename:
+                try:
+                    raw_json = upload.read().decode("utf-8")
+                except Exception:
+                    flash("تعذر قراءة ملف JSON. تأكد أن الترميز UTF-8.", "error")
+                    return _edit_redirect("import")
+
+            if not raw_json:
+                flash("يرجى رفع ملف JSON أو لصق المحتوى.", "error")
+                return _edit_redirect("import")
+
+            try:
+                payload = json.loads(raw_json)
+            except Exception as exc:
+                flash(f"JSON غير صحيح: {exc}", "error")
+                return _edit_redirect("import")
+
+            items = payload
+            if isinstance(payload, dict):
+                items = payload.get("quiz") or payload.get("questions") or payload.get("items") or []
+
+            if not isinstance(items, list):
+                flash("تنسيق JSON غير مدعوم.", "error")
+                return _edit_redirect("import")
+
+            imported = 0
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+
+                q_text = str(
+                    item.get("question")
+                    or item.get("text")
+                    or item.get("question_text")
+                    or item.get("questionText")
+                    or ""
+                ).strip()
+
+                q_image = _normalize_url(
+                    item.get("questionImage")
+                    or item.get("question_image")
+                    or item.get("questionImageUrl")
+                    or item.get("question_image_url")
+                )
+
+                raw_item_type = str(item.get("type") or item.get("question_type") or item.get("kind") or "").strip().lower()
+                explicit_interactive = raw_item_type in {"interactive", "essay", "text", "subjective", "written"}
+
+                choices_list = item.get("choices") or item.get("options") or item.get("answerOptions") or item.get("answer_options") or []
+                has_mcq_payload = isinstance(choices_list, list) and len(choices_list) > 0
+
+                interactive_answer_text = str(
+                    item.get("answerText")
+                    or item.get("answer_text")
+                    or item.get("interactive_answer_text")
+                    or item.get("solution")
+                    or ""
+                ).strip()
+                if not interactive_answer_text and not has_mcq_payload and isinstance(item.get("answer"), str):
+                    interactive_answer_text = str(item.get("answer") or "").strip()
+
+                interactive_answer_image = _normalize_url(
+                    item.get("answerImage")
+                    or item.get("answer_image")
+                    or item.get("answerImageUrl")
+                    or item.get("answer_image_url")
+                    or item.get("solutionImage")
+                    or item.get("solution_image")
+                )
+
+                should_import_interactive = bool(
+                    (explicit_interactive and ((q_text or q_image) and (interactive_answer_text or interactive_answer_image)))
+                    or ((not has_mcq_payload) and ((q_text or q_image) and (interactive_answer_text or interactive_answer_image)))
+                )
+
+                if should_import_interactive:
+                    CourseQuestion(
+                        course_set_id=course_set.id,
+                        question_type="interactive",
+                        question_text=q_text or None,
+                        question_image_url=q_image,
+                        answer_text=interactive_answer_text or None,
+                        answer_image_url=interactive_answer_image,
+                        choices=[],
+                        correct_choice_id=None,
+                        correct_value=True,
+                    ).save()
+                    imported += 1
+                    continue
+
+                if not q_text:
+                    continue
+                if not has_mcq_payload:
+                    continue
+
+                correct = item.get("answer") if "answer" in item else item.get("correct")
+                correct_indices = set()
+
+                if isinstance(correct, int):
+                    correct_indices.add(correct if correct >= 1 else correct + 1)
+                elif isinstance(correct, list):
+                    for c in correct:
+                        if isinstance(c, int):
+                            correct_indices.add(c if c >= 1 else c + 1)
+                elif isinstance(correct, str):
+                    if correct.strip().isdigit():
+                        correct_indices.add(int(correct.strip()))
+
+                choices = []
+                has_correct = False
+                for idx, opt in enumerate(choices_list, start=1):
+                    if opt is None:
+                        continue
+
+                    if isinstance(opt, dict):
+                        opt_text = str(opt.get("text", "")).strip()
+                        opt_image = _normalize_url(
+                            opt.get("image")
+                            or opt.get("imageUrl")
+                            or opt.get("image_url")
+                            or opt.get("imageUri")
+                            or opt.get("image_uri")
+                        )
+                        opt_declared_correct = _to_bool(opt.get("isCorrect") if "isCorrect" in opt else opt.get("is_correct"))
+                    else:
+                        opt_text = str(opt).strip()
+                        opt_image = None
+                        opt_declared_correct = False
+
+                    if not opt_text:
+                        continue
+
+                    is_correct = bool(opt_declared_correct)
+                    if not is_correct and correct_indices:
+                        is_correct = idx in correct_indices
+                    if not is_correct and isinstance(correct, str) and correct.strip() and not correct.strip().isdigit():
+                        is_correct = (opt_text == correct.strip())
+
+                    if is_correct:
+                        has_correct = True
+                    choices.append(Choice(text=opt_text, image_url=opt_image, is_correct=is_correct))
+
+                if len(choices) < 2:
+                    continue
+                if not has_correct:
+                    choices[0].is_correct = True
+
+                correct_embedded = next((c for c in choices if c.is_correct), None)
+                CourseQuestion(
+                    course_set_id=course_set.id,
+                    question_type="mcq",
+                    question_text=q_text,
+                    question_image_url=q_image,
+                    answer_text=None,
+                    answer_image_url=None,
+                    choices=choices,
+                    correct_choice_id=correct_embedded.choice_id if correct_embedded else None,
+                    correct_value=True,
+                ).save()
+                imported += 1
+
+            if imported:
+                flash(f"تم استيراد {imported} سؤال من JSON.", "success")
                 return _edit_redirect("questions")
-            question_ids = [qid.strip() for qid in question_ids_str.split(",") if qid.strip()]
-            if not question_ids:
-                flash("لم يتم تحديد أسئلة للحذف.", "error")
-                return _edit_redirect("questions")
-            valid_ids = []
-            for qid in question_ids:
-                if ObjectId.is_valid(qid):
-                    valid_ids.append(ObjectId(qid))
-            if valid_ids:
-                CourseQuestion.objects(id__in=valid_ids, course_set_id=course_set.id).delete()
-                flash(f"تم حذف {len(valid_ids)} سؤال.", "success")
-            else:
-                flash("لم يتم العثور على أسئلة صحيحة للحذف.", "error")
-            return _edit_redirect("questions")
+
+            flash("لم يتم استيراد أي سؤال. تحقق من بنية JSON.", "warning")
+            return _edit_redirect("import")
 
     questions = list(CourseQuestion.objects(course_set_id=course_set.id).order_by("created_at").all())
 
