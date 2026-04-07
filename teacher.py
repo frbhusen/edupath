@@ -1467,6 +1467,25 @@ def _latin_safe_text(text):
         return ""
 
 
+def _safe_related_id(value):
+    if not value:
+        return None
+    try:
+        if hasattr(value, "id"):
+            return value.id
+    except DoesNotExist:
+        return None
+    except Exception:
+        return None
+    try:
+        maybe = getattr(value, "$id", None)
+        if maybe:
+            return maybe
+    except Exception:
+        return None
+    return None
+
+
 def _collect_report_data(filter_student=None):
     attempts_q = Attempt.objects(student_id=filter_student.id) if filter_student else Attempt.objects()
     custom_attempts_q = CustomTestAttempt.objects(student_id=filter_student.id, status="submitted") if filter_student else CustomTestAttempt.objects(status="submitted")
@@ -1765,11 +1784,25 @@ def analytics_dashboard():
     pass_rate = round((len([s for s in scored if s >= 50]) / len(scored)) * 100, 2) if scored else 0
 
     by_test = {}
+    attempt_test_ids = []
     for a in attempts:
-        if not a.test_id or not a.total:
+        test_id = _safe_related_id(getattr(a, "test_id", None))
+        if test_id:
+            attempt_test_ids.append(test_id)
+
+    test_title_map = {}
+    if attempt_test_ids:
+        for test in Test.objects(id__in=list(set(attempt_test_ids))).only("title").all():
+            test_title_map[str(test.id)] = test.title or "-"
+
+    for a in attempts:
+        if not a.total:
             continue
-        tid = str(a.test_id.id)
-        bucket = by_test.setdefault(tid, {"title": a.test_id.title if a.test_id else "-", "sum": 0.0, "count": 0})
+        test_id = _safe_related_id(getattr(a, "test_id", None))
+        if not test_id:
+            continue
+        tid = str(test_id)
+        bucket = by_test.setdefault(tid, {"title": test_title_map.get(tid, "-"), "sum": 0.0, "count": 0})
         bucket["sum"] += (a.score / a.total) * 100
         bucket["count"] += 1
 
@@ -1794,13 +1827,19 @@ def analytics_dashboard():
     }
 
     xp_profiles = list(StudentGamification.objects.only("student_id", "xp_total", "level").order_by("-xp_total").limit(5).all())
-    top_users = User.objects(id__in=[p.student_id.id for p in xp_profiles if p.student_id]).all() if xp_profiles else []
+    top_user_ids = []
+    for p in xp_profiles:
+        student_id = _safe_related_id(getattr(p, "student_id", None))
+        if student_id:
+            top_user_ids.append(student_id)
+    top_users = User.objects(id__in=top_user_ids).all() if top_user_ids else []
     user_map = {u.id: u for u in top_users}
     top_students = []
     for idx, p in enumerate(xp_profiles, start=1):
-        if not p.student_id:
+        student_id = _safe_related_id(getattr(p, "student_id", None))
+        if not student_id:
             continue
-        user = user_map.get(p.student_id.id)
+        user = user_map.get(student_id)
         top_students.append(
             {
                 "rank": idx,
