@@ -1436,6 +1436,8 @@ def grade_assignment_attempt(attempt_id):
 
 def _pdf_font_candidates():
     return [
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"),
         ("C:\\Windows\\Fonts\\tahoma.ttf", "C:\\Windows\\Fonts\\tahomabd.ttf"),
         ("C:\\Windows\\Fonts\\arial.ttf", "C:\\Windows\\Fonts\\arialbd.ttf"),
     ]
@@ -1685,7 +1687,7 @@ def reports_download_pdf():
     title_font = "Arabic" if using_ar_font else "Helvetica"
     body_font = "Arabic" if using_ar_font else "Helvetica"
     title = _shape_arabic_text("تقرير منصة EduPath") if using_ar_font else "EduPath Report"
-    scope_text = student.full_name if student else "All Students"
+    scope_text = student.full_name if student else "كل الطلاب"
 
     if using_ar_font and hasattr(pdf, "set_text_shaping"):
         try:
@@ -1703,18 +1705,18 @@ def reports_download_pdf():
     pdf.ln(3)
 
     metric_lines = [
-        ("Number of Test Attempts", report["regular_attempts"]),
-        ("Number of Custom Attempts", report["custom_attempts"]),
-        ("Number of Completed Lessons", report["lessons_completed"]),
-        ("Completed Assignments", report["assignments_completed"]),
-        ("Average Score", f"{report['avg_score']}%"),
-        ("Pass Rate", f"{report['pass_rate']}%"),
-        ("Average Gems", report["avg_xp"]),
-        ("Assignment Completion Rate", f"{report['assignment_completion_rate']}%"),
-        ("Subjects Count", report["subjects_count"]),
-        ("Sections Count", report["sections_count"]),
-        ("Lessons Count", report["lessons_count"]),
-        ("Tests Count", report["tests_count"]),
+        ("عدد محاولات الاختبارات", report["regular_attempts"]),
+        ("عدد المحاولات المخصصة", report["custom_attempts"]),
+        ("عدد الدروس المكتملة", report["lessons_completed"]),
+        ("الواجبات المكتملة", report["assignments_completed"]),
+        ("متوسط النتائج", f"{report['avg_score']}%"),
+        ("نسبة النجاح", f"{report['pass_rate']}%"),
+        ("متوسط الجواهر", report["avg_xp"]),
+        ("نسبة إنجاز الواجبات", f"{report['assignment_completion_rate']}%"),
+        ("عدد المواد", report["subjects_count"]),
+        ("عدد الأقسام", report["sections_count"]),
+        ("عدد الدروس", report["lessons_count"]),
+        ("عدد الاختبارات", report["tests_count"]),
     ]
 
     pdf.set_font(title_font, "B", 13)
