@@ -1495,14 +1495,20 @@ def _collect_report_data(filter_student=None):
 
     by_test = {}
     for a in attempts:
-        if not a.test_id or not a.total:
+        if not a.total:
             continue
-        tid = str(a.test_id.id)
+        try:
+            test_ref = a.test_id
+        except DoesNotExist:
+            continue
+        if not test_ref:
+            continue
+        tid = str(test_ref.id)
         pct = (a.score / a.total) * 100
         bucket = by_test.setdefault(
             tid,
             {
-                "title": a.test_id.title if a.test_id else "-",
+                "title": (test_ref.title or "-"),
                 "sum": 0.0,
                 "count": 0,
                 "pass": 0,
@@ -1529,18 +1535,36 @@ def _collect_report_data(filter_student=None):
     top_students = []
     if not filter_student:
         top_profiles = list(StudentGamification.objects.order_by("-xp_total").limit(5).all())
-        user_map = {u.id: u for u in User.objects(id__in=[p.student_id.id for p in top_profiles if p.student_id]).all()}
-        for idx, profile in enumerate(top_profiles, start=1):
-            if not profile.student_id:
+        top_student_ids = []
+        valid_profiles = []
+        for p in top_profiles:
+            try:
+                if not p.student_id:
+                    continue
+                top_student_ids.append(p.student_id.id)
+                valid_profiles.append(p)
+            except DoesNotExist:
                 continue
+
+        user_map = {u.id: u for u in User.objects(id__in=top_student_ids).all()}
+        rank_index = 1
+        for profile in valid_profiles:
+            try:
+                student_ref = profile.student_id
+            except DoesNotExist:
+                continue
+            if not student_ref:
+                continue
+            student_row = user_map.get(student_ref.id)
             top_students.append(
                 {
-                    "rank": idx,
-                    "name": (user_map.get(profile.student_id.id).full_name if user_map.get(profile.student_id.id) else "-") ,
+                    "rank": rank_index,
+                    "name": (student_row.full_name if student_row else "-"),
                     "xp": int(profile.xp_total or 0),
                     "level": int(profile.level or 1),
                 }
             )
+            rank_index += 1
     elif filter_student:
         profile = StudentGamification.objects(student_id=filter_student.id).first()
         top_students.append(
@@ -1931,21 +1955,39 @@ def _rebuild_ranked_students():
     profiles = list(StudentGamification.objects.order_by("-xp_total", "student_id").all())
     if not profiles:
         return []
-    student_ids = [p.student_id.id for p in profiles if p.student_id]
+    student_ids = []
+    valid_profiles = []
+    for p in profiles:
+        try:
+            if not p.student_id:
+                continue
+            student_ids.append(p.student_id.id)
+            valid_profiles.append(p)
+        except DoesNotExist:
+            # Skip orphaned gamification rows pointing to deleted users.
+            continue
+
     users = User.objects(id__in=student_ids).all() if student_ids else []
     users_by_id = {u.id: u for u in users}
 
     ranked = []
-    for idx, profile in enumerate(profiles, start=1):
-        if not profile.student_id:
+    rank_index = 1
+    for profile in valid_profiles:
+        try:
+            if not profile.student_id:
+                continue
+            student_id = profile.student_id.id
+        except DoesNotExist:
             continue
+
         ranked.append(
             {
-                "rank": idx,
+                "rank": rank_index,
                 "profile": profile,
-                "student": users_by_id.get(profile.student_id.id),
+                "student": users_by_id.get(student_id),
             }
         )
+        rank_index += 1
     return ranked
 
 
@@ -2044,7 +2086,25 @@ def gamification_admin():
             return redirect(url_for("teacher.gamification_admin"))
 
     ranked_students = _rebuild_ranked_students()
-    lessons = list(Lesson.objects().order_by("created_at").all())
+
+    lessons = []
+    for lesson in Lesson.objects().order_by("created_at").all():
+        try:
+            section = lesson.section
+            subject = section.subject if section else None
+            lessons.append(
+                {
+                    "id": lesson.id,
+                    "title": lesson.title,
+                    "xp_reward": lesson.xp_reward,
+                    "section_title": (section.title if section else "-"),
+                    "subject_name": (subject.name if subject else "-"),
+                }
+            )
+        except DoesNotExist:
+            # Skip orphaned lesson references to deleted sections/subjects.
+            continue
+
     return render_template(
         "teacher/gamification_manage.html",
         ranked_students=ranked_students,

@@ -119,6 +119,11 @@
             >
             <a
               class="btn btn-cta btn-sm"
+              href="{{ url_for('student.statistics') }}"
+              >الإحصائيات</a
+            >
+            <a
+              class="btn btn-cta btn-sm"
               href="{{ url_for('student.favorites') }}"
               >المفضلة</a
             >
@@ -133,6 +138,13 @@
               href="{{ url_for('teacher.dashboard') }}"
               >لوحة التحكم</a
             >
+            {% if current_user.role|lower == 'admin' %}
+            <a
+              class="btn btn-cta btn-sm"
+              href="{{ url_for('student.statistics') }}"
+              >إحصائيات الطلاب</a
+            >
+            {% endif %}
             {% else %}
             <a class="btn btn-cta btn-sm" href="{{ url_for('auth.login') }}"
               >تسجيل الدخول</a

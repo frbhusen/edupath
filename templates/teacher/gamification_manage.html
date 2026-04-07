@@ -96,9 +96,9 @@
             {% for lesson in lessons %}
               <tr>
                 <td class="text-muted small">
-                  {{ lesson.section.subject.name if lesson.section and lesson.section.subject else '-' }}
+                  {{ lesson.subject_name }}
                   /
-                  {{ lesson.section.title if lesson.section else '-' }}
+                  {{ lesson.section_title }}
                 </td>
                 <td class="fw-semibold">{{ lesson.title }}</td>
                 <td><span class="badge text-bg-info">{{ lesson.xp_reward|default(10) }}</span></td>

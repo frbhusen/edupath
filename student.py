@@ -3844,6 +3844,126 @@ def results():
     )
 
 
+@student_bp.route("/statistics")
+@login_required
+def statistics():
+    role = (current_user.role or "").lower()
+    if role not in {"student", "admin"}:
+        flash("غير مسموح.", "error")
+        return redirect(url_for("index"))
+
+    if role == "admin":
+        students = list(User.objects(role="student").order_by("first_name", "last_name", "username").all())
+    else:
+        students = [current_user]
+
+    student_ids = [s.id for s in students if s and s.id]
+    total_lessons = Lesson.objects.count()
+
+    regular_attempt_counts = {str(sid): 0 for sid in student_ids}
+    regular_test_unique_counts = {str(sid): 0 for sid in student_ids}
+    custom_attempt_counts = {str(sid): 0 for sid in student_ids}
+    course_attempt_counts = {str(sid): 0 for sid in student_ids}
+    completed_lessons_counts = {str(sid): 0 for sid in student_ids}
+
+    if student_ids:
+        regular_rows = list(
+            Attempt._get_collection().aggregate(
+                [
+                    {"$match": {"student_id": {"$in": student_ids}}},
+                    {"$group": {"_id": "$student_id", "count": {"$sum": 1}}},
+                ]
+            )
+        )
+        for row in regular_rows:
+            sid = str(row.get("_id"))
+            regular_attempt_counts[sid] = int(row.get("count", 0) or 0)
+
+        regular_unique_rows = list(
+            Attempt._get_collection().aggregate(
+                [
+                    {"$match": {"student_id": {"$in": student_ids}}},
+                    {"$group": {"_id": {"student_id": "$student_id", "test_id": "$test_id"}}},
+                    {"$group": {"_id": "$_id.student_id", "count": {"$sum": 1}}},
+                ]
+            )
+        )
+        for row in regular_unique_rows:
+            sid = str(row.get("_id"))
+            regular_test_unique_counts[sid] = int(row.get("count", 0) or 0)
+
+        custom_rows = list(
+            CustomTestAttempt._get_collection().aggregate(
+                [
+                    {"$match": {"student_id": {"$in": student_ids}, "status": "submitted"}},
+                    {"$group": {"_id": "$student_id", "count": {"$sum": 1}}},
+                ]
+            )
+        )
+        for row in custom_rows:
+            sid = str(row.get("_id"))
+            custom_attempt_counts[sid] = int(row.get("count", 0) or 0)
+
+        course_rows = list(
+            CourseAttempt._get_collection().aggregate(
+                [
+                    {"$match": {"student_id": {"$in": student_ids}, "status": "submitted"}},
+                    {"$group": {"_id": "$student_id", "count": {"$sum": 1}}},
+                ]
+            )
+        )
+        for row in course_rows:
+            sid = str(row.get("_id"))
+            course_attempt_counts[sid] = int(row.get("count", 0) or 0)
+
+        lesson_rows = list(
+            LessonCompletion._get_collection().aggregate(
+                [
+                    {"$match": {"student_id": {"$in": student_ids}}},
+                    {"$group": {"_id": {"student_id": "$student_id", "lesson_id": "$lesson_id"}}},
+                    {"$group": {"_id": "$_id.student_id", "count": {"$sum": 1}}},
+                ]
+            )
+        )
+        for row in lesson_rows:
+            sid = str(row.get("_id"))
+            completed_lessons_counts[sid] = int(row.get("count", 0) or 0)
+
+    rows = []
+    for student in students:
+        sid = str(student.id)
+        regular_attempts = regular_attempt_counts.get(sid, 0)
+        custom_attempts = custom_attempt_counts.get(sid, 0)
+        course_attempts = course_attempt_counts.get(sid, 0)
+        total_attempts = regular_attempts + custom_attempts + course_attempts
+
+        completed_tests = (
+            regular_test_unique_counts.get(sid, 0)
+            + custom_attempts
+            + course_attempts
+        )
+
+        completed_lessons = completed_lessons_counts.get(sid, 0)
+        remaining_lessons = max(total_lessons - completed_lessons, 0)
+
+        rows.append(
+            {
+                "student": student,
+                "completed_tests": completed_tests,
+                "total_attempts": total_attempts,
+                "completed_lessons": completed_lessons,
+                "remaining_lessons": remaining_lessons,
+            }
+        )
+
+    return render_template(
+        "student/statistics.html",
+        is_admin_view=(role == "admin"),
+        rows=rows,
+        total_lessons=total_lessons,
+    )
+
+
 def _frequently_wrong_question_counts(student_id):
     counts = {}
     if not student_id:

@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h1 class="h4 mb-1">إحصائيات الطلاب</h1>
+    <p class="mb-0">ملخص الاختبارات والدروس المنجزة والمتبقية.</p>
+  </div>
+  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('student.subjects') }}">العودة للمواد</a>
+</div>
+
+{% if rows %}
+  {% if is_admin_view %}
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>الطالب</th>
+                <th>الاختبارات المكتملة</th>
+                <th>عدد المحاولات</th>
+                <th>الدروس المنجزة</th>
+                <th>الدروس المتبقية</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+              <tr>
+                <td>{{ row.student.full_name if row.student.full_name else row.student.username }}</td>
+                <td><span class="badge text-bg-primary">{{ row.completed_tests }}</span></td>
+                <td>{{ row.total_attempts }}</td>
+                <td>{{ row.completed_lessons }} / {{ total_lessons }}</td>
+                <td>{{ row.remaining_lessons }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    {% set row = rows[0] %}
+    <div class="row g-3">
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="text-muted mb-1">الاختبارات المكتملة</h6>
+            <div class="h4 mb-0">{{ row.completed_tests }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="text-muted mb-1">إجمالي المحاولات</h6>
+            <div class="h4 mb-0">{{ row.total_attempts }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="text-muted mb-1">الدروس المنجزة</h6>
+            <div class="h4 mb-0">{{ row.completed_lessons }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="text-muted mb-1">الدروس المتبقية</h6>
+            <div class="h4 mb-0">{{ row.remaining_lessons }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-body">
+        <div class="small text-muted">الدروس المنجزة من أصل {{ total_lessons }}</div>
+        {% set pct = ((row.completed_lessons / total_lessons) * 100) if total_lessons > 0 else 0 %}
+        <div class="progress mt-2" role="progressbar" aria-label="Lesson completion progress" aria-valuenow="{{ row.completed_lessons }}" aria-valuemin="0" aria-valuemax="{{ total_lessons if total_lessons > 0 else 1 }}">
+          <div class="progress-bar" data-pct="{{ '%.1f'|format(pct) }}">{{ '%.1f'|format(pct) }}%</div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="alert alert-info">لا توجد بيانات متاحة.</div>
+{% endif %}
+<script>
+  document.querySelectorAll('.progress-bar[data-pct]').forEach((bar) => {
+    const pct = bar.getAttribute('data-pct') || '0';
+    bar.style.width = `${pct}%`;
+  });
+</script>
+{% endblock %}
