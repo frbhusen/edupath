@@ -1056,7 +1056,7 @@ class SubjectActivation(Document):
 class SubjectActivationCode(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     subject_id = ReferenceField(Subject, required=True)
-    student_id = ReferenceField(User, required=True)
+    student_id = ReferenceField(User, null=True)
     code = StringField(unique=True, required=True, max_length=6)
     created_at = DateTimeField(default=datetime.utcnow)
     used_at = DateTimeField(null=True)

@@ -2153,6 +2153,29 @@ def manage_subject_access(subject_id):
             if subject.requires_code:
                 lock_subject_access_for_all(subject.id)
             flash("تم تحديث حالة التفعيل للمادة.", "success")
+        elif action == "generate_batch_codes":
+            try:
+                amount = int((request.form.get("codes_amount") or "0").strip())
+            except Exception:
+                amount = 0
+
+            amount = max(0, min(amount, 500))
+            if amount <= 0:
+                flash("حدد عدد أكواد صحيح.", "error")
+                return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
+
+            created = 0
+            for _ in range(amount):
+                code_value = _generate_unique_code(SubjectActivationCode)
+                SubjectActivationCode(
+                    subject_id=subject.id,
+                    student_id=None,
+                    code=code_value,
+                    is_used=False,
+                ).save()
+                created += 1
+
+            flash(f"تم إنشاء {created} كود تفعيل للمادة.", "success")
         elif action == "generate_code":
             student_id = request.form.get("student_id")
             student = User.objects(id=student_id).first()
@@ -2222,6 +2245,7 @@ def manage_subject_access(subject_id):
 
     codes = SubjectActivationCode.objects(subject_id=subject.id).order_by('-created_at').all()
     codes_by_student = {}
+    unassigned_codes = []
     for code in codes:
         try:
             key = code.student_id.id if code.student_id else None
@@ -2229,6 +2253,8 @@ def manage_subject_access(subject_id):
             key = None
         if key is not None:
             codes_by_student.setdefault(key, []).append(code)
+        else:
+            unassigned_codes.append(code)
     
     return render_template(
         "teacher/subject_access.html",
@@ -2237,6 +2263,28 @@ def manage_subject_access(subject_id):
         activations=activated_students,
         codes=codes,
         codes_by_student=codes_by_student,
+        unassigned_codes=unassigned_codes,
+    )
+
+
+@teacher_bp.route("/subjects/<subject_id>/codes/print", methods=["GET"])
+@login_required
+@role_required("teacher")
+def print_subject_codes(subject_id):
+    subject = Subject.objects(id=subject_id).first()
+    if not subject:
+        raise NotFound()
+
+    scope_response = _ensure_subject_scope(subject.id)
+    if scope_response:
+        return scope_response
+
+    codes = list(SubjectActivationCode.objects(subject_id=subject.id).order_by("code").all())
+    return render_template(
+        "teacher/subject_codes_print.html",
+        subject=subject,
+        codes=codes,
+        generated_at=datetime.utcnow(),
     )
 
 

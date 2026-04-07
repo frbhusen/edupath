@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>أكواد تفعيل المادة - {{ subject.name }}</title>
+    <style>
+      body { font-family: Tahoma, Arial, sans-serif; margin: 20px; }
+      h2 { margin: 0 0 6px 0; }
+      .meta { color: #555; margin-bottom: 14px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #ccc; padding: 8px; text-align: right; }
+      th { background: #f3f6fb; }
+      .code { font-weight: 700; letter-spacing: 1px; }
+      .used { color: #777; }
+      @media print {
+        .print-actions { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="print-actions" style="margin-bottom: 12px;">
+      <button onclick="window.print()">طباعة</button>
+    </div>
+
+    <h2>أكواد تفعيل المادة</h2>
+    <div class="meta">
+      المادة: {{ subject.name }}<br>
+      تاريخ التجهيز: {{ generated_at.strftime('%Y-%m-%d %H:%M') if generated_at else '' }}
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 20%;">الكود</th>
+          <th>اسم المادة</th>
+          <th style="width: 18%;">الحالة</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in codes %}
+          <tr>
+            <td class="code">{{ c.code }}</td>
+            <td>{{ subject.name }}</td>
+            <td class="{% if c.is_used %}used{% endif %}">{% if c.is_used %}مستخدم{% else %}غير مستخدم{% endif %}</td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="3">لا توجد أكواد متاحة.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

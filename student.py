@@ -3417,20 +3417,31 @@ def activate_subject(subject_id):
     form = ActivationForm()
     if request.method == "POST" and form.validate_on_submit():
         code_value = form.code.data.strip().upper()
-        ac = SubjectActivationCode.objects(subject_id=subject.id, student_id=current_user.id, code=code_value).first()
+        ac = SubjectActivationCode.objects(subject_id=subject.id, code=code_value).first()
         if not ac:
             flash("رمز غير صحيح لهذه المادة.", "error")
             return render_template("student/activate_subject.html", subject=subject, form=form)
         if ac.is_used:
             flash("This code has already been used.", "error")
             return render_template("student/activate_subject.html", subject=subject, form=form)
+
+        # Backward compatibility: old per-student codes remain limited to their owner.
+        if ac.student_id and str(ac.student_id.id) != str(current_user.id):
+            flash("هذا الرمز غير مخصص لهذا الحساب.", "error")
+            return render_template("student/activate_subject.html", subject=subject, form=form)
+
+        # Don't consume a code if the subject is already activated for this student.
+        existing = SubjectActivation.objects(subject_id=subject.id, student_id=current_user.id, active=True).first()
+        if existing:
+            flash("المادة مفعلة بالفعل لهذا الحساب.", "info")
+            return redirect(url_for("student.subject_detail", subject_id=subject.id))
+
         # mark used and activate
         ac.is_used = True
         ac.used_at = datetime.utcnow()
+        ac.student_id = current_user.id
         ac.save()
-        existing = SubjectActivation.objects(subject_id=subject.id, student_id=current_user.id, active=True).first()
-        if not existing:
-            SubjectActivation(subject_id=subject.id, student_id=current_user.id).save()
+        SubjectActivation(subject_id=subject.id, student_id=current_user.id).save()
         cascade_subject_activation(subject, current_user.id)
         flash("تم تفعيل المادة بالكامل!", "success")
         return redirect(url_for("student.subject_detail", subject_id=subject.id))

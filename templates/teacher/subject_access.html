@@ -19,6 +19,28 @@
 <div class="alert alert-info mb-3" id="subject-activation-note">
   <strong>ملاحظة:</strong> تفعيل مادة كاملة يمنح الطالب وصولاً فورياً لجميع الأقسام والدروس والاختبارات في هذه المادة.
 </div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+      <h5 class="mb-0">إنشاء أكواد تفعيل جماعية</h5>
+      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teacher.print_subject_codes', subject_id=subject.id) }}" target="_blank">ملف قابل للطباعة</a>
+    </div>
+    <p class="text-muted small mb-2">أنشئ أكواد مسبقة بدون ربطها بطالب. كل كود يُستخدم مرة واحدة فقط.</p>
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-end">
+      <input type="hidden" name="action" value="generate_batch_codes" />
+      <div>
+        <label class="form-label mb-1">عدد الأكواد</label>
+        <input class="form-control form-control-sm" type="number" name="codes_amount" min="1" max="500" value="20" required>
+      </div>
+      <div>
+        <button class="btn btn-cta btn-sm" type="submit">إنشاء دفعة أكواد</button>
+      </div>
+    </form>
+    <div class="mt-2 small text-muted">عدد الأكواد غير المستخدمة حالياً: {{ (unassigned_codes | selectattr('is_used', 'equalto', False) | list) | length }}</div>
+  </div>
+</div>
+
 <script>
   setTimeout(function() {
     var note = document.getElementById('subject-activation-note');
@@ -54,7 +76,6 @@
             </td>
             <td class="small">
               {% if codes %}
-                {% set has_unused = (codes | selectattr('is_used', 'equalto', False) | list) | length > 0 %}
                 {% for c in codes %}
                   <div class="d-flex align-items-center gap-2 mb-1">
                     <span class="badge {% if c.is_used %}text-bg-secondary{% else %}text-bg-info{% endif %}">{{ c.code }}</span>
@@ -101,4 +122,42 @@
 {% else %}
   <div class="alert alert-light">No students found.</div>
 {% endif %}
+
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <h5 class="mb-2">الأكواد الجماعية</h5>
+    {% if unassigned_codes %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>الكود</th>
+              <th>الحالة</th>
+              <th>تاريخ الإنشاء</th>
+              <th class="text-end">إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in unassigned_codes %}
+              <tr>
+                <td><span class="badge {% if c.is_used %}text-bg-secondary{% else %}text-bg-info{% endif %}">{{ c.code }}</span></td>
+                <td>{% if c.is_used %}مستخدم{% else %}جاهز{% endif %}</td>
+                <td class="small text-muted">{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}</td>
+                <td class="text-end">
+                  <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="delete_code" />
+                    <input type="hidden" name="code_id" value="{{ c.id }}" />
+                    <button class="btn btn-link btn-sm text-danger p-0" type="submit">حذف</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted small">لا توجد أكواد جماعية حالياً.</div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}
