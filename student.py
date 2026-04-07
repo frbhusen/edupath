@@ -3869,109 +3869,136 @@ def statistics():
         students = [current_user]
 
     student_ids = [s.id for s in students if s and s.id]
-    total_lessons = Lesson.objects.count()
+    subjects = list(Subject.objects().order_by("created_at").all())
+    subject_ids = [s.id for s in subjects]
+    subject_name_by_id = {s.id: s.name for s in subjects}
 
-    regular_attempt_counts = {str(sid): 0 for sid in student_ids}
-    regular_test_unique_counts = {str(sid): 0 for sid in student_ids}
-    custom_attempt_counts = {str(sid): 0 for sid in student_ids}
-    course_attempt_counts = {str(sid): 0 for sid in student_ids}
-    completed_lessons_counts = {str(sid): 0 for sid in student_ids}
+    lessons_total_by_subject = {sid: 0 for sid in subject_ids}
+    lesson_subject_by_id = {}
+    for lesson in Lesson.objects().only("id", "section_id").all():
+        try:
+            if not lesson.section_id or not lesson.section_id.subject_id:
+                continue
+            sid = lesson.section_id.subject_id.id
+        except Exception:
+            continue
+        if sid in lessons_total_by_subject:
+            lessons_total_by_subject[sid] += 1
+            lesson_subject_by_id[lesson.id] = sid
+
+    test_subject_by_id = {}
+    for test in Test.objects().only("id", "section_id").all():
+        try:
+            if not test.section_id or not test.section_id.subject_id:
+                continue
+            sid = test.section_id.subject_id.id
+        except Exception:
+            continue
+        test_subject_by_id[test.id] = sid
+
+    course_subject_by_id = {}
+    for cs in CourseSet.objects().only("id", "subject_id").all():
+        try:
+            sid = cs.subject_id.id if cs.subject_id else None
+        except Exception:
+            sid = None
+        if sid:
+            course_subject_by_id[cs.id] = sid
+
+    attempts_by_student_subject = {}
+    completed_tests_by_student_subject = {}
+    completed_lessons_by_student_subject = {}
+
+    def _inc_attempt(student_id, subject_id):
+        key = (student_id, subject_id)
+        attempts_by_student_subject[key] = attempts_by_student_subject.get(key, 0) + 1
+
+    def _add_completed_test(student_id, subject_id, test_key):
+        key = (student_id, subject_id)
+        completed_tests_by_student_subject.setdefault(key, set()).add(test_key)
+
+    def _add_completed_lesson(student_id, subject_id, lesson_id):
+        key = (student_id, subject_id)
+        completed_lessons_by_student_subject.setdefault(key, set()).add(lesson_id)
 
     if student_ids:
-        regular_rows = list(
-            Attempt._get_collection().aggregate(
-                [
-                    {"$match": {"student_id": {"$in": student_ids}}},
-                    {"$group": {"_id": "$student_id", "count": {"$sum": 1}}},
-                ]
-            )
-        )
-        for row in regular_rows:
-            sid = str(row.get("_id"))
-            regular_attempt_counts[sid] = int(row.get("count", 0) or 0)
+        for attempt in Attempt.objects(student_id__in=student_ids).only("student_id", "test_id").all():
+            try:
+                stu_id = attempt.student_id.id if attempt.student_id else None
+                tst_id = attempt.test_id.id if attempt.test_id else None
+            except Exception:
+                continue
+            if not stu_id or not tst_id:
+                continue
+            subject_id = test_subject_by_id.get(tst_id)
+            if not subject_id:
+                continue
+            _inc_attempt(stu_id, subject_id)
+            _add_completed_test(stu_id, subject_id, f"t:{tst_id}")
 
-        regular_unique_rows = list(
-            Attempt._get_collection().aggregate(
-                [
-                    {"$match": {"student_id": {"$in": student_ids}}},
-                    {"$group": {"_id": {"student_id": "$student_id", "test_id": "$test_id"}}},
-                    {"$group": {"_id": "$_id.student_id", "count": {"$sum": 1}}},
-                ]
-            )
-        )
-        for row in regular_unique_rows:
-            sid = str(row.get("_id"))
-            regular_test_unique_counts[sid] = int(row.get("count", 0) or 0)
+        for cattempt in CourseAttempt.objects(student_id__in=student_ids, status="submitted").only("student_id", "course_set_id").all():
+            try:
+                stu_id = cattempt.student_id.id if cattempt.student_id else None
+                cs_id = cattempt.course_set_id.id if cattempt.course_set_id else None
+            except Exception:
+                continue
+            if not stu_id or not cs_id:
+                continue
+            subject_id = course_subject_by_id.get(cs_id)
+            if not subject_id:
+                continue
+            _inc_attempt(stu_id, subject_id)
+            _add_completed_test(stu_id, subject_id, f"c:{cs_id}")
 
-        custom_rows = list(
-            CustomTestAttempt._get_collection().aggregate(
-                [
-                    {"$match": {"student_id": {"$in": student_ids}, "status": "submitted"}},
-                    {"$group": {"_id": "$student_id", "count": {"$sum": 1}}},
-                ]
-            )
-        )
-        for row in custom_rows:
-            sid = str(row.get("_id"))
-            custom_attempt_counts[sid] = int(row.get("count", 0) or 0)
-
-        course_rows = list(
-            CourseAttempt._get_collection().aggregate(
-                [
-                    {"$match": {"student_id": {"$in": student_ids}, "status": "submitted"}},
-                    {"$group": {"_id": "$student_id", "count": {"$sum": 1}}},
-                ]
-            )
-        )
-        for row in course_rows:
-            sid = str(row.get("_id"))
-            course_attempt_counts[sid] = int(row.get("count", 0) or 0)
-
-        lesson_rows = list(
-            LessonCompletion._get_collection().aggregate(
-                [
-                    {"$match": {"student_id": {"$in": student_ids}}},
-                    {"$group": {"_id": {"student_id": "$student_id", "lesson_id": "$lesson_id"}}},
-                    {"$group": {"_id": "$_id.student_id", "count": {"$sum": 1}}},
-                ]
-            )
-        )
-        for row in lesson_rows:
-            sid = str(row.get("_id"))
-            completed_lessons_counts[sid] = int(row.get("count", 0) or 0)
+        for comp in LessonCompletion.objects(student_id__in=student_ids).only("student_id", "lesson_id").all():
+            try:
+                stu_id = comp.student_id.id if comp.student_id else None
+                les_id = comp.lesson_id.id if comp.lesson_id else None
+            except Exception:
+                continue
+            if not stu_id or not les_id:
+                continue
+            subject_id = lesson_subject_by_id.get(les_id)
+            if not subject_id:
+                continue
+            _add_completed_lesson(stu_id, subject_id, les_id)
 
     rows = []
     for student in students:
-        sid = str(student.id)
-        regular_attempts = regular_attempt_counts.get(sid, 0)
-        custom_attempts = custom_attempt_counts.get(sid, 0)
-        course_attempts = course_attempt_counts.get(sid, 0)
-        total_attempts = regular_attempts + custom_attempts + course_attempts
+        student_subject_rows = []
+        try:
+            stu_id = student.id
+        except Exception:
+            continue
 
-        completed_tests = (
-            regular_test_unique_counts.get(sid, 0)
-            + custom_attempts
-            + course_attempts
-        )
+        for sid in subject_ids:
+            completed_lessons = len(completed_lessons_by_student_subject.get((stu_id, sid), set()))
+            total_lessons = lessons_total_by_subject.get(sid, 0)
+            remaining_lessons = max(total_lessons - completed_lessons, 0)
+            total_attempts = int(attempts_by_student_subject.get((stu_id, sid), 0) or 0)
+            completed_tests = len(completed_tests_by_student_subject.get((stu_id, sid), set()))
+            completion_pct = round((completed_lessons / total_lessons) * 100, 1) if total_lessons > 0 else 0.0
 
-        completed_lessons = completed_lessons_counts.get(sid, 0)
-        remaining_lessons = max(total_lessons - completed_lessons, 0)
+            student_subject_rows.append(
+                {
+                    "subject_id": sid,
+                    "subject_name": subject_name_by_id.get(sid, "-") or "-",
+                    "completed_tests": completed_tests,
+                    "total_attempts": total_attempts,
+                    "completed_lessons": completed_lessons,
+                    "remaining_lessons": remaining_lessons,
+                    "total_lessons": total_lessons,
+                    "completion_pct": completion_pct,
+                }
+            )
 
-        rows.append(
-            {
-                "student": student,
-                "completed_tests": completed_tests,
-                "total_attempts": total_attempts,
-                "completed_lessons": completed_lessons,
-                "remaining_lessons": remaining_lessons,
-            }
-        )
+        student_subject_rows.sort(key=lambda x: x["subject_name"])
+        rows.append({"student": student, "subjects": student_subject_rows})
 
     return render_template(
         "student/statistics.html",
         is_admin_view=(role == "admin"),
         rows=rows,
-        total_lessons=total_lessons,
     )
 
 

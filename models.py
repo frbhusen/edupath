@@ -1058,6 +1058,7 @@ class SubjectActivationCode(Document):
     subject_id = ReferenceField(Subject, required=True)
     student_id = ReferenceField(User, null=True)
     code = StringField(unique=True, required=True, max_length=6)
+    code_price_syp = IntField(default=0, required=True)
     created_at = DateTimeField(default=datetime.utcnow)
     used_at = DateTimeField(null=True)
     is_used = BooleanField(default=False, required=True)

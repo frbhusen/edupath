@@ -2159,7 +2159,13 @@ def manage_subject_access(subject_id):
             except Exception:
                 amount = 0
 
+            try:
+                code_price_syp = int((request.form.get("code_price_syp") or "0").strip())
+            except Exception:
+                code_price_syp = 0
+
             amount = max(0, min(amount, 500))
+            code_price_syp = max(0, code_price_syp)
             if amount <= 0:
                 flash("حدد عدد أكواد صحيح.", "error")
                 return redirect(url_for("teacher.manage_subject_access", subject_id=subject.id))
@@ -2171,11 +2177,12 @@ def manage_subject_access(subject_id):
                     subject_id=subject.id,
                     student_id=None,
                     code=code_value,
+                    code_price_syp=code_price_syp,
                     is_used=False,
                 ).save()
                 created += 1
 
-            flash(f"تم إنشاء {created} كود تفعيل للمادة.", "success")
+            flash(f"تم إنشاء {created} كود تفعيل للمادة بسعر {code_price_syp} ل.س لكل كود.", "success")
         elif action == "generate_code":
             student_id = request.form.get("student_id")
             student = User.objects(id=student_id).first()

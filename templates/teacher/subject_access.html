@@ -34,6 +34,10 @@
         <input class="form-control form-control-sm" type="number" name="codes_amount" min="1" max="500" value="20" required>
       </div>
       <div>
+        <label class="form-label mb-1">سعر الكود (SYP)</label>
+        <input class="form-control form-control-sm" type="number" name="code_price_syp" min="0" step="1" value="0" required>
+      </div>
+      <div>
         <button class="btn btn-cta btn-sm" type="submit">إنشاء دفعة أكواد</button>
       </div>
     </form>
@@ -132,6 +136,7 @@
           <thead>
             <tr>
               <th>الكود</th>
+              <th>السعر (SYP)</th>
               <th>الحالة</th>
               <th>تاريخ الإنشاء</th>
               <th class="text-end">إجراء</th>
@@ -141,6 +146,7 @@
             {% for c in unassigned_codes %}
               <tr>
                 <td><span class="badge {% if c.is_used %}text-bg-secondary{% else %}text-bg-info{% endif %}">{{ c.code }}</span></td>
+                <td>{{ c.code_price_syp|default(0) }}</td>
                 <td>{% if c.is_used %}مستخدم{% else %}جاهز{% endif %}</td>
                 <td class="small text-muted">{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}</td>
                 <td class="text-end">
