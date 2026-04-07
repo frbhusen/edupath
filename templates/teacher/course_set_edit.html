@@ -103,6 +103,10 @@
     color: #94a3b8;
     font-size: 0.78rem;
   }
+  .form-label-sm {
+    font-size: 0.75rem;
+    margin-bottom: 0.2rem;
+  }
 </style>
 
 <div class="row mb-3">
@@ -201,50 +205,56 @@
 
     <div class="workspace-panel d-none" data-panel="questions">
       <div class="card panel-card mb-3">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-          <h4 class="mb-0">الأسئلة (تحريرية / اختيار من متعدد)</h4>
-          <span class="badge text-bg-light">{{ questions|length }}</span>
+        <div class="card-header bg-primary text-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+          <div>
+            <h4 class="mb-1">الأسئلة</h4>
+            <div class="small opacity-75">{{ course_set.title }}</div>
+          </div>
         </div>
         <div class="card-body">
-          <h5 class="card-title mb-3">إضافة سؤال جديد (تحريري أو اختيار من متعدد)</h5>
-          <form method="post" class="row g-2 mb-4">
-            <input type="hidden" name="action" value="add_question">
-            <div class="col-12 col-md-4">
-              <label class="form-label">نوع السؤال</label>
-              <select class="form-select" name="question_type" id="new-question-type">
-                <option value="interactive" selected>تحريري</option>
-                <option value="mcq">اختيار من متعدد</option>
-              </select>
-            </div>
-            <div class="col-12 col-lg-6">
-              <label class="form-label">نص السؤال (يدعم LaTeX)</label>
-              <textarea class="form-control" name="question_text" rows="2" placeholder="اكتب السؤال نصيًا إن رغبت"></textarea>
-            </div>
-            <div class="col-12 col-lg-6 interactive-only-group new-interactive-group">
-              <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
-              <textarea class="form-control" name="answer_text" rows="2" placeholder="اكتب الإجابة نصيًا إن رغبت"></textarea>
-            </div>
-            <div class="col-12 col-lg-6">
-              <label class="form-label">رابط صورة السؤال</label>
-              <input class="form-control" name="question_image_url" data-preview-target="new-question-preview" placeholder="https://...">
-            </div>
-            <div class="col-12 col-lg-6 interactive-only-group new-interactive-group">
-              <label class="form-label">رابط صورة الإجابة</label>
-              <input class="form-control" name="answer_image_url" data-preview-target="new-answer-preview" placeholder="https://...">
-            </div>
-            <div class="col-12 mcq-only-group new-mcq-group d-none">
-              <div class="border rounded p-2 bg-light">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">إضافة وتعديل الأسئلة</h5>
+            <span class="badge text-bg-secondary">{{ questions|length }}</span>
+          </div>
+          <button class="btn btn-outline-secondary btn-sm question-drawer-toggle mb-2" type="button" id="questionDrawerToggle" aria-expanded="false" aria-controls="questionDrawer">فتح درج إضافة الأسئلة</button>
+          <div class="d-none" id="questionDrawer">
+            <form method="post" class="row g-2 mb-3 p-2 border rounded bg-light">
+              <input type="hidden" name="action" value="add_question">
+              <div class="col-12 col-md-4">
+                <label class="form-label">نوع السؤال</label>
+                <select class="form-select form-select-sm" name="question_type" id="new-question-type">
+                  <option value="interactive" selected>تحريري</option>
+                  <option value="mcq">اختيار من متعدد</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">نص السؤال</label>
+                <textarea class="form-control form-control-sm" name="question_text" rows="2" placeholder="اختياري"></textarea>
+              </div>
+              <div class="col-12 interactive-only-group new-interactive-group">
+                <label class="form-label">نص الإجابة</label>
+                <textarea class="form-control form-control-sm" name="answer_text" rows="2" placeholder="اختياري"></textarea>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">رابط صورة السؤال</label>
+                <input class="form-control form-control-sm" name="question_image_url" placeholder="https://...">
+              </div>
+              <div class="col-12 col-md-6 interactive-only-group new-interactive-group">
+                <label class="form-label">رابط صورة الإجابة</label>
+                <input class="form-control form-control-sm" name="answer_image_url" placeholder="https://...">
+              </div>
+              <div class="col-12 mcq-only-group new-mcq-group d-none">
                 <div class="small fw-semibold mb-2">خيارات MCQ</div>
-                <div class="row g-2">
+                <div class="row g-1">
                   {% for i in range(1, 5) %}
                     <div class="col-12 col-lg-6">
-                      <label class="form-label">الخيار {{ i }}</label>
-                      <input class="form-control" name="choice_{{ i }}" placeholder="اكتب نص الخيار {{ i }}">
+                      <label class="form-label form-label-sm">الخيار {{ i }}</label>
+                      <input class="form-control form-control-sm" name="choice_{{ i }}" placeholder="الخيار {{ i }}">
                     </div>
                   {% endfor %}
                   <div class="col-12 col-lg-4">
-                    <label class="form-label">الخيار الصحيح</label>
-                    <select class="form-select" name="correct_choice">
+                    <label class="form-label form-label-sm">الخيار الصحيح</label>
+                    <select class="form-select form-select-sm" name="correct_choice">
                       <option value="1">1</option>
                       <option value="2">2</option>
                       <option value="3">3</option>
@@ -253,118 +263,105 @@
                   </div>
                 </div>
               </div>
-            </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button class="btn btn-outline-primary" type="submit">إضافة السؤال</button>
-            </div>
-            <div class="col-12">
-              <div class="preview-grid">
-                <div class="preview-box">
-                  <span class="label">معاينة صورة السؤال</span>
-                  <div class="preview-frame">
-                    <img id="new-question-preview" src="" alt="معاينة السؤال" class="d-none">
-                    <span class="preview-empty" id="new-question-preview-empty">لا توجد صورة بعد</span>
-                  </div>
-                </div>
-                <div class="preview-box">
-                  <span class="label">معاينة صورة الإجابة</span>
-                  <div class="preview-frame">
-                    <img id="new-answer-preview" src="" alt="معاينة الإجابة" class="d-none">
-                    <span class="preview-empty" id="new-answer-preview-empty">لا توجد صورة بعد</span>
-                  </div>
+              <div class="col-12 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="closeDrawerBtn">إغلاق</button>
+                <button type="submit" class="btn btn-sm btn-outline-primary">إضافة السؤال</button>
+              </div>
+            </form>
+          </div>
+
+          {% if questions %}
+            <form method="post" id="batchDeleteForm" class="mb-2">
+              <input type="hidden" name="action" value="batch_delete_question" />
+              <input type="hidden" name="question_ids" id="batchQuestionIds" />
+              <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                <span class="small text-muted">حدد الأسئلة ثم اختر الإجراء.</span>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="selectAllBtn">تحديد الكل</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="deselectAllBtn">إلغاء التحديد</button>
+                  <button type="button" class="btn btn-outline-danger btn-sm" id="batchDeleteBtn" disabled>حذف المحدد</button>
                 </div>
               </div>
-            </div>
-          </form>
-
-          <h5 class="card-title">أسئلة الدورة - {{ questions|length }} سؤال</h5>
-          {% if questions %}
-            <div class="d-flex flex-column gap-3">
-              {% for q in questions %}
-                <div class="border rounded p-3">
+            </form>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th class="text-center" style="width: 44px;">تحديد</th>
+                    <th>#</th>
+                    <th>السؤال</th>
+                    <th>النوع</th>
+                    <th class="text-end">إجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for q in questions %}
                   {% set q_type = (q.question_type or 'interactive') %}
-                  <div class="fw-semibold mb-2">السؤال {{ loop.index }} <span class="badge text-bg-light">{{ 'اختيار' if q_type == 'mcq' else 'تحريري' }}</span></div>
-                  <form method="post" class="row g-2">
-                    <input type="hidden" name="action" value="update_question">
-                    <input type="hidden" name="question_id" value="{{ q.id }}">
-                    <div class="col-12 col-md-4">
-                      <label class="form-label">نوع السؤال</label>
-                      <select class="form-select existing-question-type" name="question_type" data-target-prefix="q{{ q.id }}">
-                        <option value="interactive" {% if q_type != 'mcq' %}selected{% endif %}>تحريري</option>
-                        <option value="mcq" {% if q_type == 'mcq' %}selected{% endif %}>اختيار من متعدد</option>
-                      </select>
-                    </div>
-                    <div class="col-12 col-lg-6">
-                      <label class="form-label">نص السؤال</label>
-                      <textarea class="form-control" name="question_text" rows="2">{{ q.question_text or '' }}</textarea>
-                    </div>
-                    <div class="col-12 col-lg-6 interactive-only-group q{{ q.id }}-interactive {% if q_type == 'mcq' %}d-none{% endif %}">
-                      <label class="form-label">نص الإجابة</label>
-                      <textarea class="form-control" name="answer_text" rows="2">{{ q.answer_text or '' }}</textarea>
-                    </div>
-                    <div class="col-12 col-lg-6">
-                      <label class="form-label">صورة السؤال</label>
-                      <input class="form-control" name="question_image_url" value="{{ q.question_image_url or '' }}" data-preview-target="q-preview-{{ q.id }}">
-                    </div>
-                    <div class="col-12 col-lg-6 interactive-only-group q{{ q.id }}-interactive {% if q_type == 'mcq' %}d-none{% endif %}">
-                      <label class="form-label">صورة الإجابة</label>
-                      <input class="form-control" name="answer_image_url" value="{{ q.answer_image_url or '' }}" data-preview-target="a-preview-{{ q.id }}">
-                    </div>
-                    <div class="col-12 q{{ q.id }}-mcq {% if q_type != 'mcq' %}d-none{% endif %}">
-                      <div class="border rounded p-2 bg-light">
-                        <div class="small fw-semibold mb-2">خيارات MCQ</div>
-                        <div class="row g-2">
-                          {% for i in range(1, 5) %}
-                            {% set existing_choice = q.choices[i-1] if q.choices and (q.choices|length) >= i else None %}
-                            <div class="col-12 col-lg-6">
-                              <label class="form-label">الخيار {{ i }}</label>
-                              <input class="form-control" name="choice_{{ i }}" value="{{ existing_choice.text if existing_choice else '' }}">
+                  <tr>
+                    <td class="text-center">
+                      <input class="form-check-input question-select" type="checkbox" value="{{ q.id }}" aria-label="Select question" />
+                    </td>
+                    <td class="fw-semibold">{{ loop.index }}</td>
+                    <td>
+                      <form method="post">
+                        <input type="hidden" name="action" value="update_question">
+                        <input type="hidden" name="question_id" value="{{ q.id }}">
+                        <textarea class="form-control form-control-sm mb-1" name="question_text" rows="2" placeholder="نص السؤال">{{ q.question_text or '' }}</textarea>
+                        <input class="form-control form-control-sm mb-1" name="question_image_url" value="{{ q.question_image_url or '' }}" placeholder="رابط صورة السؤال">
+                        <div class="interactive-only-group q{{ q.id }}-interactive {% if q_type == 'mcq' %}d-none{% endif %}">
+                          <textarea class="form-control form-control-sm mb-1" name="answer_text" rows="2" placeholder="نص الإجابة">{{ q.answer_text or '' }}</textarea>
+                          <input class="form-control form-control-sm" name="answer_image_url" value="{{ q.answer_image_url or '' }}" placeholder="رابط صورة الإجابة">
+                        </div>
+                        <div class="q{{ q.id }}-mcq {% if q_type != 'mcq' %}d-none{% endif %}">
+                          <div class="small fw-semibold mb-1">خيارات MCQ</div>
+                          <div class="row g-1">
+                            {% for i in range(1, 5) %}
+                              {% set existing_choice = q.choices[i-1] if q.choices and (q.choices|length) >= i else None %}
+                              <div class="col-6">
+                                <input class="form-control form-control-sm" name="choice_{{ i }}" value="{{ existing_choice.text if existing_choice else '' }}" placeholder="خيار {{ i }}">
+                              </div>
+                            {% endfor %}
+                          </div>
+                          <div class="row g-1 mt-1">
+                            <div class="col-6">
+                              <select class="form-select form-select-sm" name="correct_choice">
+                                {% for i in range(1, 5) %}
+                                  {% set existing_choice = q.choices[i-1] if q.choices and (q.choices|length) >= i else None %}
+                                  <option value="{{ i }}" {% if existing_choice and existing_choice.is_correct %}selected{% endif %}>الصحيح: {{ i }}</option>
+                                {% endfor %}
+                              </select>
                             </div>
-                          {% endfor %}
-                          <div class="col-12 col-lg-4">
-                            <label class="form-label">الخيار الصحيح</label>
-                            <select class="form-select" name="correct_choice">
-                              {% for i in range(1, 5) %}
-                                {% set existing_choice = q.choices[i-1] if q.choices and (q.choices|length) >= i else None %}
-                                <option value="{{ i }}" {% if existing_choice and existing_choice.is_correct %}selected{% endif %}>{{ i }}</option>
-                              {% endfor %}
+                          </div>
+                        </div>
+                        <div class="row g-1 mt-1">
+                          <div class="col-auto">
+                            <select class="form-select form-select-sm existing-question-type" name="question_type" data-target-prefix="q{{ q.id }}">
+                              <option value="interactive" {% if q_type != 'mcq' %}selected{% endif %}>تحريري</option>
+                              <option value="mcq" {% if q_type == 'mcq' %}selected{% endif %}>MCQ</option>
                             </select>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 d-flex justify-content-end">
-                      <button class="btn btn-outline-primary btn-sm" type="submit">حفظ</button>
-                    </div>
-                    <div class="col-12">
-                      <div class="preview-grid">
-                        <div class="preview-box">
-                          <span class="label">معاينة السؤال</span>
-                          <div class="preview-frame">
-                            <img id="q-preview-{{ q.id }}" src="{{ q.question_image_url or '' }}" alt="معاينة السؤال" {% if not q.question_image_url %}class="d-none"{% endif %}>
-                            <span class="preview-empty {% if q.question_image_url %}d-none{% endif %}" id="q-preview-{{ q.id }}-empty">لا توجد صورة</span>
+                          <div class="col-auto">
+                            <button class="btn btn-outline-primary btn-sm" type="submit">حفظ</button>
+                          </div>
+                          <div class="col-auto">
+                            <button class="btn btn-outline-danger btn-sm" type="button" onclick="if(confirm('حذف السؤال؟')) { var f = document.createElement('form'); f.method='POST'; f.innerHTML='<input type=hidden name=action value=delete_question><input type=hidden name=question_id value={{ q.id }}>'; f.submit(); }">حذف</button>
                           </div>
                         </div>
-                        <div class="preview-box">
-                          <span class="label">معاينة الإجابة</span>
-                          <div class="preview-frame">
-                            <img id="a-preview-{{ q.id }}" src="{{ q.answer_image_url or '' }}" alt="معاينة الإجابة" {% if not q.answer_image_url or q_type == 'mcq' %}class="d-none"{% endif %}>
-                            <span class="preview-empty {% if q.answer_image_url and q_type != 'mcq' %}d-none{% endif %}" id="a-preview-{{ q.id }}-empty">لا توجد صورة</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </form>
-                  <form method="post" class="mt-2 d-flex justify-content-end" onsubmit="return confirm('حذف السؤال؟');">
-                    <input type="hidden" name="action" value="delete_question">
-                    <input type="hidden" name="question_id" value="{{ q.id }}">
-                    <button class="btn btn-outline-danger btn-sm" type="submit">حذف</button>
-                  </form>
-                </div>
-              {% endfor %}
+                      </form>
+                    </td>
+                    <td>
+                      <span class="badge text-bg-light">{{ 'تحريري' if q_type == 'interactive' else 'MCQ' }}</span>
+                    </td>
+                    <td class="text-end">
+                      <!-- Actions handled inline above -->
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
           {% else %}
-            <div class="alert alert-light mb-0">لا توجد أسئلة بعد.</div>
+            <div class="alert alert-info mb-0">لا توجد أسئلة حتى الآن. قم بإضافة أسئلتك الأولى.</div>
           {% endif %}
         </div>
       </div>
@@ -430,33 +427,73 @@
     tab.addEventListener('click', () => switchWorkspace(tab.dataset.tab));
   });
 
-  (function () {
-    const inputs = document.querySelectorAll('[data-preview-target]');
-    inputs.forEach((input) => {
-      const targetId = input.getAttribute('data-preview-target');
-      if (!targetId) return;
-      const img = document.getElementById(targetId);
-      if (!img) return;
-      const empty = document.getElementById(targetId + '-empty');
+  // Drawer toggle
+  const drawerToggle = document.getElementById('questionDrawerToggle');
+  const drawer = document.getElementById('questionDrawer');
+  const closeDrawerBtn = document.getElementById('closeDrawerBtn');
 
-      function updatePreview() {
-        const value = (input.value || '').trim();
-        if (!value) {
-          img.classList.add('d-none');
-          img.removeAttribute('src');
-          if (empty) empty.classList.remove('d-none');
-          return;
-        }
-        img.src = value;
-        img.classList.remove('d-none');
-        if (empty) empty.classList.add('d-none');
-      }
-
-      input.addEventListener('input', updatePreview);
-      updatePreview();
+  if (drawerToggle && drawer) {
+    drawerToggle.addEventListener('click', () => {
+      const isOpen = drawer.classList.toggle('d-none');
+      drawerToggle.setAttribute('aria-expanded', !drawer.classList.contains('d-none'));
     });
-  })();
+    if (closeDrawerBtn) {
+      closeDrawerBtn.addEventListener('click', () => {
+        drawer.classList.add('d-none');
+        drawerToggle.setAttribute('aria-expanded', 'false');
+      });
+    }
+  }
 
+  // Batch delete functionality
+  const selectAllBtn = document.getElementById('selectAllBtn');
+  const deselectAllBtn = document.getElementById('deselectAllBtn');
+  const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+  const questionSelects = document.querySelectorAll('.question-select');
+  const batchIdsInput = document.getElementById('batchQuestionIds');
+
+  function updateBatchDeleteBtn() {
+    const selectedCount = Array.from(questionSelects).filter(cb => cb.checked).length;
+    if (batchDeleteBtn) {
+      batchDeleteBtn.disabled = selectedCount === 0;
+    }
+  }
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', () => {
+      questionSelects.forEach(cb => cb.checked = true);
+      updateBatchDeleteBtn();
+    });
+  }
+
+  if (deselectAllBtn) {
+    deselectAllBtn.addEventListener('click', () => {
+      questionSelects.forEach(cb => cb.checked = false);
+      updateBatchDeleteBtn();
+    });
+  }
+
+  questionSelects.forEach(cb => {
+    cb.addEventListener('change', updateBatchDeleteBtn);
+  });
+
+  if (batchDeleteBtn) {
+    batchDeleteBtn.addEventListener('click', () => {
+      const selected = Array.from(questionSelects).filter(cb => cb.checked).map(cb => cb.value);
+      if (selected.length === 0) {
+        alert('يرجى تحديد أسئلة أولاً.');
+        return;
+      }
+      if (confirm(`حذف ${selected.length} سؤال؟`)) {
+        if (batchIdsInput) {
+          batchIdsInput.value = selected.join(',');
+        }
+        document.getElementById('batchDeleteForm').submit();
+      }
+    });
+  }
+
+  // Question type toggle
   function toggleQuestionTypeGroups(typeValue, interactiveSelector, mcqSelector) {
     const showInteractive = typeValue !== 'mcq';
     document.querySelectorAll(interactiveSelector).forEach(el => {

@@ -2749,6 +2749,26 @@ def course_set_edit(course_set_id):
             flash("تم حذف السؤال.", "success")
             return _edit_redirect("questions")
 
+        if action == "batch_delete_question":
+            question_ids_str = (request.form.get("question_ids") or "").strip()
+            if not question_ids_str:
+                flash("لم يتم تحديد أسئلة للحذف.", "error")
+                return _edit_redirect("questions")
+            question_ids = [qid.strip() for qid in question_ids_str.split(",") if qid.strip()]
+            if not question_ids:
+                flash("لم يتم تحديد أسئلة للحذف.", "error")
+                return _edit_redirect("questions")
+            valid_ids = []
+            for qid in question_ids:
+                if ObjectId.is_valid(qid):
+                    valid_ids.append(ObjectId(qid))
+            if valid_ids:
+                CourseQuestion.objects(id__in=valid_ids, course_set_id=course_set.id).delete()
+                flash(f"تم حذف {len(valid_ids)} سؤال.", "success")
+            else:
+                flash("لم يتم العثور على أسئلة صحيحة للحذف.", "error")
+            return _edit_redirect("questions")
+
     questions = list(CourseQuestion.objects(course_set_id=course_set.id).order_by("created_at").all())
 
     return render_template(
