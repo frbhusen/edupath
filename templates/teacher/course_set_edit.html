@@ -124,7 +124,7 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
           <h4 class="mb-1">إدارة الدورة التفاعلية</h4>
-          <div class="editor-subtitle">واجهة مطابقة لنمط تعديل الاختبار مع تبويب موارد مستقل.</div>
+          <div class="editor-subtitle">واجهة للدورات التفاعلية مع أسئلة تحريرية وأسئلة اختيار من متعدد.</div>
         </div>
         <div class="d-flex flex-wrap gap-2">
           <span class="editor-badge">إعدادات</span>
@@ -134,7 +134,7 @@
       </div>
       <div class="workspace-tabs mt-3" role="tablist" aria-label="مساحات التحرير">
         <button type="button" class="workspace-tab active" data-tab="settings">إعدادات الدورة</button>
-        <button type="button" class="workspace-tab" data-tab="questions">الأسئلة التحريرية</button>
+        <button type="button" class="workspace-tab" data-tab="questions">الأسئلة (تحريرية / اختيار)</button>
         <button type="button" class="workspace-tab" data-tab="resources">الموارد</button>
       </div>
     </div>
@@ -202,11 +202,11 @@
     <div class="workspace-panel d-none" data-panel="questions">
       <div class="card panel-card mb-3">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-          <h4 class="mb-0">الأسئلة التحريرية</h4>
+          <h4 class="mb-0">الأسئلة (تحريرية / اختيار من متعدد)</h4>
           <span class="badge text-bg-light">{{ questions|length }}</span>
         </div>
         <div class="card-body">
-          <h5 class="card-title mb-3">إضافة سؤال جديد</h5>
+          <h5 class="card-title mb-3">إضافة سؤال جديد (تحريري أو اختيار من متعدد)</h5>
           <form method="post" class="row g-2 mb-4">
             <input type="hidden" name="action" value="add_question">
             <div class="col-12 col-md-4">
@@ -277,7 +277,7 @@
             </div>
           </form>
 
-          <h5 class="card-title">أسئلة الدورة ({{ questions|length }})</h5>
+          <h5 class="card-title">أسئلة الدورة - {{ questions|length }} سؤال</h5>
           {% if questions %}
             <div class="d-flex flex-column gap-3">
               {% for q in questions %}
