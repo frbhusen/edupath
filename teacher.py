@@ -1459,6 +1459,14 @@ def _shape_arabic_text(text):
         return value
 
 
+def _latin_safe_text(text):
+    value = str(text or "")
+    try:
+        return value.encode("latin-1", errors="ignore").decode("latin-1")
+    except Exception:
+        return ""
+
+
 def _collect_report_data(filter_student=None):
     attempts_q = Attempt.objects(student_id=filter_student.id) if filter_student else Attempt.objects()
     custom_attempts_q = CustomTestAttempt.objects(student_id=filter_student.id, status="submitted") if filter_student else CustomTestAttempt.objects(status="submitted")
@@ -1658,7 +1666,7 @@ def reports_download_pdf():
     title_font = "Arabic" if using_ar_font else "Helvetica"
     body_font = "Arabic" if using_ar_font else "Helvetica"
     title = _shape_arabic_text("تقرير منصة EduPath") if using_ar_font else "EduPath Report"
-    scope_text = student.full_name if student else "كل الطلاب"
+    scope_text = student.full_name if student else "All Students"
 
     if using_ar_font and hasattr(pdf, "set_text_shaping"):
         try:
@@ -1670,24 +1678,24 @@ def reports_download_pdf():
     pdf.cell(0, 10, title, ln=1, align="R" if using_ar_font else "L")
     pdf.set_font(body_font, "", 11)
     generated_at_text = _shape_arabic_text(f"تاريخ الإنشاء: {report['generated_at'].strftime('%Y-%m-%d %H:%M UTC')}") if using_ar_font else f"Generated At: {report['generated_at'].strftime('%Y-%m-%d %H:%M UTC')}"
-    scope_line = _shape_arabic_text(f"نطاق التقرير: {scope_text}") if using_ar_font else f"Scope: {scope_text}"
+    scope_line = _shape_arabic_text(f"نطاق التقرير: {scope_text}") if using_ar_font else f"Scope: {_latin_safe_text(scope_text)}"
     pdf.cell(0, 8, generated_at_text, ln=1, align="R" if using_ar_font else "L")
     pdf.cell(0, 8, scope_line, ln=1, align="R" if using_ar_font else "L")
     pdf.ln(3)
 
     metric_lines = [
-        ("عدد محاولات الاختبارات", report["regular_attempts"]),
-        ("عدد المحاولات المخصصة", report["custom_attempts"]),
-        ("عدد الدروس المكتملة", report["lessons_completed"]),
-        ("الواجبات المكتملة", report["assignments_completed"]),
-        ("متوسط النتائج", f"{report['avg_score']}%"),
-        ("نسبة النجاح", f"{report['pass_rate']}%"),
-        ("متوسط الجواهر", report["avg_xp"]),
-        ("نسبة إنجاز الواجبات", f"{report['assignment_completion_rate']}%"),
-        ("عدد المواد", report["subjects_count"]),
-        ("عدد الأقسام", report["sections_count"]),
-        ("عدد الدروس", report["lessons_count"]),
-        ("عدد الاختبارات", report["tests_count"]),
+        ("Number of Test Attempts", report["regular_attempts"]),
+        ("Number of Custom Attempts", report["custom_attempts"]),
+        ("Number of Completed Lessons", report["lessons_completed"]),
+        ("Completed Assignments", report["assignments_completed"]),
+        ("Average Score", f"{report['avg_score']}%"),
+        ("Pass Rate", f"{report['pass_rate']}%"),
+        ("Average Gems", report["avg_xp"]),
+        ("Assignment Completion Rate", f"{report['assignment_completion_rate']}%"),
+        ("Subjects Count", report["subjects_count"]),
+        ("Sections Count", report["sections_count"]),
+        ("Lessons Count", report["lessons_count"]),
+        ("Tests Count", report["tests_count"]),
     ]
 
     pdf.set_font(title_font, "B", 13)
@@ -1705,7 +1713,10 @@ def reports_download_pdf():
         pdf.cell(0, 8, weak_title, ln=1, align="R" if using_ar_font else "L")
         pdf.set_font(body_font, "", 10)
         for t in report["weak_tests"][:5]:
-            line = _shape_arabic_text(f"- {t['title']} | متوسط: {t['avg']}% | محاولات: {t['count']}") if using_ar_font else f"- {t['title']} | Avg: {t['avg']}% | Attempts: {t['count']}"
+            if using_ar_font:
+                line = _shape_arabic_text(f"- {t['title']} | متوسط: {t['avg']}% | محاولات: {t['count']}")
+            else:
+                line = f"- {_latin_safe_text(t['title'])} | Avg: {t['avg']}% | Attempts: {t['count']}"
             pdf.multi_cell(0, 6, line, align="R" if using_ar_font else "L")
 
     if report.get("top_students"):
@@ -1715,7 +1726,10 @@ def reports_download_pdf():
         pdf.cell(0, 8, top_title, ln=1, align="R" if using_ar_font else "L")
         pdf.set_font(body_font, "", 10)
         for st in report["top_students"][:5]:
-            line = _shape_arabic_text(f"#{st['rank']} - {st['name']} | جواهر: {st['xp']} | Level: {st['level']}") if using_ar_font else f"#{st['rank']} - {st['name']} | Gems: {st['xp']} | Level: {st['level']}"
+            if using_ar_font:
+                line = _shape_arabic_text(f"#{st['rank']} - {st['name']} | جواهر: {st['xp']} | Level: {st['level']}")
+            else:
+                line = f"#{st['rank']} - {_latin_safe_text(st['name'])} | Gems: {st['xp']} | Level: {st['level']}"
             pdf.cell(0, 6, line, ln=1, align="R" if using_ar_font else "L")
 
     out = pdf.output(dest="S")
