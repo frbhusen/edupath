@@ -244,7 +244,6 @@ def _aggregate_question_counts_by_test(model_cls, test_ids):
 @teacher_bp.route("/dashboard")
 @login_required
 @role_required("teacher")
-@cache.cached(timeout=180, key_prefix=lambda: f"teacher_dashboard_{current_user.id}_{request.args.get('page', 1)}")
 def dashboard():
     # Keep payload predictable so large datasets don't hit Heroku timeouts.
     page = request.args.get('page', 1, type=int)

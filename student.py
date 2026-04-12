@@ -34,6 +34,7 @@ def _redirect_to_next_or(default_endpoint, **default_kwargs):
 
 @student_bp.route("/favorites", methods=["GET"])
 @login_required
+@cache.cached(timeout=30, key_prefix=lambda: f"favorites_{current_user.id}")
 def favorites():
     if (current_user.role or "").lower() != "student":
         flash("غير مسموح.", "error")
@@ -91,6 +92,7 @@ def add_favorite():
             correct_answer_image_url=correct_choice.image_url if correct_choice else None,
             difficulty=(question.difficulty or "medium"),
         ).save()
+        cache.delete(f"favorites_{current_user.id}")
         flash("تمت إضافة السؤال إلى المفضلة.", "success")
         return _redirect_to_next_or("student.favorites")
 
@@ -119,6 +121,7 @@ def add_favorite():
         correct_answer_image_url=interactive_question.answer_image_url,
         difficulty=(interactive_question.difficulty or "medium"),
     ).save()
+    cache.delete(f"favorites_{current_user.id}")
     flash("تمت إضافة السؤال التفاعلي إلى المفضلة.", "success")
     return _redirect_to_next_or("student.favorites")
 
@@ -140,6 +143,7 @@ def remove_favorite(favorite_id):
         return _redirect_to_next_or("student.favorites")
 
     row.delete()
+    cache.delete(f"favorites_{current_user.id}")
     flash("تم حذف السؤال من المفضلة.", "success")
     return _redirect_to_next_or("student.favorites")
 
@@ -165,6 +169,7 @@ def toggle_favorite():
         ).first()
         if exists:
             exists.delete()
+            cache.delete(f"favorites_{current_user.id}")
             return jsonify({"ok": True, "is_favorite": False, "favorite_id": None})
 
         question = Question.objects(id=item_id).first()
@@ -188,6 +193,7 @@ def toggle_favorite():
             difficulty=(question.difficulty or "medium"),
         )
         favorite.save()
+        cache.delete(f"favorites_{current_user.id}")
         return jsonify({"ok": True, "is_favorite": True, "favorite_id": str(favorite.id)})
 
     exists = StudentFavoriteQuestion.objects(
@@ -197,6 +203,7 @@ def toggle_favorite():
     ).first()
     if exists:
         exists.delete()
+        cache.delete(f"favorites_{current_user.id}")
         return jsonify({"ok": True, "is_favorite": False, "favorite_id": None})
 
     interactive_question = TestInteractiveQuestion.objects(id=item_id).first()
@@ -215,6 +222,7 @@ def toggle_favorite():
         difficulty=(interactive_question.difficulty or "medium"),
     )
     favorite.save()
+    cache.delete(f"favorites_{current_user.id}")
     return jsonify({"ok": True, "is_favorite": True, "favorite_id": str(favorite.id)})
 
 
@@ -2275,6 +2283,7 @@ def pinned_discussions():
 
 @student_bp.route("/certificates", methods=["GET"])
 @login_required
+@cache.cached(timeout=60, key_prefix=lambda: f"certificates_{current_user.id}")
 def certificates():
     if current_user.role != "student":
         flash("هذه الصفحة للطلاب فقط.", "warning")
@@ -2359,6 +2368,7 @@ def complete_lesson(lesson_id):
 
 @student_bp.route("/leaderboard")
 @login_required
+@cache.cached(timeout=20, key_prefix=lambda: f"leaderboard_{current_user.id}_{request.args.get('scope', 'global')}_{request.args.get('page', 1)}_{request.args.get('per_page', 20)}")
 def leaderboard():
     page = _to_int(request.args.get("page"), 1)
     per_page = _to_int(request.args.get("per_page"), 20)
@@ -2388,6 +2398,7 @@ def leaderboard():
 
 @student_bp.route("/leaderboard/students/<student_id>/certificates", methods=["GET"])
 @login_required
+@cache.cached(timeout=60, key_prefix=lambda: f"leaderboard_certs_{request.view_args.get('student_id', '')}")
 def leaderboard_student_certificates(student_id):
     student = User.objects(id=student_id, role="student").first() if ObjectId.is_valid(student_id) else None
     if not student:
@@ -3107,6 +3118,7 @@ def duel_submit(duel_id):
 
 @student_bp.route("/duels/leaderboard", methods=["GET"])
 @login_required
+@cache.cached(timeout=20, key_prefix="duels_leaderboard")
 def duel_leaderboard():
     stats_top = list(DuelStats.objects().order_by("-wins", "-current_win_streak", "student_id").limit(10).all())
     student_ids = [s.student_id.id for s in stats_top if s.student_id]
@@ -3493,6 +3505,7 @@ def activate_lesson(lesson_id):
 
 @student_bp.route("/assignments")
 @login_required
+@cache.cached(timeout=45, key_prefix=lambda: f"assignments_{current_user.id}")
 def assignments():
     if current_user.role != "student":
         flash("هذه الصفحة للطلاب فقط.", "warning")
@@ -3585,6 +3598,7 @@ def complete_assignment(assignment_id):
         submission.note = note
         submission.completed_at = datetime.utcnow()
     submission.save()
+    cache.delete(f"assignments_{current_user.id}")
 
     _award_flat_xp_once(
         student_id=current_user.id,
@@ -3678,6 +3692,7 @@ def solve_assignment(assignment_id):
             submitted_at=datetime.utcnow(),
         )
         attempt.save()
+        cache.delete(f"assignments_{current_user.id}")
         flash("تم إرسال الحل بنجاح. بانتظار التصحيح من المعلم.", "success")
         return redirect(url_for("student.assignments"))
 
@@ -3756,6 +3771,7 @@ def view_assignment_questions(assignment_id):
 
 @student_bp.route("/study-plans")
 @login_required
+@cache.cached(timeout=45, key_prefix=lambda: f"study_plans_{current_user.id}")
 def study_plans():
     if current_user.role != "student":
         flash("هذه الصفحة للطلاب فقط.", "warning")
@@ -3793,6 +3809,7 @@ def toggle_study_plan_item(item_id):
     item.is_done = not item.is_done
     item.done_at = datetime.utcnow() if item.is_done else None
     item.save()
+    cache.delete(f"study_plans_{current_user.id}")
 
     if item.is_done:
         _award_flat_xp_once(
@@ -3810,6 +3827,7 @@ def toggle_study_plan_item(item_id):
 
 @student_bp.route("/results")
 @login_required
+@cache.cached(timeout=30, key_prefix=lambda: f"results_{current_user.id}")
 def results():
     # Split own attempts and others for clearer presentation; answers still gated in test_result
     def _filter_missing_tests(attempts):
@@ -3857,6 +3875,7 @@ def results():
 
 @student_bp.route("/statistics")
 @login_required
+@cache.cached(timeout=60, key_prefix=lambda: f"statistics_{current_user.id}_{(current_user.role or '').lower()}")
 def statistics():
     role = (current_user.role or "").lower()
     if role not in {"student", "admin"}:

@@ -4,6 +4,11 @@ from werkzeug.exceptions import NotFound
 import time
 
 try:
+    from flask_compress import Compress
+except Exception:  # pragma: no cover - optional dependency for local dev
+    Compress = None
+
+try:
     from dotenv import load_dotenv
 except Exception:  # pragma: no cover - optional dependency in some environments
     load_dotenv = None
@@ -61,6 +66,9 @@ def create_app():
 
     # Initialize cache using environment-driven config (Redis in production, SimpleCache fallback)
     cache.init_app(app)
+
+    if Compress is not None:
+        Compress(app)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
@@ -326,6 +334,11 @@ def create_app():
     @app.after_request
     def log_request_time(response):
         """Log request processing time"""
+        if request.path.startswith('/static/'):
+            # Let browsers keep static assets to reduce repeat transfer cost.
+            if not response.headers.get("Cache-Control"):
+                max_age = int(app.config.get("SEND_FILE_MAX_AGE_DEFAULT", 604800) or 604800)
+                response.headers["Cache-Control"] = f"public, max-age={max_age}"
         if hasattr(g, 'start_time'):
             elapsed = time.time() - g.start_time
             if elapsed > 0.5:  # Log slow requests (>500ms)

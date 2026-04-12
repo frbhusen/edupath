@@ -18,3 +18,17 @@ class Config:
     CACHE_DEFAULT_TIMEOUT = int(os.environ.get("CACHE_DEFAULT_TIMEOUT", "300"))
     CACHE_KEY_PREFIX = os.environ.get("CACHE_KEY_PREFIX", "studyp:")
     CACHE_REDIS_URL = _cache_redis_url or None
+
+    # Performance tuning for first-visit page loads.
+    SEND_FILE_MAX_AGE_DEFAULT = int(os.environ.get("STATIC_MAX_AGE_SECONDS", "604800"))
+    COMPRESS_MIMETYPES = [
+        "text/html",
+        "text/css",
+        "text/xml",
+        "application/json",
+        "application/javascript",
+        "text/javascript",
+        "image/svg+xml",
+    ]
+    COMPRESS_LEVEL = int(os.environ.get("COMPRESS_LEVEL", "6"))
+    COMPRESS_MIN_SIZE = int(os.environ.get("COMPRESS_MIN_SIZE", "500"))
