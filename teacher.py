@@ -1789,7 +1789,11 @@ def analytics_dashboard():
     by_test = {}
     attempt_test_ids = []
     for a in attempts:
-        test_id = _safe_related_id(getattr(a, "test_id", None))
+        try:
+            test_ref = a.test_id
+        except DoesNotExist:
+            continue
+        test_id = _safe_related_id(test_ref)
         if test_id:
             attempt_test_ids.append(test_id)
 
@@ -1801,7 +1805,11 @@ def analytics_dashboard():
     for a in attempts:
         if not a.total:
             continue
-        test_id = _safe_related_id(getattr(a, "test_id", None))
+        try:
+            test_ref = a.test_id
+        except DoesNotExist:
+            continue
+        test_id = _safe_related_id(test_ref)
         if not test_id:
             continue
         tid = str(test_id)

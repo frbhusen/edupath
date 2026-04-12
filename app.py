@@ -2,6 +2,7 @@ from flask import Flask, render_template, session, request, redirect, url_for, f
 from pathlib import Path
 from werkzeug.exceptions import NotFound
 import time
+from urllib.parse import urlsplit
 
 try:
     from flask_compress import Compress
@@ -66,6 +67,19 @@ def create_app():
 
     # Initialize cache using environment-driven config (Redis in production, SimpleCache fallback)
     cache.init_app(app)
+    cache_type = str(app.config.get("CACHE_TYPE") or "").strip()
+    cache_url = str(app.config.get("CACHE_REDIS_URL") or "").strip()
+    if cache_type.lower() == "rediscache":
+        parsed = urlsplit(cache_url) if cache_url else None
+        has_password = bool(parsed and parsed.password)
+        app.logger.info("Cache backend: RedisCache")
+        app.logger.info("Redis cache host: %s", (parsed.hostname if parsed else ""))
+        if not has_password:
+            app.logger.warning(
+                "Redis cache URL has no password. If your Redis requires AUTH, set REDIS_PASSWORD or include password in CACHE_REDIS_URL."
+            )
+    else:
+        app.logger.info("Cache backend: %s", cache_type or "SimpleCache")
 
     if Compress is not None:
         Compress(app)
