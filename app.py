@@ -58,12 +58,9 @@ def create_app():
     _migrate_legacy_teacher_role_once(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
-    
-    # Initialize cache
-    cache.init_app(app, config={
-        'CACHE_TYPE': 'simple',
-        'CACHE_DEFAULT_TIMEOUT': 300
-    })
+
+    # Initialize cache using environment-driven config (Redis in production, SimpleCache fallback)
+    cache.init_app(app)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)

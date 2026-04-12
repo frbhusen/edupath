@@ -1629,6 +1629,7 @@ def _collect_report_data(filter_student=None):
 @teacher_bp.route("/reports", methods=["GET"])
 @login_required
 @role_required("admin")
+@cache.cached(timeout=120, query_string=True)
 def reports_dashboard():
     student_id = (request.args.get("student_id") or "").strip()
     students = list(User.objects(role="student").order_by("username").all())
@@ -1767,6 +1768,7 @@ def reports_download_pdf():
 @teacher_bp.route("/analytics", methods=["GET"])
 @login_required
 @role_required("admin")
+@cache.cached(timeout=120)
 def analytics_dashboard():
     attempts = list(Attempt.objects().only("test_id", "student_id", "score", "total", "submitted_at").all())
     lessons_completed = LessonCompletion.objects.count()
