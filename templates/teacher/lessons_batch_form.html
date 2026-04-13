@@ -40,7 +40,7 @@
                 <select class="form-select section-select" name="section_id[]" required>
                   <option value="">اختر القسم</option>
                   {% for section in sections %}
-                    <option value="{{ section.id }}" data-subject-id="{{ section.subject_id.id if section.subject_id else '' }}">{{ section.title }}</option>
+                    <option value="{{ section.id }}" data-subject-id="{{ section._safe_subject_id if section._safe_subject_id is defined else '' }}">{{ section.title }}</option>
                   {% endfor %}
                 </select>
               </td>

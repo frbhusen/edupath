@@ -42,7 +42,7 @@
         <select class="form-select" name="section_id" id="standard-section-select">
           <option value="">قسم (اختياري)</option>
           {% for s in sections %}
-            <option value="{{ s.id }}" data-subject-id="{{ s.subject_id.id if s.subject_id else '' }}">{{ s.title }}</option>
+            <option value="{{ s.id }}" data-subject-id="{{ s._safe_subject_id if s._safe_subject_id is defined else '' }}">{{ s.title }}</option>
           {% endfor %}
         </select>
       </div>
@@ -50,7 +50,7 @@
         <select class="form-select" name="lesson_id" id="standard-lesson-select">
           <option value="">درس (اختياري)</option>
           {% for l in lessons %}
-            <option value="{{ l.id }}" data-section-id="{{ l.section_id.id if l.section_id else '' }}">{{ l.title }}</option>
+            <option value="{{ l.id }}" data-section-id="{{ l._safe_section_id if l._safe_section_id is defined else '' }}">{{ l.title }}</option>
           {% endfor %}
         </select>
       </div>
@@ -181,7 +181,7 @@
                   {% endif %}
                 </td>
                 <td class="text-muted small">{{ a.due_at.strftime('%Y-%m-%d %H:%M') if a.due_at else 'بدون موعد' }}</td>
-                <td class="text-muted small">{{ a.target_student_id.full_name if a.target_student_id else 'كل الطلاب' }}</td>
+                <td class="text-muted small">{{ a._target_student_name if a._target_student_name is defined else 'كل الطلاب' }}</td>
                 <td>
                   <span class="badge {% if a.is_active %}text-bg-success{% else %}text-bg-secondary{% endif %}">
                     {{ 'نشط' if a.is_active else 'مغلق' }}

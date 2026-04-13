@@ -163,38 +163,87 @@ def _subject_allowed_for_current_user(subject_id):
 
 
 def _subject_id_for_lesson(lesson):
-    if not lesson or not lesson.section_id or not lesson.section_id.subject_id:
+    if not lesson:
         return None
-    return lesson.section_id.subject_id.id
+    try:
+        section = lesson.section_id
+    except (DoesNotExist, AttributeError):
+        return None
+    if not section:
+        return None
+    return _subject_id_for_section(section)
 
 
 def _subject_id_for_section(section):
-    if not section or not section.subject_id:
+    if not section:
         return None
-    return section.subject_id.id
+    try:
+        subject = section.subject_id
+    except (DoesNotExist, AttributeError):
+        return None
+    if not subject:
+        return None
+    try:
+        return subject.id
+    except (DoesNotExist, AttributeError):
+        return None
 
 
 def _subject_id_for_test(test):
-    if not test or not test.section_id or not test.section_id.subject_id:
+    if not test:
         return None
-    return test.section_id.subject_id.id
+    try:
+        section = test.section_id
+    except (DoesNotExist, AttributeError):
+        return None
+    if not section:
+        return None
+    return _subject_id_for_section(section)
 
 
 def _subject_id_for_course_set(course_set):
-    if not course_set or not course_set.subject_id:
+    if not course_set:
         return None
-    return course_set.subject_id.id
+    try:
+        subject = course_set.subject_id
+    except (DoesNotExist, AttributeError):
+        return None
+    if not subject:
+        return None
+    try:
+        return subject.id
+    except (DoesNotExist, AttributeError):
+        return None
 
 
 def _subject_id_for_assignment(assignment):
     if not assignment:
         return None
-    if assignment.subject_id:
-        return assignment.subject_id.id
-    if assignment.section_id and assignment.section_id.subject_id:
-        return assignment.section_id.subject_id.id
-    if assignment.lesson_id and assignment.lesson_id.section_id and assignment.lesson_id.section_id.subject_id:
-        return assignment.lesson_id.section_id.subject_id.id
+    try:
+        subject = assignment.subject_id
+    except (DoesNotExist, AttributeError):
+        subject = None
+    if subject:
+        try:
+            return subject.id
+        except (DoesNotExist, AttributeError):
+            return None
+
+    try:
+        section = assignment.section_id
+    except (DoesNotExist, AttributeError):
+        section = None
+    section_subject_id = _subject_id_for_section(section)
+    if section_subject_id:
+        return section_subject_id
+
+    try:
+        lesson = assignment.lesson_id
+    except (DoesNotExist, AttributeError):
+        lesson = None
+    lesson_subject_id = _subject_id_for_lesson(lesson)
+    if lesson_subject_id:
+        return lesson_subject_id
     return None
 
 
@@ -1209,14 +1258,22 @@ def assignments_manage():
     attempts = AssignmentAttempt.objects(assignment_id__in=[a.id for a in assignments]).all() if assignments else []
     submissions_by_assignment = {}
     for sub in submissions:
-        aid = sub.assignment_id.id if sub.assignment_id else None
+        try:
+            assignment_ref = sub.assignment_id
+        except (DoesNotExist, AttributeError):
+            assignment_ref = None
+        aid = assignment_ref.id if assignment_ref else None
         if not aid:
             continue
         submissions_by_assignment.setdefault(aid, []).append(sub)
 
     attempts_by_assignment = {}
     for attempt in attempts:
-        aid = attempt.assignment_id.id if attempt.assignment_id else None
+        try:
+            assignment_ref = attempt.assignment_id
+        except (DoesNotExist, AttributeError):
+            assignment_ref = None
+        aid = assignment_ref.id if assignment_ref else None
         if not aid:
             continue
         attempts_by_assignment.setdefault(aid, []).append(attempt)
@@ -1234,6 +1291,24 @@ def assignments_manage():
     subjects = list(subjects_q.order_by("created_at").all())
     sections = list(sections_q.order_by("created_at").all())
     lessons = list(lessons_q.order_by("created_at").all())
+
+    for section in sections:
+        sid = _subject_id_for_section(section)
+        section._safe_subject_id = str(sid) if sid else ""
+
+    for lesson in lessons:
+        try:
+            section_ref = lesson.section_id
+        except (DoesNotExist, AttributeError):
+            section_ref = None
+        lesson._safe_section_id = str(section_ref.id) if section_ref else ""
+
+    for assignment in assignments:
+        try:
+            target = assignment.target_student_id
+        except (DoesNotExist, AttributeError):
+            target = None
+        assignment._target_student_name = target.full_name if target else "كل الطلاب"
 
     selected_custom_lesson_id = (request.args.get("custom_lesson_id") or "").strip()
     questions_page = max(1, int(request.args.get("questions_page", 1) or 1))
@@ -1767,7 +1842,6 @@ def reports_download_pdf():
 @teacher_bp.route("/analytics", methods=["GET"])
 @login_required
 @role_required("admin")
-@cache.cached(timeout=120)
 def analytics_dashboard():
     attempts = list(Attempt.objects().only("test_id", "student_id", "score", "total", "submitted_at").all())
     lessons_completed = LessonCompletion.objects.count()
@@ -3340,6 +3414,9 @@ def batch_new_lessons():
     if allowed_subject_ids is not None:
         sections_q = sections_q.filter(subject_id__in=list(allowed_subject_ids))
     sections = list(sections_q.order_by("created_at").all())
+    for section in sections:
+        sid = _subject_id_for_section(section)
+        section._safe_subject_id = str(sid) if sid else ""
 
     if request.method == "POST":
         subject_ids = request.form.getlist("subject_id[]")
@@ -3371,7 +3448,8 @@ def batch_new_lessons():
             if not subject or not section:
                 invalid_rows += 1
                 continue
-            if not section.subject_id or str(section.subject_id.id) != str(subject.id):
+            section_subject_id = _subject_id_for_section(section)
+            if not section_subject_id or str(section_subject_id) != str(subject.id):
                 invalid_rows += 1
                 continue
             if not _subject_allowed_for_current_user(subject.id):
