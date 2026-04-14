@@ -98,7 +98,7 @@
               <tbody>
                 {% for duel in incoming %}
                   <tr>
-                    <td>{{ duel.challenger_id.full_name if duel.challenger_id else 'لاعب' }}</td>
+                    <td>{{ duel._challenger_name or 'لاعب' }}</td>
                     <td>{{ duel.scope_title }}</td>
                     <td>{{ duel_status_ar.get(duel.status, duel.status) }}</td>
                     <td class="d-flex gap-1">
@@ -130,7 +130,7 @@
               <tbody>
                 {% for duel in outgoing %}
                   <tr>
-                    <td>{{ duel.opponent_username_snapshot }}</td>
+                    <td>{{ duel._opponent_name or duel.opponent_username_snapshot or 'لاعب' }}</td>
                     <td>{{ duel.scope_title }}</td>
                     <td>{{ duel_status_ar.get(duel.status, duel.status) }}</td>
                     <td class="d-flex gap-1">
@@ -165,14 +165,13 @@
         <table class="table table-sm align-middle mb-0">
           <thead><tr><th>#</th><th>اللاعب</th><th>فوز</th><th>خسارة</th><th>سلسلة</th></tr></thead>
           <tbody>
-            {% for row in top_stats %}
-              {% set user = users_by_id.get(row.student_id.id if row.student_id else None) %}
+            {% for row in leaderboard_rows %}
               <tr>
                 <td>{{ loop.index }}</td>
-                <td>{{ user.full_name if user else 'لاعب' }}</td>
+                <td>{{ row.display_name }}</td>
                 <td>{{ row.wins }}</td>
                 <td>{{ row.losses }}</td>
-                <td>{{ row.current_win_streak }}</td>
+                <td>{{ row.streak }}</td>
               </tr>
             {% endfor %}
           </tbody>

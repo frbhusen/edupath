@@ -55,3 +55,10 @@ Thumbs.db
 # Logs
 *.log
 db_backup.gz
+AI_STUDENT_NAV_AGENT_KNOWLEDGE_QA_EN.csv
+*.pdf
+generate_detailed_pdf.py
+*.csv
+AI_STUDENT_NAV_AGENT_KNOWLEDGE.md
+AI_STUDENT_NAV_AGENT_KNOWLEDGE_QA.md
+AI_STUDENT_NAV_AGENT_KNOWLEDGE - Copy.md

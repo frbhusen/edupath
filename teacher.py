@@ -1854,8 +1854,18 @@ def analytics_dashboard():
     tests_count = Test.objects.count()
     questions_count = int(Question.objects.count() + TestInteractiveQuestion.objects.count())
 
+    def _safe_percent(attempt):
+        try:
+            total = float(attempt.total or 0)
+            score = float(attempt.score or 0)
+        except (TypeError, ValueError):
+            return None
+        if total <= 0:
+            return None
+        return (score / total) * 100
+
     overall_avg = 0
-    scored = [((a.score / a.total) * 100) for a in attempts if a.total]
+    scored = [pct for pct in (_safe_percent(a) for a in attempts) if pct is not None]
     if scored:
         overall_avg = round(sum(scored) / len(scored), 2)
     pass_rate = round((len([s for s in scored if s >= 50]) / len(scored)) * 100, 2) if scored else 0
@@ -1877,7 +1887,8 @@ def analytics_dashboard():
             test_title_map[str(test.id)] = test.title or "-"
 
     for a in attempts:
-        if not a.total:
+        pct = _safe_percent(a)
+        if pct is None:
             continue
         try:
             test_ref = a.test_id
@@ -1888,7 +1899,7 @@ def analytics_dashboard():
             continue
         tid = str(test_id)
         bucket = by_test.setdefault(tid, {"title": test_title_map.get(tid, "-"), "sum": 0.0, "count": 0})
-        bucket["sum"] += (a.score / a.total) * 100
+        bucket["sum"] += pct
         bucket["count"] += 1
 
     weak_tests = []
@@ -1912,16 +1923,24 @@ def analytics_dashboard():
     }
 
     xp_profiles = list(StudentGamification.objects.only("student_id", "xp_total", "level").order_by("-xp_total").limit(5).all())
+
+    def _safe_profile_student_id(profile):
+        try:
+            student_ref = profile.student_id
+        except (DoesNotExist, AttributeError):
+            return None
+        return _safe_related_id(student_ref)
+
     top_user_ids = []
     for p in xp_profiles:
-        student_id = _safe_related_id(getattr(p, "student_id", None))
+        student_id = _safe_profile_student_id(p)
         if student_id:
             top_user_ids.append(student_id)
     top_users = User.objects(id__in=top_user_ids).all() if top_user_ids else []
     user_map = {u.id: u for u in top_users}
     top_students = []
     for idx, p in enumerate(xp_profiles, start=1):
-        student_id = _safe_related_id(getattr(p, "student_id", None))
+        student_id = _safe_profile_student_id(p)
         if not student_id:
             continue
         user = user_map.get(student_id)

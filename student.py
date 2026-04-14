@@ -9,6 +9,7 @@ import time
 from flask_login import login_required, current_user
 from bson import ObjectId
 from bson.dbref import DBRef
+from mongoengine.errors import DoesNotExist
 
 from .models import User, Subject, Section, Lesson, Test, TestResource, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer, StudentFavoriteQuestion
 from .forms import ActivationForm, StudentProfileForm
@@ -922,10 +923,27 @@ def _duel_time_left_seconds(duel, player_slot: str, now=None):
     return max(0, left)
 
 
+def _duel_safe_user(user_ref):
+    try:
+        return user_ref
+    except (DoesNotExist, AttributeError):
+        return None
+
+
+def _duel_safe_user_id(user_ref):
+    user = _duel_safe_user(user_ref)
+    return getattr(user, "id", None) if user else None
+
+
+def _duel_safe_user_name(user_ref, fallback="لاعب"):
+    user = _duel_safe_user(user_ref)
+    return user.full_name if user else fallback
+
+
 def _duel_player_slot(duel, user_id):
-    if duel.challenger_id and duel.challenger_id.id == user_id:
+    if _duel_safe_user_id(getattr(duel, "challenger_id", None)) == user_id:
         return "challenger"
-    if duel.opponent_id and duel.opponent_id.id == user_id:
+    if _duel_safe_user_id(getattr(duel, "opponent_id", None)) == user_id:
         return "opponent"
     return None
 
@@ -1387,7 +1405,16 @@ def get_unlocked_lessons(student_id: int):
     # Group lessons by section for faster access
     lessons_by_section = {}
     for lesson in all_lessons:
-        section_id = lesson.section_id.id
+        try:
+            section_ref = lesson.section_id
+        except Exception:
+            # Skip orphan lessons with broken section references.
+            continue
+        if not section_ref:
+            continue
+        section_id = getattr(section_ref, "id", None)
+        if not section_id:
+            continue
         if section_id not in lessons_by_section:
             lessons_by_section[section_id] = []
         lessons_by_section[section_id].append(lesson)
@@ -2470,7 +2497,16 @@ def duels_home():
 
     unlocked_lessons = get_unlocked_lessons(current_user.id)
     lesson_groups = []
-    section_ids = list({l.section_id.id for l in unlocked_lessons if l.section_id})
+    section_ids = []
+    for lesson in unlocked_lessons:
+        try:
+            section_ref = lesson.section_id
+            section_id = section_ref.id if section_ref else None
+        except (DoesNotExist, AttributeError):
+            section_id = None
+        if section_id:
+            section_ids.append(section_id)
+    section_ids = list(set(section_ids))
     subject_ids = []
     if section_ids:
         sections = list(Section.objects(id__in=section_ids).only("id", "subject_id", "title").all())
@@ -2636,11 +2672,30 @@ def duels_home():
 
     for duel in incoming + outgoing:
         _duel_expire_if_needed(duel)
+        duel._challenger_name = _duel_safe_user_name(getattr(duel, "challenger_id", None), "لاعب")
+        opponent_user = _duel_safe_user(getattr(duel, "opponent_id", None))
+        duel._opponent_name = (opponent_user.username if opponent_user else None) or (getattr(duel, "opponent_username_snapshot", None) or "لاعب")
 
     stats_top = list(DuelStats.objects().order_by("-wins", "-current_win_streak", "student_id").limit(10).all())
-    top_ids = [s.student_id.id for s in stats_top if s.student_id]
+    top_ids = []
+    for s in stats_top:
+        sid = _duel_safe_user_id(getattr(s, "student_id", None))
+        if sid:
+            top_ids.append(sid)
     top_users = User.objects(id__in=top_ids).only("id", "username", "first_name", "last_name").all() if top_ids else []
     top_users_by_id = {u.id: u for u in top_users}
+    leaderboard_rows = []
+    for row in stats_top:
+        sid = _duel_safe_user_id(getattr(row, "student_id", None))
+        user = top_users_by_id.get(sid) if sid else None
+        leaderboard_rows.append(
+            {
+                "wins": int(getattr(row, "wins", 0) or 0),
+                "losses": int(getattr(row, "losses", 0) or 0),
+                "streak": int(getattr(row, "current_win_streak", 0) or 0),
+                "display_name": user.full_name if user else "لاعب",
+            }
+        )
 
     scope_choices = {
         "lesson_groups": lesson_groups,
@@ -2658,6 +2713,7 @@ def duels_home():
         whatsapp_share=whatsapp_share,
         telegram_share=telegram_share,
         top_stats=stats_top,
+        leaderboard_rows=leaderboard_rows,
         top_users_by_id=top_users_by_id,
         users_by_id=top_users_by_id,
     )
@@ -2725,7 +2781,7 @@ def duel_invite(token):
         return redirect(url_for("student.duels_home"))
 
     _duel_expire_if_needed(duel)
-    challenger_name = duel.challenger_id.full_name if duel.challenger_id else "لاعب"
+    challenger_name = _duel_safe_user_name(getattr(duel, "challenger_id", None), "لاعب")
     return render_template("student/duel_invite.html", duel=duel, slot=slot, challenger_name=challenger_name)
 
 
@@ -2761,15 +2817,21 @@ def duel_respond(duel_id):
         flash("إجراء غير صالح.", "error")
         return redirect(url_for("student.duel_invite", token=duel.invite_token))
 
-    challenger_profile = _get_or_create_gamification_profile(duel.challenger_id.id)
-    opponent_profile = _get_or_create_gamification_profile(duel.opponent_id.id)
+    challenger_id = _duel_safe_user_id(getattr(duel, "challenger_id", None))
+    opponent_id = _duel_safe_user_id(getattr(duel, "opponent_id", None))
+    if not challenger_id or not opponent_id:
+        flash("تعذر معالجة الدعوة بسبب بيانات مستخدم ناقصة.", "error")
+        return redirect(url_for("student.duels_home"))
+
+    challenger_profile = _get_or_create_gamification_profile(challenger_id)
+    opponent_profile = _get_or_create_gamification_profile(opponent_id)
     fee = int(duel.entry_fee_xp or 20)
     if int(challenger_profile.xp_total or 0) < fee or int(opponent_profile.xp_total or 0) < fee:
         flash("لا يمكن قبول الدعوة: أحد اللاعبين لا يملك جواهر كافية.", "error")
         return redirect(url_for("student.duels_home"))
 
-    _duel_apply_xp_delta_once(duel.challenger_id.id, "duel_entry_fee", f"{duel.id}:challenger_fee", -fee)
-    _duel_apply_xp_delta_once(duel.opponent_id.id, "duel_entry_fee", f"{duel.id}:opponent_fee", -fee)
+    _duel_apply_xp_delta_once(challenger_id, "duel_entry_fee", f"{duel.id}:challenger_fee", -fee)
+    _duel_apply_xp_delta_once(opponent_id, "duel_entry_fee", f"{duel.id}:opponent_fee", -fee)
 
     duel.fee_applied = True
     duel.invite_consumed = True
@@ -2799,7 +2861,7 @@ def duel_cancel(duel_id):
     if not duel:
         return "404", 404
 
-    if not duel.challenger_id or duel.challenger_id.id != current_user.id:
+    if _duel_safe_user_id(getattr(duel, "challenger_id", None)) != current_user.id:
         flash("فقط مرسل الدعوة يمكنه إلغاءها.", "error")
         return redirect(url_for("student.duels_home"))
 
@@ -2860,7 +2922,12 @@ def duel_play(duel_id):
     _duel_autosubmit_timeout(duel)
 
     if duel.status in {"pending", "declined", "expired", "canceled"}:
-        return render_template("student/duel_invite.html", duel=duel, slot=slot, challenger_name=(duel.challenger_id.full_name if duel.challenger_id else "لاعب"))
+        return render_template(
+            "student/duel_invite.html",
+            duel=duel,
+            slot=slot,
+            challenger_name=_duel_safe_user_name(getattr(duel, "challenger_id", None), "لاعب"),
+        )
 
     question_ids = []
     try:
@@ -2878,7 +2945,7 @@ def duel_play(duel_id):
     my_left = int(state["my_left"])
     opp_left = int(state["opp_left"])
     opp_slot = "opponent" if slot == "challenger" else "challenger"
-    opponent_user = duel.opponent_id if slot == "challenger" else duel.challenger_id
+    opponent_user = _duel_safe_user(duel.opponent_id if slot == "challenger" else duel.challenger_id)
     phase = state["phase"]
     xp_summary = _duel_get_xp_change_summary(duel, current_user.id) if phase == "completed" else None
 
@@ -2972,8 +3039,8 @@ def duel_review(duel_id):
             continue
         answers_by_key[(str(a.player_id.id), str(a.question_id.id))] = a
 
-    my_user = duel.challenger_id if slot == "challenger" else duel.opponent_id
-    opponent_user = duel.opponent_id if slot == "challenger" else duel.challenger_id
+    my_user = _duel_safe_user(duel.challenger_id if slot == "challenger" else duel.opponent_id)
+    opponent_user = _duel_safe_user(duel.opponent_id if slot == "challenger" else duel.challenger_id)
     my_user_id = str(my_user.id) if my_user else ""
     opponent_user_id = str(opponent_user.id) if opponent_user else ""
 
@@ -4446,6 +4513,21 @@ def retake_test_new_questions(attempt_id):
 @student_bp.route("/custom-tests/new", methods=["GET", "POST"])
 @login_required
 def custom_test_new():
+    def _safe_section_for_lesson(lesson):
+        try:
+            return lesson.section
+        except Exception:
+            return None
+
+    def _safe_subject_for_lesson(lesson):
+        section = _safe_section_for_lesson(lesson)
+        if not section:
+            return None
+        try:
+            return section.subject_id
+        except Exception:
+            return None
+
     subjects = list(Subject.objects().order_by('created_at').all())
     selected_subject_id = request.args.get("subject_id") or request.form.get("subject_id")
     selected_lesson_id = request.args.get("lesson_id") or request.form.get("lesson_id")
@@ -4462,7 +4544,12 @@ def custom_test_new():
             flash("الدرس المحدد غير موجود.", "error")
             return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id) if selected_subject_id else url_for("student.custom_test_new"))
 
-        access = AccessContext(selected_lesson.section, current_user.id)
+        selected_section = _safe_section_for_lesson(selected_lesson)
+        if not selected_section:
+            flash("تعذر الوصول إلى القسم المرتبط بهذا الدرس.", "error")
+            return redirect(url_for("student.custom_test_new", subject_id=selected_subject_id) if selected_subject_id else url_for("student.custom_test_new"))
+
+        access = AccessContext(selected_section, current_user.id)
         if not access.lesson_open(selected_lesson):
             flash("لا يمكنك الوصول إلى هذا الدرس حالياً.", "warning")
             return redirect(url_for("student.lesson_detail", lesson_id=selected_lesson.id))
@@ -4475,7 +4562,7 @@ def custom_test_new():
     elif current_user.role == "student":
         unlocked_lessons = get_unlocked_lessons(current_user.id)
     else:
-        unlocked_lessons = list(Lesson.objects().all())
+        unlocked_lessons = [l for l in Lesson.objects().all() if _safe_section_for_lesson(l)]
 
     if selected_lesson_id and not selected_lesson:
         selected_lesson = Lesson.objects(id=selected_lesson_id).first()
@@ -4494,8 +4581,10 @@ def custom_test_new():
                 return redirect(url_for("student.lesson_detail", lesson_id=selected_lesson.id))
 
     if selected_lesson:
-        if selected_lesson.section and selected_lesson.section.subject_id:
-            selected_subject_id = str(selected_lesson.section.subject_id.id)
+        selected_section = _safe_section_for_lesson(selected_lesson)
+        selected_subject = _safe_subject_for_lesson(selected_lesson)
+        if selected_subject:
+            selected_subject_id = str(selected_subject.id)
         # Full lesson test should always allocate by tests inside the lesson.
         forced_selection_mode = "test"
     
@@ -4505,7 +4594,7 @@ def custom_test_new():
         if subject_filter:
             unlocked_lessons = [
                 lesson for lesson in unlocked_lessons
-                if lesson.section and lesson.section.subject_id == subject_filter
+                if _safe_subject_for_lesson(lesson) == subject_filter
             ]
 
     if selected_lesson:
