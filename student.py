@@ -1421,11 +1421,22 @@ def get_unlocked_lessons(student_id: int):
     
     unlocked = []
     for section in sections:
+        # Skip orphan sections whose subject reference no longer exists.
+        try:
+            _ = section.subject
+        except (DoesNotExist, AttributeError):
+            continue
+
         section_lessons = lessons_by_section.get(section.id, [])
         if not section_lessons:
             continue
-        
-        access = AccessContext(section, student_id)
+
+        try:
+            access = AccessContext(section, student_id)
+        except (DoesNotExist, AttributeError):
+            # Any dangling refs in section hierarchy should not break page load.
+            continue
+
         for lesson in section_lessons:
             if access.lesson_open(lesson):
                 unlocked.append(lesson)
