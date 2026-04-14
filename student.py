@@ -2510,7 +2510,16 @@ def duels_home():
     subject_ids = []
     if section_ids:
         sections = list(Section.objects(id__in=section_ids).only("id", "subject_id", "title").all())
-        subject_ids = list({s.subject_id.id for s in sections if s.subject_id})
+        subject_ids_set = set()
+        for section in sections:
+            try:
+                subject_ref = section.subject_id
+                subject_id = subject_ref.id if subject_ref else None
+            except (DoesNotExist, AttributeError):
+                subject_id = None
+            if subject_id:
+                subject_ids_set.add(subject_id)
+        subject_ids = list(subject_ids_set)
     else:
         sections = []
     subjects = list(Subject.objects(id__in=subject_ids).only("id", "name").all()) if subject_ids else []
@@ -2518,7 +2527,6 @@ def duels_home():
     sections_by_id = {section.id: section for section in sections}
     subjects_by_id = {subject.id: subject for subject in subjects}
     lessons_by_subject = {}
-    lessons_by_section = {}
     for lesson in unlocked_lessons:
         try:
             section_id = lesson.section_id.id if lesson.section_id else None
@@ -2527,9 +2535,15 @@ def duels_home():
         if not section_id:
             continue
         section = sections_by_id.get(section_id)
-        if not section or not section.subject_id:
+        if not section:
             continue
-        subject_id = section.subject_id.id
+        try:
+            subject_ref = section.subject_id
+            subject_id = subject_ref.id if subject_ref else None
+        except (DoesNotExist, AttributeError):
+            subject_id = None
+        if not subject_id:
+            continue
         subject = subjects_by_id.get(subject_id)
         if not subject:
             continue
@@ -2542,7 +2556,15 @@ def duels_home():
 
     for subject in sorted(subjects, key=lambda item: (item.name or "")):
         section_groups = []
-        subject_sections = [section for section in sections if section.subject_id and section.subject_id.id == subject.id]
+        subject_sections = []
+        for section in sections:
+            try:
+                subject_ref = section.subject_id
+                sid = subject_ref.id if subject_ref else None
+            except (DoesNotExist, AttributeError):
+                sid = None
+            if sid == subject.id:
+                subject_sections.append(section)
         for section in sorted(subject_sections, key=lambda item: (item.title or "")):
             lesson_rows = lessons_by_subject.get(subject.id, {}).get(section.id, [])
             if not lesson_rows:
