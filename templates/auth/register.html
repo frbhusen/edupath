@@ -1,142 +1,165 @@
-{% extends 'base.html' %}
-{% block title %}إنشاء حساب | EduPath{% endblock %}
-{% block meta_description %}أنشئ حساباً جديداً في EduPath للانضمام إلى الدروس والاختبارات والأنشطة التعليمية.{% endblock %}
-{% block meta_robots %}noindex,nofollow{% endblock %}
-{% block content %}
+{% extends 'base.html' %} {% block title %}إنشاء حساب | EduPath{% endblock %} {%
+block meta_description %}أنشئ حساباً جديداً في EduPath للانضمام إلى الدروس
+والاختبارات والأنشطة التعليمية.{% endblock %} {% block meta_robots
+%}noindex,nofollow{% endblock %} {% block content %}
 <div class="row justify-content-center gx-0">
-    <div class="col-12 col-md-6 col-lg-5 pb-5 px-0 px-sm-2">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h2 class="h4 mb-3">إنشاء حساب</h2>
-                <form method="post" novalidate>
-                    {{ form.hidden_tag() }}
-                    <div class="mb-3">
-                        {{ form.first_name.label(class="form-label") }}
-                        {{ form.first_name(class="form-control") }}
-                        {% if form.first_name.errors %}
-                            <div class="text-danger small mt-1">
-                                {% for error in form.first_name.errors %}{{ error }}{% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.last_name.label(class="form-label") }}
-                        {{ form.last_name(class="form-control") }}
-                        {% if form.last_name.errors %}
-                            <div class="text-danger small mt-1">
-                                {% for error in form.last_name.errors %}{{ error }}{% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.username.label(class="form-label") }}
-                        {{ form.username(class="form-control", pattern="[A-Za-z0-9_]+", title="اسم المستخدم يجب أن يكون بالإنجليزية فقط") }}
-                        {% if form.username.errors %}
-                            <div class="text-danger small mt-1">
-                                {% for error in form.username.errors %}{{ error }}{% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.phone.label(class="form-label") }}
-                        {{ form.phone(class="form-control", inputmode="numeric", pattern="09[0-9]{8}", minlength="10", maxlength="10") }}
-                        {% if form.phone.errors %}
-                            <div class="text-danger small mt-1">
-                                {% for error in form.phone.errors %}{{ error }}{% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.password.label(class="form-label") }}
-                        <div class="position-relative">
-                            {{ form.password(class="form-control pe-5", id="register-password") }}
-                            <button class="btn btn-link position-absolute end-0 top-50 translate-middle-y me-2 p-0" type="button" id="toggle-register-password" aria-label="إظهار كلمة المرور">
-                                <i class="bi bi-eye" id="register-password-icon"></i>
-                            </button>
-                        </div>
-                        {% if form.password.errors %}
-                            <div class="text-danger small mt-1">
-                                {% for error in form.password.errors %}{{ error }}{% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                                        <div class="mb-3">
-                                            {{ form.confirm.label(class="form-label") }}
-                                            <div class="position-relative">
-                                                {{ form.confirm(class="form-control pe-5", id="register-confirm") }}
-                                                <button class="btn btn-link position-absolute end-0 top-50 translate-middle-y me-2 p-0" type="button" id="toggle-register-confirm" aria-label="إظهار تأكيد كلمة المرور">
-                                                    <i class="bi bi-eye" id="register-confirm-icon"></i>
-                                                </button>
-                                            </div>
-                        {% if form.confirm.errors %}
-                            <div class="text-danger small mt-1">
-                                {% for error in form.confirm.errors %}{{ error }}{% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                                        <div id="password-match-feedback" class="small mb-3"></div>
-                    {{ form.submit(class="btn btn-primary w-100") }}
-                </form>
+  <div class="col-12 col-md-6 col-lg-5 pb-5 px-0 px-sm-2">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h4 mb-3">إنشاء حساب</h2>
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+            {{ form.first_name.label(class="form-label") }} {{
+            form.first_name(class="form-control") }} {% if
+            form.first_name.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.first_name.errors %}{{ error }}{% endfor %}
             </div>
-        </div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            {{ form.last_name.label(class="form-label") }} {{
+            form.last_name(class="form-control") }} {% if form.last_name.errors
+            %}
+            <div class="text-danger small mt-1">
+              {% for error in form.last_name.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            {{ form.username.label(class="form-label") }} {{
+            form.username(class="form-control", pattern="[A-Za-z0-9_]+",
+            title="اسم المستخدم يجب أن يكون بالإنجليزية فقط") }} {% if
+            form.username.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.username.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            {{ form.phone.label(class="form-label") }} {{
+            form.phone(class="form-control", inputmode="numeric",
+            pattern="09[0-9]{8}", minlength="10", maxlength="10") }} {% if
+            form.phone.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.phone.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            {{ form.password.label(class="form-label") }}
+            <div class="position-relative">
+              {{ form.password(class="form-control pe-5",
+              id="register-password") }}
+              <button
+                class="btn btn-link position-absolute end-0 top-50 translate-middle-y me-2 p-0"
+                type="button"
+                id="toggle-register-password"
+                aria-label="إظهار كلمة المرور"
+              >
+                <i class="bi bi-eye" id="register-password-icon"></i>
+              </button>
+            </div>
+            {% if form.password.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.password.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            {{ form.confirm.label(class="form-label") }}
+            <div class="position-relative">
+              {{ form.confirm(class="form-control pe-5", id="register-confirm")
+              }}
+              <button
+                class="btn btn-link position-absolute end-0 top-50 translate-middle-y me-2 p-0"
+                type="button"
+                id="toggle-register-confirm"
+                aria-label="إظهار تأكيد كلمة المرور"
+              >
+                <i class="bi bi-eye" id="register-confirm-icon"></i>
+              </button>
+            </div>
+            {% if form.confirm.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.confirm.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div id="password-match-feedback" class="small mb-3"></div>
+          {{ form.submit(class="btn btn-primary w-100") }}
+        </form>
+      </div>
+      <div class="card-footer text-center">
+        <p class="mb-0">
+          <a
+            href="{{ url_for('auth.login') }}"
+            class="text-decoration-none d-inline-block text-break"
+          >
+            لديك حساب بالفعل؟ سجل الدخول
+          </a>
+        </p>
+      </div>
     </div>
+  </div>
 </div>
 <script>
-    (function () {
-        const passwordInput = document.querySelector('input[name="password"]');
-        const confirmInput = document.querySelector('input[name="confirm"]');
-        const feedback = document.getElementById('password-match-feedback');
+  (function () {
+    const passwordInput = document.querySelector('input[name="password"]');
+    const confirmInput = document.querySelector('input[name="confirm"]');
+    const feedback = document.getElementById("password-match-feedback");
 
-        function updateFeedback() {
-            const password = passwordInput ? passwordInput.value : "";
-            const confirm = confirmInput ? confirmInput.value : "";
+    function updateFeedback() {
+      const password = passwordInput ? passwordInput.value : "";
+      const confirm = confirmInput ? confirmInput.value : "";
 
-            if (!password && !confirm) {
-                feedback.textContent = "";
-                feedback.className = "small mb-3";
-                return;
-            }
+      if (!password && !confirm) {
+        feedback.textContent = "";
+        feedback.className = "small mb-3";
+        return;
+      }
 
-            if (password === confirm) {
-                feedback.textContent = "كلمتا المرور متطابقتان";
-                feedback.className = "small mb-3 text-success";
-            } else {
-                feedback.textContent = "كلمتا المرور غير متطابقتين";
-                feedback.className = "small mb-3 text-danger";
-            }
-        }
+      if (password === confirm) {
+        feedback.textContent = "كلمتا المرور متطابقتان";
+        feedback.className = "small mb-3 text-success";
+      } else {
+        feedback.textContent = "كلمتا المرور غير متطابقتين";
+        feedback.className = "small mb-3 text-danger";
+      }
+    }
 
-        if (passwordInput && confirmInput) {
-            passwordInput.addEventListener('input', updateFeedback);
-            confirmInput.addEventListener('input', updateFeedback);
-            updateFeedback();
-        }
-    })();
+    if (passwordInput && confirmInput) {
+      passwordInput.addEventListener("input", updateFeedback);
+      confirmInput.addEventListener("input", updateFeedback);
+      updateFeedback();
+    }
+  })();
 </script>
 <script>
-    (function () {
-        const passBtn = document.getElementById('toggle-register-password');
-        const passInput = document.getElementById('register-password');
-        const passIcon = document.getElementById('register-password-icon');
-        const confirmBtn = document.getElementById('toggle-register-confirm');
-        const confirmInput = document.getElementById('register-confirm');
-        const confirmIcon = document.getElementById('register-confirm-icon');
+  (function () {
+    const passBtn = document.getElementById("toggle-register-password");
+    const passInput = document.getElementById("register-password");
+    const passIcon = document.getElementById("register-password-icon");
+    const confirmBtn = document.getElementById("toggle-register-confirm");
+    const confirmInput = document.getElementById("register-confirm");
+    const confirmIcon = document.getElementById("register-confirm-icon");
 
-        if (passBtn && passInput && passIcon) {
-            passBtn.addEventListener('click', () => {
-                const isHidden = passInput.type === 'password';
-                passInput.type = isHidden ? 'text' : 'password';
-                passIcon.className = isHidden ? 'bi bi-eye-slash' : 'bi bi-eye';
-            });
-        }
+    if (passBtn && passInput && passIcon) {
+      passBtn.addEventListener("click", () => {
+        const isHidden = passInput.type === "password";
+        passInput.type = isHidden ? "text" : "password";
+        passIcon.className = isHidden ? "bi bi-eye-slash" : "bi bi-eye";
+      });
+    }
 
-        if (confirmBtn && confirmInput && confirmIcon) {
-            confirmBtn.addEventListener('click', () => {
-                const isHidden = confirmInput.type === 'password';
-                confirmInput.type = isHidden ? 'text' : 'password';
-                confirmIcon.className = isHidden ? 'bi bi-eye-slash' : 'bi bi-eye';
-            });
-        }
-    })();
+    if (confirmBtn && confirmInput && confirmIcon) {
+      confirmBtn.addEventListener("click", () => {
+        const isHidden = confirmInput.type === "password";
+        confirmInput.type = isHidden ? "text" : "password";
+        confirmIcon.className = isHidden ? "bi bi-eye-slash" : "bi bi-eye";
+      });
+    }
+  })();
 </script>
 {% endblock %}

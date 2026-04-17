@@ -402,6 +402,18 @@ table {
   color: var(--brand-muted);
 }
 
+.guest-auth-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.guest-auth-actions .btn {
+  flex: 0 0 auto !important;
+  white-space: nowrap;
+}
+
 .notification-mark-all-btn,
 .notification-read-btn {
   white-space: nowrap;
@@ -430,6 +442,124 @@ table {
 
 .login-btn {
   font-size: 16px;
+}
+
+.login-video-card {
+  width: min(100%, 760px);
+  margin-inline: auto;
+  direction: rtl;
+  text-align: right;
+  background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 48%, #f4fff9 100%);
+  border: 1px solid #d5e4ff;
+  border-radius: 18px;
+  padding: 1rem;
+  box-shadow: 0 14px 34px rgba(15, 61, 145, 0.1);
+}
+
+.login-video-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  text-align: right;
+}
+
+.video-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 61, 145, 0.1);
+  color: var(--brand-primary);
+  border: 1px solid rgba(15, 61, 145, 0.2);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.login-video-text {
+  color: #26435f;
+  font-size: 0.96rem;
+}
+
+.video-placeholder {
+  position: relative;
+  border-radius: 14px;
+  border: 1px dashed #92b3ee;
+  background:
+    linear-gradient(160deg, rgba(15, 61, 145, 0.14), rgba(11, 122, 117, 0.1)),
+    repeating-linear-gradient(
+      -35deg,
+      rgba(255, 255, 255, 0.56) 0,
+      rgba(255, 255, 255, 0.56) 12px,
+      rgba(255, 255, 255, 0.32) 12px,
+      rgba(255, 255, 255, 0.32) 24px
+    );
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+.video-frame {
+  width: min(100%, 720px);
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 28px rgba(20, 49, 77, 0.2);
+  background: #000;
+}
+
+.video-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.video-play {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  background: #ffffff;
+  color: #d62828;
+  border: 1px solid #f2c7c7;
+  box-shadow: 0 10px 24px rgba(214, 40, 40, 0.18);
+}
+
+.video-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: #14314d;
+}
+
+.video-meta strong {
+  font-size: 1rem;
+}
+
+.video-meta span {
+  font-size: 0.86rem;
+  color: #4a5f78;
+}
+
+@media (max-width: 575.98px) {
+  .login-video-card {
+    border-radius: 14px;
+    padding: 0.82rem;
+  }
+
+  .video-placeholder {
+    padding: 0.75rem;
+  }
 }
 /* Badges & chips */
 .badge {
@@ -546,6 +676,19 @@ table {
 .dashboard-hero p {
   margin: 0;
   opacity: 0.92;
+}
+
+.guest-hero {
+  direction: rtl;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.guest-hero p {
+  max-width: 100%;
 }
 
 /* Home action hub */
@@ -784,12 +927,6 @@ mjx-container,
 .resource-card.resource-card-youtube:hover {
   box-shadow: 0 14px 32px rgba(255, 0, 0, 0.3);
 }
-.resource-card.resource-card-mindmap {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-.resource-card.resource-card-mindmap:hover {
-  box-shadow: 0 14px 32px rgba(102, 126, 234, 0.3);
-}
 .resource-card.resource-card-link {
   background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
   color: #333;
@@ -897,14 +1034,6 @@ mjx-container,
 
   .offcanvas-collapse .navbar-nav.align-items-center {
     align-items: stretch !important;
-  }
-
-  .offcanvas-collapse .navbar-text,
-  .offcanvas-collapse .badge {
-    display: block;
-    width: 100%;
-    white-space: normal;
-    text-align: center;
   }
 }
 
@@ -1036,9 +1165,6 @@ mjx-container,
   .mindmap-canvas {
     min-height: 300px;
   }
-  .login-btn {
-    font-size: 16px;
-  }
 }
 
 @media (max-width: 575.98px) {
@@ -1060,8 +1186,5 @@ mjx-container,
   .alert {
     padding: 0.7rem 0.8rem;
     font-size: 0.9rem;
-  }
-  .login-btn {
-    font-size: 16px;
   }
 }

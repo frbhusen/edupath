@@ -78,11 +78,19 @@
             <div class="text-muted small mb-2">درس</div>
             <div class="mt-auto d-flex justify-content-start align-items-center">
               {% if locked %}
+              {% if current_user.is_authenticated and current_user.role == 'student' %}
               <a
                 class="btn btn-cta btn-sm"
                 href="{{ url_for('student.activate_section', section_id=section.id) }}"
                 >تفعيل القسم</a
               >
+              {% else %}
+              <a
+                class="btn btn-cta btn-sm"
+                href="{{ url_for('auth.login', next=url_for('student.lesson_detail', lesson_id=lesson.id)) }}"
+                >سجّل الدخول للمتابعة</a
+              >
+              {% endif %}
               {% else %}
               <a
                 class="btn btn-cta btn-sm"
@@ -147,11 +155,19 @@
             <div class="mt-auto d-flex justify-content-start align-items-center gap-2">
               <span class="chip">MCQ</span>
               {% if locked %}
+              {% if current_user.is_authenticated and current_user.role == 'student' %}
               <a
                 class="btn btn-cta btn-sm"
                 href="{{ url_for('student.activate_section', section_id=section.id) }}"
                 >تفعيل القسم</a
               >
+              {% else %}
+              <a
+                class="btn btn-cta btn-sm"
+                href="{{ url_for('auth.login', next=url_for('student.section_detail', section_id=section.id)) }}"
+                >سجّل الدخول للمتابعة</a
+              >
+              {% endif %}
               {% else %}
               <a
                 class="btn btn-cta btn-sm"

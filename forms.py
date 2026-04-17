@@ -7,8 +7,8 @@ def _strip_edges(value):
     return value.strip() if isinstance(value, str) else value
 
 class RegisterForm(FlaskForm):
-    first_name = StringField("الاسم الأول", filters=[_strip_edges], validators=[DataRequired(), Length(min=3, max=20)])
-    last_name = StringField("اسم العائلة", filters=[_strip_edges], validators=[DataRequired(), Length(min=2, max=20)])
+    first_name = StringField("الاسم الأول (باللغة العربية)", filters=[_strip_edges], validators=[DataRequired(), Length(min=3, max=20)])
+    last_name = StringField("الكنية  (باللغة العربية)", filters=[_strip_edges], validators=[DataRequired(), Length(min=2, max=20)])
     username = StringField(
         "اسم المستخدم (بالإنجليزية فقط)", 
         filters=[_strip_edges],

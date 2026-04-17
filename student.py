@@ -33,6 +33,42 @@ def _redirect_to_next_or(default_endpoint, **default_kwargs):
     return redirect(url_for(default_endpoint, **default_kwargs))
 
 
+def _viewer_cache_tag():
+    if current_user.is_authenticated:
+        role = (getattr(current_user, "role", "") or "auth").lower()
+        return f"{current_user.id}_{role}"
+    return "anon"
+
+
+def _first_lesson_id_for_subject(subject_id):
+    if not subject_id:
+        return None
+    first_section = Section.objects(subject_id=subject_id).order_by("created_at", "id").first()
+    if not first_section:
+        return None
+    first_lesson = Lesson.objects(section_id=first_section.id).order_by("created_at", "id").first()
+    return first_lesson.id if first_lesson else None
+
+
+def _is_guest_free_lesson(lesson):
+    if not lesson:
+        return False
+    try:
+        section = lesson.section
+    except (DoesNotExist, AttributeError):
+        return False
+    if not section:
+        return False
+    try:
+        subject = section.subject
+    except (DoesNotExist, AttributeError):
+        return False
+    if not subject:
+        return False
+    first_lesson_id = _first_lesson_id_for_subject(subject.id)
+    return bool(first_lesson_id and lesson.id == first_lesson_id)
+
+
 @student_bp.route("/favorites", methods=["GET"])
 @login_required
 @cache.cached(timeout=30, key_prefix=lambda: f"favorites_{current_user.id}")
@@ -233,13 +269,16 @@ class AccessContext:
     def __init__(self, section: Section, student_id: int):
         self.section = section
         self.student_id = student_id
-        self.subject = section.subject
+        try:
+            self.subject = section.subject
+        except (DoesNotExist, AttributeError):
+            self.subject = None
         
         # Check if entire subject is activated
-        self.subject_requires_code = getattr(self.subject, "requires_code", False)
+        self.subject_requires_code = bool(getattr(self.subject, "requires_code", False)) if self.subject else False
         self.subject_active = bool(
             SubjectActivation.objects(subject_id=self.subject.id, student_id=student_id, active=True).first()
-        )
+        ) if self.subject else False
         self.subject_open = self.subject_active or not self.subject_requires_code
         
         # Check if section is activated
@@ -255,11 +294,12 @@ class AccessContext:
 
         # Always-open rule: first lesson of first section in the subject is never locked.
         self.first_lesson_id = None
-        first_section = Section.objects(subject_id=self.subject.id).order_by("created_at", "id").first()
-        if first_section:
-            first_lesson = Lesson.objects(section_id=first_section.id).order_by("created_at", "id").first()
-            if first_lesson:
-                self.first_lesson_id = first_lesson.id
+        if self.subject:
+            first_section = Section.objects(subject_id=self.subject.id).order_by("created_at", "id").first()
+            if first_section:
+                first_lesson = Lesson.objects(section_id=first_section.id).order_by("created_at", "id").first()
+                if first_lesson:
+                    self.first_lesson_id = first_lesson.id
         self.first_section_wide_test_id = None
 
     def lesson_open(self, lesson: Lesson) -> bool:
@@ -1459,8 +1499,7 @@ def student_duel_maintenance():
     return None
 
 @student_bp.route("/subjects")
-@login_required
-@cache.cached(timeout=60, key_prefix=lambda: f"subjects_{current_user.id}_{current_user.role}")
+@cache.cached(timeout=60, key_prefix=lambda: f"subjects_{_viewer_cache_tag()}")
 def subjects():
     subs = list(Subject.objects().order_by('created_at').all())
     
@@ -1481,7 +1520,7 @@ def subjects():
     
     # Get activation status for each subject if student
     subject_activations = {}
-    if current_user.role == "student":
+    if current_user.is_authenticated and (current_user.role or "").lower() == "student":
         activations = SubjectActivation.objects(
             student_id=current_user.id, 
             active=True
@@ -1639,10 +1678,9 @@ def profile():
     )
 
 @student_bp.route("/subjects/<subject_id>")
-@login_required
 @cache.cached(
     timeout=60,
-    key_prefix=lambda: f"subject_detail_{request.view_args.get('subject_id', '')}_{current_user.id}",
+    key_prefix=lambda: f"subject_detail_{request.view_args.get('subject_id', '')}_{_viewer_cache_tag()}",
 )
 def subject_detail(subject_id):
     subject = Subject.objects(id=subject_id).first()
@@ -1669,7 +1707,7 @@ def subject_detail(subject_id):
     subject_requires_code = getattr(subject, "requires_code", False)
     subject_open = True
     
-    if current_user.role == "student":
+    if current_user.is_authenticated and (current_user.role or "").lower() == "student":
         subject_activation = SubjectActivation.objects(
             subject_id=subject.id,
             student_id=current_user.id,
@@ -1915,10 +1953,9 @@ def course_result(attempt_id):
     return render_template("student/course_result.html", attempt=attempt, course_set=course_set, review=review, gamification=gamification)
 
 @student_bp.route("/sections/<section_id>")
-@login_required
 @cache.cached(
     timeout=60,
-    key_prefix=lambda: f"section_detail_{request.view_args.get('section_id', '')}_{current_user.id}",
+    key_prefix=lambda: f"section_detail_{request.view_args.get('section_id', '')}_{_viewer_cache_tag()}",
 )
 def section_detail(section_id):
     section = Section.objects(id=section_id).first()
@@ -1956,7 +1993,7 @@ def section_detail(section_id):
             test._question_count = question_counts.get(test.id, 0)
             test._resources = resources_by_test.get(test.id, [])
     
-    if current_user.role == "student":
+    if current_user.is_authenticated and (current_user.role or "").lower() == "student":
         access = AccessContext(section, current_user.id)
         completed_lesson_ids = set(
             lc.lesson_id.id
@@ -1989,6 +2026,35 @@ def section_detail(section_id):
             lessons_data=lessons_data,
             tests_data=tests_data,
         )
+    if not current_user.is_authenticated:
+        subject_id = None
+        try:
+            subject_ref = section.subject
+            subject_id = subject_ref.id if subject_ref else None
+        except (DoesNotExist, AttributeError):
+            subject_id = None
+
+        guest_free_lesson_id = _first_lesson_id_for_subject(subject_id)
+        lessons_data = [
+            {
+                "lesson": lesson,
+                "is_open": bool(guest_free_lesson_id and lesson.id == guest_free_lesson_id),
+                "is_completed": False,
+            }
+            for lesson in lessons
+        ]
+        tests_data = [{"test": test, "is_open": False} for test in tests]
+        return render_template(
+            "student/section_detail.html",
+            section=section,
+            subject_requires_code=False,
+            subject_open=True,
+            section_active=True,
+            section_requires_code=False,
+            section_open=True,
+            lessons_data=lessons_data,
+            tests_data=tests_data,
+        )
     # Teachers/admins can view everything unlocked
     lessons_data = [{"lesson": l, "is_open": True, "is_completed": False} for l in lessons]
     tests_data = [{"test": t, "is_open": True} for t in tests]
@@ -2005,7 +2071,6 @@ def section_detail(section_id):
     )
 
 @student_bp.route("/lessons/<lesson_id>")
-@login_required
 def lesson_detail(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
@@ -2013,7 +2078,11 @@ def lesson_detail(lesson_id):
     section = lesson.section
     subject_open = True
     section_open = True
-    if current_user.role == "student":
+    if not current_user.is_authenticated:
+        if not _is_guest_free_lesson(lesson):
+            flash("هذا الدرس يتطلب تسجيل الدخول أو التفعيل.", "warning")
+            return redirect(url_for("auth.login", next=request.path))
+    elif (current_user.role or "").lower() == "student":
         access = AccessContext(section, current_user.id)
         subject_open = access.subject_open
         section_open = access.section_open
@@ -2121,7 +2190,7 @@ def lesson_detail(lesson_id):
     lesson_full_custom_test_enabled = bool(getattr(lesson, "allow_full_lesson_test", False))
     lesson_completion_xp = max(0, int(getattr(lesson, "xp_reward", 10) or 10))
 
-    if current_user.role == "student":
+    if current_user.is_authenticated and (current_user.role or "").lower() == "student":
         access = AccessContext(section, current_user.id)
         tests_data = [
             {"test": test, "is_open": access.test_open(test)}
@@ -2133,11 +2202,13 @@ def lesson_detail(lesson_id):
                 student_id=current_user.id,
             ).first()
         )
+    elif not current_user.is_authenticated:
+        tests_data = [{"test": test, "is_open": False} for test in tests]
     else:
         tests_data = [{"test": t, "is_open": True} for t in tests]
 
     certificate = None
-    if current_user.role == "student":
+    if current_user.is_authenticated and (current_user.role or "").lower() == "student":
         certificate = Certificate.objects(student_id=current_user.id, lesson_id=lesson.id).first()
 
     return render_template(
