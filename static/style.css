@@ -425,6 +425,19 @@ table {
   min-width: 132px;
 }
 
+.btn-soft-notification {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--brand-primary);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: 0 8px 18px rgba(15, 61, 145, 0.14);
+}
+
+.btn-soft-notification:hover {
+  background: #ffffff;
+  color: var(--brand-primary);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
 .notification-item-actions form {
   margin: 0;
 }
@@ -442,6 +455,129 @@ table {
 
 .login-btn {
   font-size: 16px;
+}
+
+@media (min-width: 992px) {
+  body.profile-page .desktop-logout {
+    display: none !important;
+  }
+}
+
+.profile-hero-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-avatar-large,
+.profile-avatar-summary {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at top, #ffffff 0%, #dce9ff 35%, #b8d2ff 100%);
+  color: #0f3d91;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 10px 24px rgba(15, 61, 145, 0.18);
+}
+
+.profile-avatar-large {
+  width: 72px;
+  height: 72px;
+  font-size: 1.8rem;
+}
+
+.profile-avatar-summary {
+  width: 58px;
+  height: 58px;
+  font-size: 1.45rem;
+  flex: 0 0 58px;
+}
+
+.profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.profile-summary-card {
+  border: 1px solid #d6e2f6;
+  background: linear-gradient(180deg, #ffffff, #f7fbff);
+  box-shadow: 0 16px 38px rgba(16, 24, 40, 0.08);
+}
+
+.profile-summary-top {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.profile-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.profile-summary-grid > div {
+  background: #f7faff;
+  border: 1px solid #e3ecfb;
+  border-radius: 14px;
+  padding: 0.8rem 0.85rem;
+}
+
+.student-gems-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: linear-gradient(135deg, #effff6 0%, #e5f4ff 100%);
+  border: 1px solid rgba(15, 122, 117, 0.22);
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  color: #0c5b38;
+  font-weight: 800;
+  font-size: 0.86rem;
+  white-space: nowrap;
+  box-shadow: 0 10px 22px rgba(11, 122, 117, 0.12);
+}
+
+.student-gems-chip .gems-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #0f766e;
+}
+
+.student-gems-chip .gems-main i {
+  color: #10b981;
+}
+
+.student-gems-chip .gems-sep {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(12, 91, 56, 0.22);
+}
+
+.student-gems-chip .gems-meta {
+  color: #0f5132;
+}
+
+.student-gems-chip .gems-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.student-gems-chip .gems-streak i {
+  color: #ef7b18;
+}
+
+@media (max-width: 991.98px) {
+  .profile-hero-wrap {
+    align-items: flex-start;
+  }
+
+  .profile-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .login-video-card {
@@ -466,6 +602,41 @@ table {
   text-align: right;
 }
 
+.library-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
+.library-card-actions .btn {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.9rem 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.15;
+  border-radius: 14px;
+}
+
+@media (min-width: 992px) {
+  .library-card-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 575.98px) {
+  .library-card-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .video-pill {
   display: inline-flex;
   align-items: center;
@@ -476,6 +647,18 @@ table {
   border-radius: 999px;
   padding: 0.2rem 0.65rem;
   font-size: 0.82rem;
+  font-weight: 700;
+}
+.video-pill-bold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 61, 145, 0.1);
+  color: var(--brand-primary);
+  border: 1px solid rgba(15, 61, 145, 0.2);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 1rem;
   font-weight: 700;
 }
 
@@ -579,51 +762,6 @@ table {
   color: #1d4ed8;
   font-weight: 700;
   font-size: 0.85rem;
-}
-
-.student-gems-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: linear-gradient(135deg, #f8fffb, #ebfff4);
-  border: 1px solid #7ad7a3;
-  border-radius: 999px;
-  padding: 0.32rem 0.68rem;
-  color: #0c5b38;
-  font-weight: 700;
-  font-size: 0.84rem;
-  white-space: nowrap;
-}
-
-.student-gems-chip .gems-main {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-  color: #0b7a75;
-}
-
-.student-gems-chip .gems-main i {
-  color: #12a3e0;
-}
-
-.student-gems-chip .gems-sep {
-  width: 1px;
-  align-self: stretch;
-  background: rgba(12, 91, 56, 0.22);
-}
-
-.student-gems-chip .gems-meta {
-  color: #0f5132;
-}
-
-.student-gems-chip .gems-streak {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.student-gems-chip .gems-streak i {
-  color: #ef7b18;
 }
 
 /* Alerts & forms */

@@ -74,12 +74,16 @@ visitors with role-aware greeting/actions #} {% if current_user.is_authenticated
 {#Library card#}
 <div class="login-video-card mb-3" dir="rtl">
   <div class="login-video-head">
-    <span class="video-pill">مكتبة EduPath</span>
-    <h2 class="h4 m-0">يمكنك الحصول على:</h2>
-    <h3 class="h6 m-0">كتب المنهج الدراسي</h3>
-    <h3 class="h6 m-0 btn btn-sm btn-check">كتب المنهج الدراسي</h3>
-    <a class="btn btn-sm btn-light" href="{{ url_for('student.subjects') }}"
-      >استعرض المكتبة</a>
+    <span class="video-pill-bold">مكتبة EduPath</span>
+
+    <div class="library-card-actions align-content-center">
+      <a class="btn btn-info library-action-btn" href="{{ url_for('student.subjects') }}"
+        >استعرض المواد</a
+      >
+      <a class="btn btn-info library-action-btn" href="./pages/Library.html"
+        >كتب المنهج الدراسي</a
+      >
+    </div>
   </div>
 </div>  
   {%endif%} {#Show the welcome page for new users #} {#dashboard links for

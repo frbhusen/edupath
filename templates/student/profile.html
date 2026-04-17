@@ -1,10 +1,21 @@
 {% extends 'base.html' %} {% block content %}
+{% set display_name = (current_user.first_name ~ ' ' ~ current_user.last_name).strip() %}
+{% set profile_initial = (current_user.first_name or current_user.username or 'U')[:1] %}
 <div
   class="dashboard-hero mb-3 d-flex justify-content-between align-items-center"
 >
-  <div>
-    <h1 class="h4 mb-1">الملف الشخصي</h1>
-    <p class="mb-0">راجع بياناتك الشخصية وعدلها عند الحاجة.</p>
+  <div class="profile-hero-wrap">
+    <div class="profile-avatar-large">{{ profile_initial }}</div>
+    <div>
+      <h1 class="h4 mb-1">{{ display_name if display_name else current_user.username }}</h1>
+      <p class="mb-0">
+        {{ current_user.username }}{% if current_user.phone %} • {{ current_user.phone }}{% endif %}
+      </p>
+      <div class="profile-badges mt-2">
+        <span class="badge text-bg-light text-primary">طالب</span>
+        <span class="badge text-bg-light text-primary">{{ current_user.email or 'EduPath' }}</span>
+      </div>
+    </div>
   </div>
   <a class="btn btn-cta btn-sm" href="{{ url_for('student.subjects') }}"
     >العودة للمواد</a
@@ -73,6 +84,36 @@
   </div>
 
   <div class="col-12 col-lg-5">
+    <div class="card mb-3 profile-summary-card">
+      <div class="card-body">
+        <div class="profile-summary-top">
+          <div class="profile-avatar-summary">{{ profile_initial }}</div>
+          <div>
+            <h5 class="card-title mb-1">{{ display_name if display_name else current_user.username }}</h5>
+            <div class="text-muted small">{{ current_user.username }}</div>
+          </div>
+        </div>
+        <div class="profile-summary-grid mt-3">
+          <div>
+            <div class="text-muted small">الاسم الأول</div>
+            <div class="fw-semibold">{{ current_user.first_name or '—' }}</div>
+          </div>
+          <div>
+            <div class="text-muted small">اسم العائلة</div>
+            <div class="fw-semibold">{{ current_user.last_name or '—' }}</div>
+          </div>
+          <div>
+            <div class="text-muted small">رقم الهاتف</div>
+            <div class="fw-semibold">{{ current_user.phone or '—' }}</div>
+          </div>
+          <div>
+            <div class="text-muted small">نوع الحساب</div>
+            <div class="fw-semibold">{{ current_user.role or 'student' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card mb-3">
       <div class="card-body">
         <h5 class="card-title mb-3">المواد المفعلة</h5>
