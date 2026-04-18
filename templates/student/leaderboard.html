@@ -242,24 +242,46 @@
       });
     }
 
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function toInt(value, fallback = 0) {
+      const num = Number(value);
+      return Number.isFinite(num) ? Math.trunc(num) : fallback;
+    }
+
     function buildRow(entry) {
-      const topClass = entry.rank === 1 ? 'top-1' : (entry.rank === 2 ? 'top-2' : (entry.rank === 3 ? 'top-3' : ''));
-      const badges = (entry.badges || []).slice(0, 3).map((b) => `<span class="meta-chip badge-chip">${b}</span>`).join('');
-      const certificatesUrl = entry.student_id ? certificatesBaseUrl.replace('__student_id__', entry.student_id) : '';
+      const rank = toInt(entry.rank, 0);
+      const xp = toInt(entry.xp, 0);
+      const level = toInt(entry.level, 1);
+      const certificatesCount = toInt(entry.certificates_count, 0);
+      const topClass = rank === 1 ? 'top-1' : (rank === 2 ? 'top-2' : (rank === 3 ? 'top-3' : ''));
+      const studentIdRaw = String(entry.student_id || '');
+      const studentId = escapeHtml(studentIdRaw);
+      const avatar = escapeHtml(entry.avatar || '');
+      const username = escapeHtml(entry.username || '');
+      const badges = (entry.badges || []).slice(0, 3).map((b) => `<span class="meta-chip badge-chip">${escapeHtml(b)}</span>`).join('');
+      const certificatesUrl = studentIdRaw ? certificatesBaseUrl.replace('__student_id__', encodeURIComponent(studentIdRaw)) : '';
       return `
-        <article class="leaderboard-row ${topClass}" data-student-id="${entry.student_id}" data-rank="${entry.rank}">
-          <div class="rank-col">#${entry.rank}</div>
-          <div class="avatar-col">${entry.avatar}</div>
+        <article class="leaderboard-row ${topClass}" data-student-id="${studentId}" data-rank="${rank}">
+          <div class="rank-col">#${rank}</div>
+          <div class="avatar-col">${avatar}</div>
           <div class="user-col">
-            <div class="fw-semibold">${entry.username}</div>
+            <div class="fw-semibold">${username}</div>
             <div class="meta-row">
-              <span class="meta-chip">Lvl ${entry.level}</span>
-              <span class="meta-chip">الشهادات: ${entry.certificates_count || 0}</span>
+              <span class="meta-chip">Lvl ${level}</span>
+              <span class="meta-chip">الشهادات: ${certificatesCount}</span>
               ${badges}
             </div>
-            ${entry.student_id ? `<div class="mt-1"><a class="small" href="${certificatesUrl}">عرض الشهادات</a></div>` : ''}
+            ${studentIdRaw ? `<div class="mt-1"><a class="small" href="${certificatesUrl}">عرض الشهادات</a></div>` : ''}
           </div>
-          <div class="xp-col"><span class="xp-pill"><i class="fa-solid fa-gem me-1"></i>${entry.xp}</span></div>
+          <div class="xp-col"><span class="xp-pill"><i class="fa-solid fa-gem me-1"></i>${xp}</span></div>
         </article>
       `;
     }
@@ -291,7 +313,7 @@
       }
       const xpChip = document.getElementById('my-xp-chip');
       if (xpChip && typeof payload.current_xp === 'number') {
-        xpChip.innerHTML = `<i class="fa-solid fa-gem me-1"></i>(${scope}): ${payload.current_xp}`;
+        xpChip.textContent = `(${scope}): ${payload.current_xp}`;
       }
       const certChip = document.getElementById('my-cert-chip');
       if (certChip && typeof payload.current_certificates_count === 'number') {

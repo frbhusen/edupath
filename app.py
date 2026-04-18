@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template, session, request, redirect, url_for, flash, send_from_directory, g, jsonify
 from pathlib import Path
 from werkzeug.exceptions import NotFound
@@ -32,6 +33,54 @@ from .student import student_bp
 from .staff_activity import log_staff_activity_from_request
 
 
+def _is_production_mode() -> bool:
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("APP_ENV") or "").strip().lower()
+    return env in {"prod", "production"}
+
+
+def _enforce_secret_key_safety(app):
+    secret_key = str(app.config.get("SECRET_KEY") or "").strip()
+    insecure_values = {
+        "",
+        "dev",
+        "development",
+        "changeme",
+        "change-me",
+        "secret",
+        "dev-secret-key-change-me",
+    }
+
+    if not _is_production_mode():
+        return
+
+    if secret_key.lower() in insecure_values or len(secret_key) < 32:
+        raise RuntimeError(
+            "Unsafe SECRET_KEY for production. Set a strong SECRET_KEY environment variable (>= 32 chars)."
+        )
+
+
+def _extract_origin_host(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    parsed = urlsplit(raw)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+
+
+def _is_same_origin_json_request() -> bool:
+    expected = f"{request.scheme.lower()}://{request.host.lower()}"
+    origin = _extract_origin_host(request.headers.get("Origin") or "")
+    referer = _extract_origin_host(request.headers.get("Referer") or "")
+
+    if origin:
+        return origin == expected
+    if referer:
+        return referer == expected
+    return False
+
+
 def _migrate_legacy_teacher_role_once(app):
     """One-time migration for old installs where teacher was the full admin role."""
     try:
@@ -57,6 +106,7 @@ def _migrate_legacy_teacher_role_once(app):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    _enforce_secret_key_safety(app)
     try:
         app.logger.setLevel('DEBUG')
     except Exception:
@@ -335,6 +385,16 @@ def create_app():
     def start_timer():
         """Track request start time for performance monitoring"""
         g.start_time = time.time()
+
+    @app.before_request
+    def protect_json_mutations_same_origin():
+        if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+            return None
+        if not request.is_json:
+            return None
+        if _is_same_origin_json_request():
+            return None
+        return jsonify({"ok": False, "error": "csrf_origin_blocked"}), 403
     
     @app.before_request
     def enforce_single_device_login():
@@ -380,5 +440,6 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True)
+    debug_mode = os.environ.get("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    app.run(debug=debug_mode)
 

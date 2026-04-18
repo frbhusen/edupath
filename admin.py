@@ -140,7 +140,52 @@ def dashboard():
     for subject in subjects:
         subject._sections_count = sections_count.get(subject.id, 0)
 
-    return render_template("admin/dashboard.html", counts=counts, subjects=subjects)
+    now = datetime.utcnow()
+    students = list(
+        User.objects(role="student")
+        .order_by("first_name", "last_name", "username")
+        .limit(300)
+        .all()
+    )
+    locked_students = []
+    for student in students:
+        locked_until = getattr(student, "login_locked_until", None)
+        is_locked = bool(locked_until and locked_until > now)
+        if is_locked:
+            remaining_seconds = int((locked_until - now).total_seconds())
+            student._lock_remaining_minutes = max(1, (remaining_seconds + 59) // 60)
+        else:
+            student._lock_remaining_minutes = 0
+        student._is_locked = is_locked
+        locked_students.append(student)
+
+    return render_template(
+        "admin/dashboard.html",
+        counts=counts,
+        subjects=subjects,
+        locked_students=locked_students,
+    )
+
+
+@admin_bp.route("/students/<user_id>/unlock-login", methods=["POST"])
+@login_required
+def unlock_student_login(user_id):
+    admin_required()
+
+    student = User.objects(id=user_id, role="student").first() if ObjectId.is_valid(user_id) else None
+    if not student:
+        flash("الطالب غير موجود.", "error")
+        return redirect(url_for("admin.dashboard"))
+
+    student.failed_login_attempts = 0
+    student.failed_login_window_start = None
+    student.last_failed_login_at = None
+    student.login_locked_until = None
+    student.lockout_cleared_by_admin_at = datetime.utcnow()
+    student.save()
+
+    flash(f"تم فتح قفل تسجيل الدخول للطالب {student.full_name}.", "success")
+    return redirect(url_for("admin.dashboard"))
 
 
 @admin_bp.route("/notifications", methods=["GET", "POST"])

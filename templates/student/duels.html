@@ -186,7 +186,7 @@
 
 {% block scripts %}
 <script>
-  const scopeChoices = JSON.parse(String.raw`{{ scope_choices|tojson|safe }}`);
+  const scopeChoices = JSON.parse(String.raw`{{ scope_choices|tojson }}`);
   const scopeTypeEl = document.getElementById('scope_type');
   const scopeIdEl = document.getElementById('scope_id');
   const lessonSubjectWrapEl = document.getElementById('lesson_subject_wrap');

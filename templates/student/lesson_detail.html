@@ -54,7 +54,7 @@
     {% endif %} {% set has_content = (lesson.content or '').strip()|length > 0
     %} {% set has_resources = resources and (resources|length > 0) %} {% if
     has_content %}
-    <div class="mb-3">{{ lesson.content|safe }}</div>
+    <div class="mb-3">{{ lesson.content }}</div>
     {% elif not has_resources %}
     <div class="text-muted mb-3">لا يوجد محتوى.</div>
     {% endif %}
@@ -347,21 +347,60 @@ lesson_full_custom_test_enabled %}
     }
   }
 
+  function sanitizeSvg(svgNode) {
+    if (!svgNode) {
+      return null;
+    }
+
+    const blockedTags = ["script", "foreignObject"];
+    blockedTags.forEach((tag) => {
+      svgNode.querySelectorAll(tag).forEach((node) => node.remove());
+    });
+
+    svgNode.querySelectorAll("*").forEach((el) => {
+      Array.from(el.attributes).forEach((attr) => {
+        const name = String(attr.name || "").toLowerCase();
+        const value = String(attr.value || "").trim().toLowerCase();
+        if (name.startsWith("on")) {
+          el.removeAttribute(attr.name);
+          return;
+        }
+        if ((name === "href" || name === "xlink:href") && value.startsWith("javascript:")) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+
+    return svgNode;
+  }
+
   async function loadMindmap(container) {
     const url = container.dataset.mindmapUrl;
     if (!url) return;
     try {
       const response = await fetch(url, { credentials: "same-origin" });
       const html = await response.text();
-      container.innerHTML = html;
-      const svg = container.querySelector("svg");
+      const parser = new DOMParser();
+      let parsed = parser.parseFromString(html, "image/svg+xml");
+      let svg = parsed.querySelector("svg");
+      if (!svg) {
+        parsed = parser.parseFromString(html, "text/html");
+        svg = parsed.querySelector("svg");
+      }
+
+      container.textContent = "";
       if (svg) {
-        const panzoom = Panzoom(svg, {
+        const safeSvg = sanitizeSvg(svg.cloneNode(true));
+        const renderedSvg = document.importNode(safeSvg, true);
+        container.appendChild(renderedSvg);
+        const panzoom = Panzoom(renderedSvg, {
           maxScale: 5,
           minScale: 0.5,
           contain: "outside",
         });
         container.addEventListener("wheel", panzoom.zoomWithWheel);
+      } else {
+        container.innerHTML = '<div class="text-muted">Unable to load mind map.</div>';
       }
     } catch (err) {
       container.innerHTML =
