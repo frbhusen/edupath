@@ -8,14 +8,14 @@
       <div class="d-flex gap-2">
         {% if section_requires_code and not section_open %}
         <a
-          class="btn btn-cta btn-sm"
+          class="btn btn-info btn-sm"
           href="{{ url_for('student.activate_section', section_id=section.id) }}"
           >تفعيل القسم</a
         >
         {% elif subject_requires_code and not subject_open and not section_open
         %}
         <a
-          class="btn btn-cta btn-sm"
+          class="btn btn-info btn-sm"
           href="{{ url_for('student.activate_section', section_id=section.id) }}"
           >تفعيل القسم</a
         >
@@ -79,11 +79,7 @@
             <div class="mt-auto d-flex justify-content-start align-items-center">
               {% if locked %}
               {% if current_user.is_authenticated and current_user.role == 'student' %}
-              <a
-                class="btn btn-cta btn-sm"
-                href="{{ url_for('student.activate_section', section_id=section.id) }}"
-                >تفعيل القسم</a
-              >
+              <div></div>
               {% else %}
               <a
                 class="btn btn-cta btn-sm"
@@ -157,7 +153,7 @@
               {% if locked %}
               {% if current_user.is_authenticated and current_user.role == 'student' %}
               <a
-                class="btn btn-cta btn-sm"
+                class="btn btn-info btn-sm"
                 href="{{ url_for('student.activate_section', section_id=section.id) }}"
                 >تفعيل القسم</a
               >

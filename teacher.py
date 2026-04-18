@@ -2708,6 +2708,7 @@ def new_subject():
         subject = Subject(
             name=form.name.data,
             description=form.description.data,
+            banner_image_url=(form.banner_image_url.data or "").strip() or None,
             requires_code=form.requires_code.data,
             created_by=current_user.id,
         )
@@ -3296,6 +3297,7 @@ def edit_subject(subject_id):
     if form.validate_on_submit():
         subject.name = form.name.data
         subject.description = form.description.data
+        subject.banner_image_url = (form.banner_image_url.data or "").strip() or None
         subject.requires_code = form.requires_code.data
         subject.save()
         flash("تم تحديث المادة بنجاح.", "success")
@@ -3303,6 +3305,7 @@ def edit_subject(subject_id):
     elif request.method == "GET":
         form.name.data = subject.name
         form.description.data = subject.description
+        form.banner_image_url.data = subject.banner_image_url
         form.requires_code.data = subject.requires_code
     return render_template("teacher/subject_form.html", form=form, subject=subject)
 

@@ -22,6 +22,8 @@ from .config import Config
 from .extensions import login_manager, init_mongo, cache
 from flask_login import current_user, logout_user, login_required
 from bson import ObjectId
+from redis import Redis
+from redis.exceptions import AuthenticationError, ConnectionError, RedisError
 
 from .auth import auth_bp
 from .admin import admin_bp
@@ -65,8 +67,8 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
 
-    # Initialize cache using environment-driven config (Redis in production, SimpleCache fallback)
-    cache.init_app(app)
+    # Initialize cache using environment-driven config, but fall back to SimpleCache
+    # when Redis is misconfigured or requires credentials that are not available.
     cache_type = str(app.config.get("CACHE_TYPE") or "").strip()
     cache_url = str(app.config.get("CACHE_REDIS_URL") or "").strip()
     if cache_type.lower() == "rediscache":
@@ -78,8 +80,20 @@ def create_app():
             app.logger.warning(
                 "Redis cache URL has no password. If your Redis requires AUTH, set REDIS_PASSWORD or include password in CACHE_REDIS_URL."
             )
+        try:
+            if cache_url:
+                Redis.from_url(cache_url).ping()
+            else:
+                raise RedisError("Missing CACHE_REDIS_URL")
+            cache.init_app(app)
+        except (AuthenticationError, ConnectionError, RedisError, Exception) as exc:
+            app.logger.warning("Redis cache unavailable, falling back to SimpleCache: %s", exc)
+            app.config["CACHE_TYPE"] = "SimpleCache"
+            app.config["CACHE_REDIS_URL"] = None
+            cache.init_app(app)
     else:
         app.logger.info("Cache backend: %s", cache_type or "SimpleCache")
+        cache.init_app(app)
 
     if Compress is not None:
         Compress(app)

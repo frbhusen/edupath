@@ -53,6 +53,7 @@ class Subject(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     name = StringField(required=True, max_length=120)
     description = StringField(null=True)
+    banner_image_url = StringField(max_length=500, null=True)
     requires_code = BooleanField(default=False, required=True)
     created_by = ReferenceField(User, required=True)
     created_at = DateTimeField(default=datetime.utcnow)
@@ -68,6 +69,29 @@ class Subject(Document):
     @property
     def sections(self):
         return Section.objects(subject_id=self).all()
+
+    @property
+    def banner_display_url(self):
+        raw = (self.banner_image_url or "").strip()
+        if not raw:
+            return ""
+
+        lowered = raw.lower()
+        if "drive.google.com" not in lowered:
+            return raw
+
+        file_id = None
+        if "/file/d/" in raw:
+            file_id = raw.split("/file/d/")[-1].split("/")[0]
+        elif "id=" in raw:
+            file_id = raw.split("id=")[-1].split("&")[0]
+        elif "/uc?" in lowered and "id=" in lowered:
+            file_id = raw.split("id=")[-1].split("&")[0]
+
+        if not file_id:
+            return raw
+
+        return f"https://drive.google.com/uc?export=view&id={file_id}"
 
 
 class StaffSubjectAccess(Document):

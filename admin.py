@@ -127,7 +127,20 @@ def dashboard():
             counts[name] = model.objects().count()
         except Exception:
             counts[name] = "?"
-    return render_template("admin/dashboard.html", counts=counts)
+
+    subjects = list(Subject.objects().order_by("created_at").all())
+    sections_count = {}
+    if subjects:
+        subject_ids = [s.id for s in subjects]
+        for section in Section.objects(subject_id__in=subject_ids).only("subject_id").all():
+            sid = section.subject_id.id if section.subject_id else None
+            if sid:
+                sections_count[sid] = sections_count.get(sid, 0) + 1
+
+    for subject in subjects:
+        subject._sections_count = sections_count.get(subject.id, 0)
+
+    return render_template("admin/dashboard.html", counts=counts, subjects=subjects)
 
 
 @admin_bp.route("/notifications", methods=["GET", "POST"])

@@ -38,6 +38,7 @@ class LoginForm(FlaskForm):
 class SubjectForm(FlaskForm):
     name = StringField("الاسم", validators=[DataRequired(), Length(max=120)])
     description = TextAreaField("الوصف")
+    banner_image_url = StringField("رابط بانر المادة (1600x900)", validators=[Optional(), Length(max=500)])
     requires_code = BooleanField("يتطلب رمز تفعيل")
     submit = SubmitField("حفظ")
 

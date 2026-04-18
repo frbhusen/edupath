@@ -791,6 +791,54 @@ table {
   font-weight: 700;
 }
 
+.subject-banner-card {
+  overflow: hidden;
+}
+
+.subject-banner-wrap {
+  position: relative;
+  background: linear-gradient(180deg, #eef3f9 0%, #e3edf8 100%);
+  border-bottom: 1px solid #dbe4f1;
+  padding: 0.5rem;
+}
+
+.subject-banner-img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 12px;
+  background: #f7fafc;
+  display: block;
+}
+
+.subject-banner-fallback {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #e2ecff 0%, #d9f3ec 100%);
+  color: #1f3f75;
+  font-weight: 800;
+  text-align: center;
+  padding: 0.75rem;
+}
+
+.subject-sections-chip {
+  position: absolute;
+  top: 0.9rem;
+  inset-inline-end: 0.9rem;
+  border-radius: 999px;
+  background: #2f7d32;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.45rem 0.7rem;
+  box-shadow: 0 6px 14px rgba(47, 125, 50, 0.24);
+}
+
 /* Progress */
 .progress {
   height: 12px;

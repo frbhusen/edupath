@@ -10,7 +10,7 @@
       {% set subject_active = subject_activation and subject_activation.active %}
       {% if subject_requires_code %}
         {% if not subject_active %}
-          <a class="btn btn-cta btn-sm" href="{{ url_for('student.activate_subject', subject_id=subject.id) }}">
+          <a class="btn btn-info btn-sm" href="{{ url_for('student.activate_subject', subject_id=subject.id) }}">
             🔓 تفعيل المادة
           </a>
           <span class="badge text-bg-warning">مقفلة</span>
@@ -54,7 +54,7 @@
             {% endif %}
             <div class="mt-auto d-flex justify-content-start align-items-center gap-2">
               {% if locked and item.requires_code and current_user.role == 'student' %}
-                <a class="btn btn-cta btn-sm" href="{{ url_for('student.activate_section', section_id=section.id) }}">تفعيل القسم</a>
+                <a class="btn btn-info btn-sm" href="{{ url_for('student.activate_section', section_id=section.id) }}">تفعيل القسم</a>
               {% else %}
                 <span class="text-muted small">&nbsp;</span>
               {% endif %}
