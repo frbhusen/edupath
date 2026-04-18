@@ -9,144 +9,631 @@
   'expired': 'منتهية',
   'canceled': 'ملغاة'
 } %}
-<div id="duelPlayRoot" data-duel-state-url="{{ url_for('student.duel_state', duel_id=duel.id) }}" data-phase="{{ phase }}" data-my-submitted="{{ 1 if my_submitted else 0 }}">
-<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
-  <div>
-    <h1 class="h4 mb-1">مباراة التحدي</h1>
-    <p class="mb-0">{{ duel.scope_title }} - الحالة: {{ duel_status_ar.get(duel.status, duel.status) }}</p>
+{% set total_questions = questions_payload|length %}
+<div
+  id="duelPlayRoot"
+  class="duel-race-shell"
+  data-duel-state-url="{{ url_for('student.duel_state', duel_id=duel.id) }}"
+  data-duel-answer-url="{{ url_for('student.duel_answer', duel_id=duel.id) }}"
+  data-phase="{{ phase }}"
+  data-my-submitted="{{ 1 if my_submitted else 0 }}"
+  data-duel-id="{{ duel.id }}"
+  data-slot="{{ slot }}"
+  data-total-questions="{{ total_questions }}"
+  data-challenger-score="{{ duel.challenger_score or 0 }}"
+  data-opponent-score="{{ duel.opponent_score or 0 }}"
+>
+  <div class="dashboard-hero duel-race-header mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <h1 class="h4 mb-1">سباق التحدي</h1>
+        <p class="mb-0">{{ duel.scope_title }} - الحالة: {{ duel_status_ar.get(duel.status, duel.status) }}</p>
+      </div>
+      <a class="btn btn-light btn-sm" href="{{ url_for('student.duels_home') }}">كل التحديات</a>
+    </div>
+    <div class="duel-race-topstats mt-3">
+      <div class="duel-stat-box">
+        <div class="small text-muted">الوقت المتبقي</div>
+        <div id="test-timer" class="duel-stat-value badge text-bg-warning" data-left-seconds="{{ my_left }}">--:--</div>
+      </div>
+      <div class="duel-stat-box">
+        <div class="small text-muted">سائقك</div>
+        <div class="duel-stat-value">أنت</div>
+      </div>
+      <div class="duel-stat-box">
+        <div class="small text-muted">الخصم</div>
+        <div class="duel-stat-value">{{ opponent_user.full_name if opponent_user else 'لاعب' }}</div>
+      </div>
+      <div class="duel-stat-box">
+        <div class="small text-muted">النتيجة</div>
+        <div id="duelScore" class="duel-stat-value">{{ duel.challenger_score }} - {{ duel.opponent_score }}</div>
+      </div>
+    </div>
   </div>
-  <div class="text-end">
-    <div class="small text-muted">الوقت المتبقي</div>
-    <div id="test-timer" class="badge text-bg-warning fs-6" data-left-seconds="{{ my_left }}">--:--</div>
-  </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('student.duels_home') }}">كل التحديات</a>
-</div>
 
-<div class="card mb-3">
-  <div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
-    <div>
-      <strong>الخصم:</strong> {{ opponent_user.full_name if opponent_user else 'لاعب' }}
+  {% if phase == 'waiting' %}
+    <div class="card">
+      <div class="card-body text-center">
+        <p class="mb-2">لن تظهر الأسئلة حتى ينضم اللاعبان.</p>
+        <p class="text-muted small mb-3">إذا كنت لم تنضم بعد اضغط زر الانضمام. إذا انضممت بالفعل فانتظر انضمام اللاعب الآخر.</p>
+        <form method="post" action="{{ url_for('student.duel_join', duel_id=duel.id) }}">
+          <button class="btn btn-cta" type="submit">انضم الآن</button>
+        </form>
+      </div>
     </div>
-    <div>
-      <strong>وقتي:</strong> <span id="myTimer" data-left-seconds="{{ my_left }}">--:--</span>
-    </div>
-    <div>
-      <strong>وقت الخصم:</strong> <span id="oppTimer" data-left-seconds="{{ opp_left }}">--:--</span>
-    </div>
-    <div>
-      <strong>النتيجة:</strong>
-      <span id="duelScore">{{ duel.challenger_score }} - {{ duel.opponent_score }}</span>
-    </div>
-  </div>
-</div>
-
-{% if phase == 'waiting' %}
-  <div class="card">
-    <div class="card-body text-center">
-      <p class="mb-2">لن تظهر الأسئلة حتى ينضم اللاعبان.</p>
-      <p class="text-muted small mb-3">إذا كنت لم تنضم بعد اضغط زر الانضمام. إذا انضممت بالفعل فانتظر انضمام اللاعب الآخر.</p>
-      <form method="post" action="{{ url_for('student.duel_join', duel_id=duel.id) }}">
-        <button class="btn btn-cta" type="submit">انضم الآن</button>
-      </form>
-    </div>
-  </div>
-{% elif phase == 'live' %}
-  <form method="post" action="{{ url_for('student.duel_submit', duel_id=duel.id) }}" id="duel-test-form">
-    {% for q in questions %}
-      <div class="card shadow-sm mb-3">
-        <div class="card-body">
-          <p class="fw-semibold">س{{ loop.index }}. {{ q.text }}</p>
-          {% if q.question_images %}
-            <div class="d-flex flex-wrap gap-2 mb-2">
-              {% for img in q.question_images %}
-                <img src="{{ img }}" alt="صورة السؤال" class="img-fluid rounded border" style="max-height: 240px;">
-              {% endfor %}
-            </div>
-          {% endif %}
-          <div class="list-group">
-            {% for c in q.choices %}
-              <label class="list-group-item" for="q{{ q.id }}_{{ loop.index }}">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <input class="form-check-input me-2" type="radio" name="q_{{ q.id }}" value="{{ c.choice_id }}" id="q{{ q.id }}_{{ loop.index }}" {% if answers_by_qid.get(q.id|string) == c.choice_id|string %}checked{% endif %} required>
-                  <span>{{ c.text }}</span>
-                  {% if c.image_url and c.image_url.startswith('http') %}
-                    <img src="{{ c.image_url }}" alt="صورة الإجابة" class="img-fluid rounded border" style="max-height: 140px;">
-                  {% endif %}
-                </div>
-              </label>
-            {% endfor %}
+  {% elif phase == 'live' %}
+    <section class="duel-track-stage" aria-label="سباق التحدي">
+      <div class="duel-track-legend">
+        <span class="badge text-bg-primary">سيارتك زرقاء</span>
+        <span class="badge text-bg-danger">سيارة الخصم حمراء</span>
+      </div>
+      <div class="duel-track-board">
+        <div class="duel-track-lane duel-track-lane-blue">
+          <div class="duel-lane-head">
+            <span>أنت</span>
+            <span class="duel-lane-score" id="myLiveScore">{{ duel.challenger_score if slot == 'challenger' else duel.opponent_score }}</span>
+          </div>
+          <div class="duel-track-runway">
+            <div class="duel-track-line"></div>
+            <div id="myCar" class="duel-car duel-car-blue" style="--progress: 5%;"></div>
+          </div>
+        </div>
+        <div class="duel-track-lane duel-track-lane-red">
+          <div class="duel-lane-head">
+            <span>الخصم</span>
+            <span class="duel-lane-score" id="opponentLiveScore">{{ duel.opponent_score if slot == 'challenger' else duel.challenger_score }}</span>
+          </div>
+          <div class="duel-track-runway">
+            <div class="duel-track-line"></div>
+            <div id="oppCar" class="duel-car duel-car-red" style="--progress: 5%;"></div>
           </div>
         </div>
       </div>
-    {% endfor %}
-    <div class="d-grid mb-4">
-      <button type="submit" class="btn btn-cta btn-lg">إرسال الإجابات</button>
-    </div>
-  </form>
-{% elif phase == 'submitted_waiting' %}
-  <div class="card">
-    <div class="card-body text-center">
-      <h5 class="mb-2">تم تسليم إجاباتك</h5>
-      <p class="text-muted mb-0">ننتظر انتهاء الخصم وسيتم تحديث الصفحة تلقائياً.</p>
-    </div>
-  </div>
-{% elif phase == 'completed' %}
-  <div class="card">
-    <div class="card-body">
-      <h5 class="card-title">انتهت المباراة</h5>
-      <p class="mb-1">نتيجة المتحدي: {{ duel.challenger_score }}</p>
-      <p class="mb-1">نتيجة الخصم: {{ duel.opponent_score }}</p>
-      <p class="mb-0">الفائز: {{ duel.winner_id.full_name if duel.winner_id else 'لم يحدد بعد' }}</p>
+    </section>
 
-      {% set first_slot = duel.first_submitter_slot %}
-      {% set second_slot = 'opponent' if first_slot == 'challenger' else ('challenger' if first_slot == 'opponent' else None) %}
-      <div class="d-flex flex-wrap gap-2 mt-3">
-        {% if duel.first_submitter_perfect and first_slot == slot %}
-          <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>مكافأة 100% (المنهي الأول): +5</span>
-        {% elif duel.first_submitter_perfect and first_slot and first_slot != slot %}
-          <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم حصل على مكافأة 100% الأولى: +5</span>
-        {% endif %}
+    <form method="post" action="{{ url_for('student.duel_submit', duel_id=duel.id) }}" id="duel-test-form" class="duel-hud-panel mt-3" autocomplete="off">
+      <div class="duel-hud-inner card shadow-lg">
+        <div class="card-body">
+          <div class="duel-hud-header">
+            <div>
+              <div class="small text-muted">السؤال الحالي</div>
+              <h2 class="h5 mb-0">{{ total_questions }} سؤال في السباق</h2>
+            </div>
+            <div class="duel-hud-progress">
+              <div class="duel-hud-progress-top">
+                <span id="questionIndexLabel">1</span>
+                <span id="duelQuestionState" class="badge text-bg-light text-primary">جاهز</span>
+              </div>
+              <div class="progress duel-progress-bar">
+                <div id="duelProgressFill" class="progress-bar bg-primary" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
 
-        {% if duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot == slot %}
-          <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>استرجاع رسوم الدخول: +20</span>
-          <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>مكافأة 100% (المنهي الثاني): +3</span>
-        {% elif duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot and second_slot != slot %}
-          <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم استرجع الرسوم: +20</span>
-          <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم حصل على مكافأة المنهي الثاني: +3</span>
-        {% endif %}
+          <div id="duelQuestionArea" class="duel-question-area mt-3"></div>
+          <div id="duelFeedback" class="duel-feedback mt-3"></div>
+          <div id="duelHiddenAnswers"></div>
+
+          <div class="duel-hud-footer mt-3 d-flex flex-wrap justify-content-between gap-2">
+            <button type="submit" class="btn btn-cta" id="duelSubmitBtn">إنهاء السباق</button>
+          </div>
+        </div>
       </div>
-
-      <div class="mt-3">
-        <a class="btn btn-outline-secondary" href="{{ url_for('student.duel_review', duel_id=duel.id) }}">مراجعة الأسئلة</a>
+    </form>
+  {% elif phase == 'submitted_waiting' %}
+    <div class="card">
+      <div class="card-body text-center">
+        <h5 class="mb-2">تم تسليم إجاباتك</h5>
+        <p class="text-muted mb-0">ننتظر انتهاء الخصم وسيتم تحديث الصفحة تلقائياً.</p>
       </div>
     </div>
-  </div>
-{% else %}
-  <div class="alert alert-light">الحالة الحالية لا تسمح بعرض واجهة اللعب.</div>
-{% endif %}
+  {% elif phase == 'completed' %}
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">انتهت المباراة</h5>
+        <p class="mb-1">نتيجة المتحدي: {{ duel.challenger_score }}</p>
+        <p class="mb-1">نتيجة الخصم: {{ duel.opponent_score }}</p>
+        <p class="mb-0">الفائز: {{ duel.winner_id.full_name if duel.winner_id else 'لم يحدد بعد' }}</p>
 
-<div id="duelFinishOverlay" class="duel-finish-overlay d-none" aria-hidden="true">
-  <div class="duel-finish-popup shadow-lg" role="alertdialog" aria-live="assertive" aria-modal="true">
-    <div id="duelFinishOverlayTitle" class="duel-finish-title">الخصم أنهى التحدي</div>
-    <p id="duelFinishOverlayBody" class="mb-3">تسليمك الآن مهم. الوقت عندك ما زال يعمل.</p>
-    <button id="duelFinishOverlayBtn" type="button" class="btn btn-cta">متابعة الحل</button>
-  </div>
-</div>
+        {% set first_slot = duel.first_submitter_slot %}
+        {% set second_slot = 'opponent' if first_slot == 'challenger' else ('challenger' if first_slot == 'opponent' else None) %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          {% if duel.first_submitter_perfect and first_slot == slot %}
+            <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>مكافأة 100% (المنهي الأول): +5</span>
+          {% elif duel.first_submitter_perfect and first_slot and first_slot != slot %}
+            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم حصل على مكافأة 100% الأولى: +5</span>
+          {% endif %}
 
-<div id="duelXpOverlay" class="duel-finish-overlay d-none" aria-hidden="true">
-  <div class="duel-xp-popup shadow-lg" role="dialog" aria-live="polite" aria-modal="true">
-    <div class="duel-xp-title">تغيّر النقاط بعد التحدي</div>
-    <div id="duelXpDelta" class="duel-xp-delta">0 💎</div>
-    <div id="duelXpTotals" class="small text-muted mb-3"></div>
-    <div id="duelXpBreakdown" class="duel-xp-breakdown"></div>
-    <button id="duelXpOverlayBtn" type="button" class="btn btn-cta mt-3">ممتاز</button>
+          {% if duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot == slot %}
+            <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>استرجاع رسوم الدخول: +20</span>
+            <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>مكافأة 100% (المنهي الثاني): +3</span>
+          {% elif duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot and second_slot != slot %}
+            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم استرجع الرسوم: +20</span>
+            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم حصل على مكافأة المنهي الثاني: +3</span>
+          {% endif %}
+        </div>
+
+        <div class="mt-3">
+          <a class="btn btn-outline-secondary" href="{{ url_for('student.duel_review', duel_id=duel.id) }}">مراجعة الأسئلة</a>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-light">الحالة الحالية لا تسمح بعرض واجهة اللعب.</div>
+  {% endif %}
+
+  <div id="duelFinishOverlay" class="duel-finish-overlay d-none" aria-hidden="true">
+    <div class="duel-finish-popup shadow-lg" role="alertdialog" aria-live="assertive" aria-modal="true">
+      <div id="duelFinishOverlayTitle" class="duel-finish-title">الخصم أنهى التحدي</div>
+      <p id="duelFinishOverlayBody" class="mb-3">تسليمك الآن مهم. الوقت عندك ما زال يعمل.</p>
+      <button id="duelFinishOverlayBtn" type="button" class="btn btn-cta">متابعة الحل</button>
+    </div>
   </div>
-</div>
+
+  <div id="duelXpOverlay" class="duel-finish-overlay d-none" aria-hidden="true">
+    <div class="duel-xp-popup shadow-lg" role="dialog" aria-live="polite" aria-modal="true">
+      <div class="duel-xp-title">تغيّر النقاط بعد التحدي</div>
+      <div id="duelXpDelta" class="duel-xp-delta">0 💎</div>
+      <div id="duelXpTotals" class="small text-muted mb-3"></div>
+      <div id="duelXpBreakdown" class="duel-xp-breakdown"></div>
+      <button id="duelXpOverlayBtn" type="button" class="btn btn-cta mt-3">ممتاز</button>
+    </div>
+  </div>
+
+  <div id="duelStartOverlay" class="duel-start-overlay d-none" aria-hidden="true">
+    <div class="duel-start-box">
+      <div class="duel-start-label">السباق سيبدأ</div>
+      <div id="duelStartNumber" class="duel-start-number">3</div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <style>
+  .duel-race-shell {
+    padding-bottom: 1.1rem;
+  }
+
+  .duel-race-header {
+    border-radius: 22px;
+  }
+
+  .duel-race-topstats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .duel-stat-box {
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px;
+    padding: 0.75rem 0.9rem;
+    backdrop-filter: blur(6px);
+  }
+
+  .duel-stat-value {
+    font-weight: 800;
+    font-size: 1.02rem;
+    color: #ffffff;
+  }
+
+  .duel-track-stage {
+    position: relative;
+    overflow: hidden;
+    border-radius: 24px;
+    border: 1px solid #d6e4ff;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 248, 255, 0.96)),
+      repeating-linear-gradient(135deg, rgba(237, 244, 255, 0.4) 0, rgba(237, 244, 255, 0.4) 26px, rgba(220, 236, 255, 0.62) 26px, rgba(220, 236, 255, 0.62) 52px);
+    box-shadow: 0 18px 44px rgba(15, 61, 145, 0.12);
+    padding: 0.85rem;
+  }
+
+  .duel-track-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 0 4%, rgba(47, 61, 90, 0.06) 4% 5%, transparent 5% 95%, rgba(47, 61, 90, 0.06) 95% 96%, transparent 96% 100%),
+      repeating-linear-gradient(90deg, transparent 0, transparent 7%, rgba(16, 24, 40, 0.04) 7% 7.4%, transparent 7.4% 14.2%);
+    pointer-events: none;
+  }
+
+  .duel-track-legend {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .duel-track-board {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .duel-track-lane {
+    position: relative;
+    border-radius: 18px;
+    padding: 0.65rem 0.8rem 0.8rem;
+    min-height: 98px;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 249, 255, 0.96));
+    border: 1px solid #d8e3f4;
+  }
+
+  .duel-track-lane-blue {
+    box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.08);
+  }
+
+  .duel-track-lane-red {
+    box-shadow: inset 0 0 0 1px rgba(220, 53, 69, 0.08);
+  }
+
+  .duel-lane-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 800;
+    margin-bottom: 0.65rem;
+  }
+
+  .duel-lane-score {
+    min-width: 2.4rem;
+    text-align: center;
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    background: #ffffff;
+    border: 1px solid #d8e3f4;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+  }
+
+  .duel-track-runway {
+    position: relative;
+    height: 50px;
+    border-radius: 16px;
+    background:
+      linear-gradient(180deg, rgba(15, 61, 145, 0.06), rgba(15, 61, 145, 0.02)),
+      repeating-linear-gradient(90deg, transparent 0 14%, rgba(255, 255, 255, 0.95) 14% 16%, transparent 16% 30%);
+    border: 1px solid rgba(15, 61, 145, 0.08);
+    overflow: hidden;
+  }
+
+  .duel-track-runway::after {
+    content: "";
+    position: absolute;
+    top: 8%;
+    bottom: 8%;
+    inset-inline-end: 3.4%;
+    width: 8px;
+    border-radius: 999px;
+    background: repeating-linear-gradient(180deg, #0f172a 0 10px, #ffffff 10px 20px);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+  }
+
+  .duel-track-line {
+    position: absolute;
+    inset: 50% 1rem auto 1rem;
+    height: 2px;
+    transform: translateY(-50%);
+    background: repeating-linear-gradient(90deg, #5c6f8d 0 24px, transparent 24px 42px);
+    opacity: 0.35;
+  }
+
+  .duel-car {
+    position: absolute;
+    top: 50%;
+    left: var(--progress, 5%);
+    transform: translate(-50%, -50%);
+    width: clamp(106px, 13vw, 170px);
+    height: clamp(42px, 5.2vw, 66px);
+    border-radius: 18px 28px 20px 20px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+    transition: left 0.35s ease, transform 0.35s ease, filter 0.2s ease;
+  }
+
+  .duel-car::before {
+    content: "";
+    position: absolute;
+    left: 38%;
+    top: 13%;
+    width: 28%;
+    height: 30%;
+    border-radius: 10px 10px 8px 8px;
+    background: rgba(255, 255, 255, 0.52);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    transform: skewX(-12deg);
+  }
+
+  .duel-car::after {
+    content: "";
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    bottom: -6px;
+    height: 10px;
+    border-radius: 999px;
+    background:
+      radial-gradient(circle at 20% 50%, #101828 0 8px, transparent 9px),
+      radial-gradient(circle at 80% 50%, #101828 0 8px, transparent 9px);
+  }
+
+  .duel-car-blue {
+    background: linear-gradient(135deg, #7fd0ff 0%, #4ba2ff 45%, #206bda 100%);
+    border: 2px solid #1659b9;
+  }
+
+  .duel-car-red {
+    background: linear-gradient(135deg, #ff9a9a 0%, #ff6f6f 45%, #dc3545 100%);
+    border: 2px solid #b42331;
+  }
+
+  .duel-car-win {
+    animation: duelWinnerPulse 0.55s ease-in-out infinite alternate;
+    filter: saturate(1.2);
+  }
+
+  .duel-car-lose {
+    filter: grayscale(0.25) brightness(0.9);
+  }
+
+  .duel-track-stage.is-finish {
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.35), 0 18px 44px rgba(15, 61, 145, 0.12);
+  }
+
+  .duel-hud-panel {
+    position: static;
+    inset-inline: auto;
+    bottom: auto;
+    z-index: auto;
+    padding: 0;
+  }
+
+  .duel-hud-inner {
+    width: 100%;
+    margin-inline: auto;
+    border-radius: 20px;
+    border: 1px solid #d7e2f3;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    max-height: none;
+    overflow: visible;
+  }
+
+  .duel-hud-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .duel-hud-progress {
+    min-width: min(100%, 360px);
+    flex: 1 1 320px;
+  }
+
+  .duel-hud-progress-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+    font-weight: 700;
+  }
+
+  .duel-progress-bar {
+    height: 10px;
+    border-radius: 999px;
+    background: #edf2f8;
+    overflow: hidden;
+  }
+
+  .duel-progress-bar .progress-bar {
+    border-radius: 999px;
+  }
+
+  .duel-question-area {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .duel-question-card {
+    border: 1px solid #c7d9f6;
+    border-radius: 16px;
+    padding: 0.95rem;
+    background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+  }
+
+  .duel-question-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1.8;
+    color: #0f172a;
+  }
+
+  .duel-question-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .duel-question-images img {
+    max-height: 180px;
+    width: auto;
+    object-fit: contain;
+    border-radius: 14px;
+    border: 1px solid #d7e2f3;
+    background: #fff;
+  }
+
+  .duel-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .duel-choice-btn {
+    width: 100%;
+    min-height: 78px;
+    padding: 0.8rem;
+    border: 1px solid #2a63bf;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #3567bb 0%, #2f5fb0 100%);
+    color: #ffffff;
+    text-align: center;
+    box-shadow: 0 8px 18px rgba(26, 65, 126, 0.2);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  }
+
+  .duel-choice-btn:hover {
+    transform: translateY(-1px);
+    border-color: #8db5ff;
+    box-shadow: 0 12px 24px rgba(15, 61, 145, 0.12);
+  }
+
+  .duel-choice-btn.is-selected {
+    border-color: #78beff;
+    background: linear-gradient(180deg, #4c83df 0%, #356dc9 100%);
+  }
+
+  .duel-choice-btn.is-correct {
+    border-color: #198754;
+    background: linear-gradient(180deg, #1fa563 0%, #178551 100%);
+  }
+
+  .duel-choice-btn.is-wrong {
+    border-color: #dc3545;
+    background: linear-gradient(180deg, #e45b66 0%, #cd3f4b 100%);
+  }
+
+  .duel-choice-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .duel-choice-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 700;
+    line-height: 1.5;
+    word-break: break-word;
+    color: inherit;
+  }
+
+  .duel-choice-image {
+    flex: 0 0 auto;
+    max-width: min(30vw, 92px);
+    max-height: 64px;
+    width: auto;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.48);
+    object-fit: contain;
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .duel-feedback {
+    min-height: 1.75rem;
+    font-weight: 700;
+  }
+
+  .duel-feedback.is-correct {
+    color: #198754;
+  }
+
+  .duel-feedback.is-wrong {
+    color: #dc3545;
+  }
+
+  .duel-feedback.is-neutral {
+    color: #475569;
+  }
+
+  @media (max-width: 991.98px) {
+    .duel-race-topstats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .duel-hud-footer {
+      display: block !important;
+    }
+
+    .duel-hud-footer #duelSubmitBtn {
+      width: 100%;
+      min-height: 48px;
+    }
+  }
+
+  @media (max-width: 575.98px) {
+    .duel-race-shell {
+      padding-bottom: 0.8rem;
+    }
+
+    .duel-race-topstats {
+      grid-template-columns: 1fr;
+    }
+
+    .duel-stat-box {
+      padding: 0.65rem 0.75rem;
+    }
+
+    .duel-stat-value {
+      font-size: 0.95rem;
+    }
+
+    .duel-choice-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .duel-choice-btn {
+      min-height: 70px;
+      padding: 0.7rem;
+    }
+
+    .duel-choice-content {
+      gap: 0.55rem;
+    }
+
+    .duel-choice-image {
+      max-width: min(27vw, 84px);
+      max-height: 58px;
+    }
+
+    .duel-track-lane {
+      min-height: 94px;
+      padding-inline: 0.65rem;
+    }
+
+    .duel-car {
+      width: clamp(88px, 32vw, 130px);
+      height: clamp(36px, 11vw, 50px);
+    }
+
+    .duel-hud-inner {
+      border-radius: 14px;
+      max-height: none;
+    }
+
+    .duel-hud-footer {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.45rem;
+    }
+
+    .duel-hud-footer .btn {
+      width: 100%;
+    }
+
+    .duel-hud-footer #duelSubmitBtn {
+      grid-column: 1 / -1;
+    }
+  }
+
   .duel-finish-overlay {
     position: fixed;
     inset: 0;
@@ -156,6 +643,40 @@
     justify-content: center;
     z-index: 3000;
     padding: 1rem;
+  }
+
+  .duel-start-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 18, 40, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3100;
+    padding: 1rem;
+  }
+
+  .duel-start-box {
+    width: min(360px, 92vw);
+    border-radius: 22px;
+    background: linear-gradient(180deg, #ffffff 0%, #f5f9ff 100%);
+    border: 2px solid #c8d9f3;
+    box-shadow: 0 22px 44px rgba(15, 23, 42, 0.24);
+    text-align: center;
+    padding: 1.2rem 1rem;
+  }
+
+  .duel-start-label {
+    color: #334155;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .duel-start-number {
+    font-size: clamp(3rem, 8vw, 5rem);
+    font-weight: 900;
+    color: #0f3d91;
+    line-height: 1;
   }
 
   .duel-finish-popup {
@@ -255,17 +776,34 @@
     from { transform: translateY(12px) scale(0.97); opacity: 0; }
     to { transform: translateY(0) scale(1); opacity: 1; }
   }
+
+  @keyframes duelWinnerPulse {
+    from { transform: translate(-50%, -50%) scale(1); }
+    to { transform: translate(-50%, -50%) scale(1.04); }
+  }
 </style>
 <script>
   (function () {
     const root = document.getElementById('duelPlayRoot');
     if (!root) return;
 
+    const questionsData = {{ questions_payload|tojson }};
+    const totalQuestions = questionsData.length;
     const stateUrl = root.dataset.duelStateUrl || '';
-    if (!stateUrl) return;
-
-    let currentPhase = root.dataset.phase || '';
+    const answerUrl = root.dataset.duelAnswerUrl || '';
+    const slot = root.dataset.slot || 'challenger';
+    const duelId = root.dataset.duelId || '';
+    const initialPhase = root.dataset.phase || '';
+    let currentPhase = initialPhase;
     let mySubmitted = root.dataset.mySubmitted === '1';
+    let currentIndex = 0;
+    let locked = false;
+    let myScoreLive = slot === 'challenger'
+      ? (parseInt(root.dataset.challengerScore || '0', 10) || 0)
+      : (parseInt(root.dataset.opponentScore || '0', 10) || 0);
+    let opponentScore = parseInt(root.dataset.opponentScore || '0', 10) || 0;
+    let selectedAnswers = {};
+
     const timerEl = document.getElementById('myTimer');
     const oppTimerEl = document.getElementById('oppTimer');
     const scoreEl = document.getElementById('duelScore');
@@ -280,7 +818,30 @@
     const xpTotalsEl = document.getElementById('duelXpTotals');
     const xpBreakdownEl = document.getElementById('duelXpBreakdown');
     const xpSummary = JSON.parse(String.raw`{{ (xp_summary or {})|tojson|safe }}`);
+    const questionArea = document.getElementById('duelQuestionArea');
+    const questionIndexLabel = document.getElementById('questionIndexLabel');
+    const questionStateEl = document.getElementById('duelQuestionState');
+    const feedbackEl = document.getElementById('duelFeedback');
+    const hiddenAnswersEl = document.getElementById('duelHiddenAnswers');
+    const progressFillEl = document.getElementById('duelProgressFill');
+    const myLiveScoreEl = document.getElementById('myLiveScore');
+    const myCarEl = document.getElementById('myCar');
+    const oppCarEl = document.getElementById('oppCar');
+    const trackStageEl = document.querySelector('.duel-track-stage');
+    const opponentLiveScoreEl = document.getElementById('opponentLiveScore');
+    const submitBtn = document.getElementById('duelSubmitBtn');
+    const formEl = document.getElementById('duel-test-form');
+    const startOverlayEl = document.getElementById('duelStartOverlay');
+    const startNumberEl = document.getElementById('duelStartNumber');
     let shownOpponentFinishedNotice = false;
+    let completedTransitionStarted = false;
+    let audioCtx = null;
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = String(text == null ? '' : text);
+      return div.innerHTML;
+    }
 
     function formatTime(seconds) {
       const safe = Math.max(0, parseInt(seconds || 0, 10));
@@ -294,6 +855,352 @@
       const safe = Math.max(0, parseInt(seconds, 10));
       el.dataset.leftSeconds = String(safe);
       el.textContent = formatTime(safe);
+    }
+
+    function setFeedback(text, state) {
+      if (!feedbackEl) return;
+      feedbackEl.className = 'duel-feedback mt-3 ' + (state || 'is-neutral');
+      feedbackEl.textContent = text || '';
+    }
+
+    function normalizeImageUrl(value) {
+      const raw = String(value == null ? '' : value).trim();
+      if (!raw) return '';
+      const lowered = raw.toLowerCase();
+      if (lowered === 'none' || lowered === 'null' || lowered === 'undefined' || lowered === 'nan') {
+        return '';
+      }
+      return raw;
+    }
+
+    function ensureAudioContext() {
+      if (!window.AudioContext && !window.webkitAudioContext) {
+        return null;
+      }
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new Ctx();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      return audioCtx;
+    }
+
+    function playTone(freq, durationMs, type, gain, delayMs) {
+      const ctx = ensureAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime + ((delayMs || 0) / 1000);
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.value = Number(freq || 440);
+      g.gain.setValueAtTime(Math.max(0.0001, Number(gain || 0.06)), now);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + (Math.max(40, durationMs || 120) / 1000));
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + (Math.max(40, durationMs || 120) / 1000));
+    }
+
+    function playCorrectSound() {
+      playTone(660, 120, 'triangle', 0.08, 0);
+      playTone(880, 160, 'triangle', 0.08, 105);
+    }
+
+    function playWrongSound() {
+      playTone(280, 170, 'sawtooth', 0.08, 0);
+      playTone(180, 190, 'sawtooth', 0.08, 120);
+    }
+
+    function playCountdownTickSound() {
+      playTone(520, 110, 'square', 0.06, 0);
+    }
+
+    function playGoSound() {
+      playTone(760, 140, 'triangle', 0.08, 0);
+      playTone(1020, 170, 'triangle', 0.08, 95);
+    }
+
+    function setCarProgress(el, percent) {
+      if (!el) return;
+      const bounded = Math.max(5, Math.min(95, percent));
+      el.style.setProperty('--progress', bounded + '%');
+    }
+
+    function scoreToProgress(score) {
+      if (!totalQuestions) return 5;
+      return 5 + (Math.max(0, score) / totalQuestions) * 90;
+    }
+
+    function recomputeCorrectCount() {
+      let count = 0;
+      questionsData.forEach((question) => {
+        const selected = selectedAnswers[question.id];
+        if (selected && String(selected) === String(question.correct_choice_id || '')) {
+          count += 1;
+        }
+      });
+      return count;
+    }
+
+    function syncHiddenAnswer(questionId, choiceId) {
+      if (!hiddenAnswersEl) return;
+      let input = hiddenAnswersEl.querySelector('input[data-qid="' + questionId + '"]');
+      if (!choiceId) {
+        if (input) input.remove();
+        return;
+      }
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.dataset.qid = questionId;
+        input.name = 'q_' + questionId;
+        hiddenAnswersEl.appendChild(input);
+      }
+      input.value = choiceId;
+    }
+
+    function updateTrack() {
+      const myScore = Math.max(0, parseInt(myScoreLive || 0, 10) || 0);
+      setCarProgress(myCarEl, scoreToProgress(myScore));
+      setCarProgress(oppCarEl, scoreToProgress(opponentScore));
+      if (myLiveScoreEl) {
+        myLiveScoreEl.textContent = String(myScore);
+      }
+      if (scoreEl) {
+        scoreEl.textContent = String(myScore) + ' - ' + String(opponentScore);
+      }
+      if (opponentLiveScoreEl) {
+        opponentLiveScoreEl.textContent = String(opponentScore);
+      }
+      if (progressFillEl) {
+        const pct = totalQuestions ? ((currentIndex) / totalQuestions) * 100 : 0;
+        progressFillEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+      }
+    }
+
+    function showQuestion(index) {
+      if (!questionArea || !questionsData.length) {
+        if (questionArea) {
+          questionArea.innerHTML = '<div class="alert alert-info mb-0">لا توجد أسئلة للتحدي الحالي.</div>';
+        }
+        return;
+      }
+
+      const question = questionsData[index];
+      if (!question) return;
+
+      const existingChoice = selectedAnswers[question.id] || '';
+      if (questionIndexLabel) {
+        questionIndexLabel.textContent = String(index + 1);
+      }
+      if (questionStateEl) {
+        questionStateEl.textContent = existingChoice ? 'تمت الإجابة' : 'جاهز';
+      }
+      setFeedback(existingChoice ? 'يمكنك تعديل الإجابة من هذا السؤال إذا رجعت إليه.' : 'اختر إجابة للبدء في تحريك السيارة.', 'is-neutral');
+
+      const imagesHtml = (question.images || []).map((img) => normalizeImageUrl(img)).filter(Boolean).map((img) => {
+        const safeImg = escapeHtml(img);
+        return '<img src="' + safeImg + '" alt="صورة السؤال" class="duel-question-image" loading="lazy" onerror="this.style.display=\'none\'; this.removeAttribute(\'src\');">';
+      }).join('');
+
+      const choicesHtml = (question.choices || []).map((choice) => {
+        const safeChoiceId = escapeHtml(choice.choice_id || '');
+        const safeChoiceText = escapeHtml(choice.text || '');
+        const choiceImageUrl = normalizeImageUrl(choice.image_url);
+        const safeChoiceImage = choiceImageUrl
+          ? '<img src="' + escapeHtml(choiceImageUrl) + '" alt="صورة الإجابة" class="duel-choice-image" loading="lazy" onerror="this.style.display=\'none\'; this.removeAttribute(\'src\');">'
+          : '';
+        const isSelected = existingChoice && String(existingChoice) === String(choice.choice_id || '');
+        return '<button type="button" class="duel-choice-btn ' + (isSelected ? 'is-selected' : '') + '" data-choice-id="' + safeChoiceId + '"><div class="duel-choice-content"><div class="duel-choice-text">' + safeChoiceText + '</div>' + safeChoiceImage + '</div></button>';
+      }).join('');
+
+      questionArea.innerHTML =
+        '<div class="duel-question-card">' +
+          '<div class="duel-question-title mb-3">س' + (index + 1) + '. ' + escapeHtml(question.text || '') + '</div>' +
+          (imagesHtml ? '<div class="duel-question-images mb-3">' + imagesHtml + '</div>' : '') +
+          '<div class="duel-choice-grid" id="duelChoiceGrid">' + choicesHtml + '</div>' +
+        '</div>';
+
+      const choiceGrid = document.getElementById('duelChoiceGrid');
+      if (choiceGrid) {
+        choiceGrid.querySelectorAll('.duel-choice-btn').forEach((button) => {
+          button.addEventListener('click', function () {
+            chooseAnswer(question, this.dataset.choiceId || '', this);
+          });
+        });
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = locked;
+      }
+      updateTrack();
+    }
+
+    async function persistAnswer(questionId, choiceId) {
+      if (!answerUrl) return;
+      try {
+        const res = await fetch(answerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          cache: 'no-store',
+          body: JSON.stringify({
+            question_id: String(questionId || ''),
+            choice_id: String(choiceId || ''),
+          }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.ok) return;
+        myScoreLive = Math.max(0, parseInt(data.my_score || 0, 10) || 0);
+        opponentScore = Math.max(0, parseInt(data.opponent_score || 0, 10) || 0);
+        updateTrack();
+      } catch (_err) {
+      }
+    }
+
+    function chooseAnswer(question, choiceId, buttonEl) {
+      if (locked || !question) return;
+      locked = true;
+      ensureAudioContext();
+
+      const isCorrect = String(choiceId || '') === String(question.correct_choice_id || '');
+      selectedAnswers[question.id] = String(choiceId || '');
+      syncHiddenAnswer(question.id, choiceId || '');
+
+      const choiceButtons = questionArea ? questionArea.querySelectorAll('.duel-choice-btn') : [];
+      choiceButtons.forEach((btn) => {
+        btn.disabled = true;
+        btn.classList.remove('is-selected', 'is-correct', 'is-wrong');
+        if (btn.dataset.choiceId === String(choiceId || '')) {
+          btn.classList.add('is-selected');
+        }
+        if (btn.dataset.choiceId === String(question.correct_choice_id || '')) {
+          btn.classList.add('is-correct');
+        }
+        if (btn.dataset.choiceId === String(choiceId || '') && !isCorrect) {
+          btn.classList.add('is-wrong');
+        }
+      });
+
+      setFeedback(isCorrect ? 'صحيح. السيارة تتقدم!' : 'خطأ. حاولت السيارة لكن بدون تقدم.', isCorrect ? 'is-correct' : 'is-wrong');
+      if (isCorrect) {
+        playCorrectSound();
+      } else {
+        playWrongSound();
+      }
+      if (questionStateEl) {
+        questionStateEl.textContent = isCorrect ? 'صحيح' : 'خطأ';
+      }
+
+      myScoreLive = recomputeCorrectCount();
+      updateTrack();
+      persistAnswer(question.id, choiceId || '');
+      pollState();
+
+      window.setTimeout(() => {
+        locked = false;
+        if (currentIndex < totalQuestions - 1) {
+          currentIndex += 1;
+          showQuestion(currentIndex);
+        } else {
+          if (formEl) {
+            formEl.submit();
+          }
+        }
+      }, 650);
+    }
+
+    function showStartOverlay() {
+      if (!startOverlayEl || !startNumberEl) return Promise.resolve();
+
+      locked = true;
+      startOverlayEl.classList.remove('d-none');
+      startOverlayEl.setAttribute('aria-hidden', 'false');
+
+      const sequence = ['3', '2', '1', 'انطلق!'];
+      let index = 0;
+
+      return new Promise((resolve) => {
+        const step = () => {
+          if (index >= sequence.length) {
+            startOverlayEl.classList.add('d-none');
+            startOverlayEl.setAttribute('aria-hidden', 'true');
+            locked = false;
+            resolve();
+            return;
+          }
+
+          const token = sequence[index];
+          startNumberEl.textContent = token;
+          startNumberEl.style.transform = 'scale(1.08)';
+          window.setTimeout(() => {
+            startNumberEl.style.transform = 'scale(1)';
+          }, 140);
+
+          if (token === 'انطلق!') {
+            playGoSound();
+          } else {
+            playCountdownTickSound();
+          }
+
+          index += 1;
+          window.setTimeout(step, token === 'انطلق!' ? 520 : 680);
+        };
+
+        step();
+      });
+    }
+
+    function animateFinishAndReload(data) {
+      if (completedTransitionStarted) return;
+      completedTransitionStarted = true;
+      locked = true;
+
+      const myScoreNow = slot === 'challenger'
+        ? parseInt(data.challenger_score || 0, 10) || 0
+        : parseInt(data.opponent_score || 0, 10) || 0;
+      const oppScoreNow = slot === 'challenger'
+        ? parseInt(data.opponent_score || 0, 10) || 0
+        : parseInt(data.challenger_score || 0, 10) || 0;
+
+      const myWin = myScoreNow > oppScoreNow;
+      const oppWin = oppScoreNow > myScoreNow;
+
+      if (trackStageEl) {
+        trackStageEl.classList.add('is-finish');
+      }
+
+      if (myCarEl) {
+        myCarEl.classList.toggle('duel-car-win', myWin);
+        myCarEl.classList.toggle('duel-car-lose', !myWin && oppWin);
+      }
+      if (oppCarEl) {
+        oppCarEl.classList.toggle('duel-car-win', oppWin);
+        oppCarEl.classList.toggle('duel-car-lose', !oppWin && myWin);
+      }
+
+      if (myWin) {
+        setCarProgress(myCarEl, 97);
+        setCarProgress(oppCarEl, Math.max(80, scoreToProgress(oppScoreNow)));
+        setFeedback('فوز! سيارتك عبرت خط النهاية.', 'is-correct');
+      } else if (oppWin) {
+        setCarProgress(oppCarEl, 97);
+        setCarProgress(myCarEl, Math.max(80, scoreToProgress(myScoreNow)));
+        setFeedback('الخصم عبر خط النهاية أولاً.', 'is-wrong');
+      } else {
+        setCarProgress(myCarEl, 97);
+        setCarProgress(oppCarEl, 97);
+        setFeedback('تعادل على خط النهاية.', 'is-neutral');
+      }
+
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 1300);
     }
 
     function showOpponentFinishedNotice(titleText, bodyText) {
@@ -313,23 +1220,11 @@
       finishOverlayEl.setAttribute('aria-hidden', 'true');
     }
 
-    if (finishOverlayBtn) {
-      finishOverlayBtn.addEventListener('click', hideOpponentFinishedNotice);
-    }
-
-    if (finishOverlayEl) {
-      finishOverlayEl.addEventListener('click', function (event) {
-        if (event.target === finishOverlayEl) {
-          hideOpponentFinishedNotice();
-        }
-      });
-    }
-
     function showXpOverlayOnce() {
       if (currentPhase !== 'completed') return;
       if (!xpSummary || !xpSummary.has_any || !xpOverlayEl) return;
 
-      const seenKey = 'duel_xp_popup_seen_' + String('{{ duel.id }}');
+      const seenKey = 'duel_xp_popup_seen_' + duelId;
       if (sessionStorage.getItem(seenKey) === '1') return;
       sessionStorage.setItem(seenKey, '1');
 
@@ -387,6 +1282,18 @@
       xpOverlayEl.setAttribute('aria-hidden', 'true');
     }
 
+    if (finishOverlayBtn) {
+      finishOverlayBtn.addEventListener('click', hideOpponentFinishedNotice);
+    }
+
+    if (finishOverlayEl) {
+      finishOverlayEl.addEventListener('click', function (event) {
+        if (event.target === finishOverlayEl) {
+          hideOpponentFinishedNotice();
+        }
+      });
+    }
+
     if (xpOverlayBtn) {
       xpOverlayBtn.addEventListener('click', hideXpOverlay);
     }
@@ -403,19 +1310,30 @@
       if (!data || !data.ok) return;
 
       if (data.phase && data.phase !== currentPhase) {
+        if ((currentPhase === 'live' || currentPhase === 'submitted_waiting') && data.phase === 'completed') {
+          currentPhase = data.phase;
+          mySubmitted = !!data.my_submitted;
+          opponentScore = slot === 'challenger' ? parseInt(data.opponent_score || 0, 10) || 0 : parseInt(data.challenger_score || 0, 10) || 0;
+          renderTimer(timerEl, data.my_left);
+          renderTimer(topTimerEl, data.my_left);
+          renderTimer(oppTimerEl, data.opp_left);
+          updateTrack();
+          animateFinishAndReload(data);
+          return;
+        }
         window.location.reload();
         return;
       }
 
       currentPhase = data.phase || currentPhase;
       mySubmitted = !!data.my_submitted;
+      myScoreLive = slot === 'challenger' ? parseInt(data.challenger_score || 0, 10) || 0 : parseInt(data.opponent_score || 0, 10) || 0;
+      opponentScore = slot === 'challenger' ? parseInt(data.opponent_score || 0, 10) || 0 : parseInt(data.challenger_score || 0, 10) || 0;
 
       renderTimer(timerEl, data.my_left);
       renderTimer(topTimerEl, data.my_left);
       renderTimer(oppTimerEl, data.opp_left);
-      if (scoreEl && Number.isFinite(data.challenger_score) && Number.isFinite(data.opponent_score)) {
-        scoreEl.textContent = String(data.challenger_score) + ' - ' + String(data.opponent_score);
-      }
+      updateTrack();
 
       if (currentPhase === 'live' && !mySubmitted && data.opp_submitted) {
         if (data.opponent_perfect_first_warning) {
@@ -432,13 +1350,26 @@
       }
 
       if (data.status === 'completed') {
-        window.location.reload();
+        animateFinishAndReload(data);
       }
     }
 
     renderTimer(timerEl, parseInt(timerEl ? timerEl.dataset.leftSeconds : '0', 10));
     renderTimer(topTimerEl, parseInt(topTimerEl ? topTimerEl.dataset.leftSeconds : '0', 10));
     renderTimer(oppTimerEl, parseInt(oppTimerEl ? oppTimerEl.dataset.leftSeconds : '0', 10));
+    updateTrack();
+
+    if (currentPhase === 'live' && totalQuestions > 0) {
+      showQuestion(0);
+      showStartOverlay().then(() => {
+        showQuestion(0);
+        if (questionsData[0]) {
+          questionArea && (questionArea.closest('.duel-hud-inner') || questionArea).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    } else if (currentPhase === 'live' && totalQuestions === 0 && questionArea) {
+      questionArea.innerHTML = '<div class="alert alert-info mb-0">لا توجد أسئلة في هذا التحدي.</div>';
+    }
 
     async function pollState() {
       try {
@@ -451,14 +1382,15 @@
     }
 
     const localTick = setInterval(() => {
-      if (!timerEl || mySubmitted || currentPhase !== 'live') return;
-      const current = parseInt(timerEl.dataset.leftSeconds || '0', 10);
+      const sourceTimerEl = timerEl || topTimerEl;
+      if (!sourceTimerEl || mySubmitted || currentPhase !== 'live') return;
+      const current = parseInt(sourceTimerEl.dataset.leftSeconds || '0', 10);
       if (!Number.isFinite(current)) return;
       renderTimer(timerEl, Math.max(0, current - 1));
       renderTimer(topTimerEl, Math.max(0, current - 1));
     }, 1000);
 
-    const syncTick = setInterval(pollState, 1000);
+    const syncTick = setInterval(pollState, 650);
     pollState();
     setTimeout(showXpOverlayOnce, 150);
 

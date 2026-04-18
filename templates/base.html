@@ -197,6 +197,11 @@
             {% if current_user.role|lower == 'admin' %}
             <a
               class="btn btn-cta btn-sm"
+              href="{{ url_for('student.duels_home') }}"
+              >التحديات الودية</a
+            >
+            <a
+              class="btn btn-cta btn-sm"
               href="{{ url_for('student.statistics') }}"
               >إحصائيات الطلاب</a
             >
@@ -716,20 +721,94 @@
         imgs.forEach((img) => enhanceDriveImageElement(img));
       }
 
+      function markImageUnavailable(img) {
+        if (!img || img.dataset.imgHidden === '1') return;
+        img.dataset.imgHidden = '1';
+        img.style.display = 'none';
+        img.setAttribute('aria-hidden', 'true');
+      }
+
+      function isInvalidImageSrc(src) {
+        const raw = String(src || '').trim();
+        if (!raw) return true;
+        const lowered = raw.toLowerCase();
+        return lowered === 'none'
+          || lowered === 'null'
+          || lowered === 'undefined'
+          || lowered === 'nan'
+          || lowered === 'about:blank'
+          || lowered.startsWith('javascript:');
+      }
+
+      function shouldSkipGlobalImageFallback(img) {
+        if (!img) return true;
+        if (img.dataset.keepBroken === '1') return true;
+        if (img.classList.contains('brand-logo')) return true;
+        if (img.closest('.navbar, .offcanvas-header, .dropdown-menu, .global-toast, .toast')) return true;
+        return false;
+      }
+
+      function bindGlobalImageFallback(img) {
+        if (!img || img.dataset.globalImgBound === '1') return;
+        img.dataset.globalImgBound = '1';
+
+        const src = img.getAttribute('src');
+        if (isInvalidImageSrc(src) && !shouldSkipGlobalImageFallback(img)) {
+          img.removeAttribute('src');
+          markImageUnavailable(img);
+          return;
+        }
+
+        img.addEventListener('error', () => {
+          if (shouldSkipGlobalImageFallback(img)) return;
+          // Let Google Drive retry handler attempt alternatives first.
+          if ((img.getAttribute('src') || '').toLowerCase().includes('drive.google.com')) return;
+          markImageUnavailable(img);
+        });
+      }
+
+      function pruneBrokenImages(root) {
+        const scope = root || document;
+        const imgs = scope.querySelectorAll ? scope.querySelectorAll('img') : [];
+        imgs.forEach((img) => {
+          if (shouldSkipGlobalImageFallback(img)) return;
+          const src = img.getAttribute('src');
+          if (isInvalidImageSrc(src)) {
+            img.removeAttribute('src');
+            markImageUnavailable(img);
+            return;
+          }
+          if (img.complete && img.naturalWidth === 0) {
+            markImageUnavailable(img);
+          }
+        });
+      }
+
+      function applyGlobalImageFallbacks(root) {
+        const scope = root || document;
+        const imgs = scope.querySelectorAll ? scope.querySelectorAll('img') : [];
+        imgs.forEach((img) => bindGlobalImageFallback(img));
+        pruneBrokenImages(scope);
+      }
+
       window.addEventListener('load', function() {
         applyDriveImageFixes(document);
+        applyGlobalImageFallbacks(document);
       });
 
       document.addEventListener('DOMContentLoaded', function() {
         applyDriveImageFixes(document);
+        applyGlobalImageFallbacks(document);
         const observer = new MutationObserver((mutations) => {
           for (const m of mutations) {
             for (const node of m.addedNodes || []) {
               if (!node || node.nodeType !== 1) continue;
               if (node.tagName === 'IMG') {
                 enhanceDriveImageElement(node);
+                bindGlobalImageFallback(node);
               } else {
                 applyDriveImageFixes(node);
+                applyGlobalImageFallbacks(node);
               }
             }
           }
@@ -737,7 +816,7 @@
         observer.observe(document.body, { childList: true, subtree: true });
       });
 
-      {% if current_user.is_authenticated and (current_user.role|lower) == 'student' %}
+      {% if current_user.is_authenticated and (current_user.role|lower) in ['student', 'admin'] %}
       (function initDuelInvitePopup() {
         const storageKey = 'duel_seen_tokens_v1';
         let seen = [];

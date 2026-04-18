@@ -212,6 +212,9 @@ visitors with role-aware greeting/actions #} {% if current_user.is_authenticated
       <a class="action-card" href="{{ url_for('student.statistics') }}"
         ><span class="icon">📈</span><span>إحصائيات الطلاب</span></a
       >
+      <a class="action-card" href="{{ url_for('student.duels_home') }}"
+        ><span class="icon">⚔️</span><span>التحديات الودية</span></a
+      >
       <a class="action-card" href="{{ url_for('teacher.gamification_admin') }}"
         ><span class="icon">💎</span><span>إدارة الجواهر</span></a
       >

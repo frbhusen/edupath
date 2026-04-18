@@ -26,6 +26,11 @@ DUEL_PAIR_RECENT_LOCK_SECONDS = 45
 TEST_EXIT_XP_PENALTY = 25
 
 
+def _duel_role_allowed(user) -> bool:
+    role = (getattr(user, "role", "") or "").lower()
+    return role in {"student", "admin"}
+
+
 def _redirect_to_next_or(default_endpoint, **default_kwargs):
     next_path = (request.form.get("next") or "").strip()
     if next_path.startswith("/"):
@@ -1049,6 +1054,26 @@ def _duel_build_play_state(duel, slot: str):
     }
 
 
+def _duel_compute_live_scores(duel):
+    challenger_id = _duel_safe_user_id(getattr(duel, "challenger_id", None))
+    opponent_id = _duel_safe_user_id(getattr(duel, "opponent_id", None))
+    if not challenger_id or not opponent_id:
+        return int(duel.challenger_score or 0), int(duel.opponent_score or 0)
+
+    answers = list(DuelAnswer.objects(duel_id=duel.id).only("player_id", "is_correct").all())
+    challenger_score = 0
+    opponent_score = 0
+    for answer in answers:
+        if not getattr(answer, "is_correct", False):
+            continue
+        pid = _duel_safe_user_id(getattr(answer, "player_id", None))
+        if pid == challenger_id:
+            challenger_score += 1
+        elif pid == opponent_id:
+            opponent_score += 1
+    return challenger_score, opponent_score
+
+
 def _duel_compute_settlement_plan(
     challenger_score: int,
     opponent_score: int,
@@ -1488,7 +1513,7 @@ def get_unlocked_lessons(student_id: int):
 def student_duel_maintenance():
     if not current_user.is_authenticated:
         return None
-    if (current_user.role or "").lower() != "student":
+    if not _duel_role_allowed(current_user):
         return None
 
     try:
@@ -2568,8 +2593,8 @@ def leaderboard_stream():
 @student_bp.route("/duels", methods=["GET", "POST"])
 @login_required
 def duels_home():
-    if (current_user.role or "").lower() != "student":
-        flash("صفحة التحديات متاحة للطلاب فقط.", "error")
+    if not _duel_role_allowed(current_user):
+        flash("صفحة التحديات متاحة للطلاب والإداريين فقط.", "error")
         return redirect(url_for("index"))
 
     created_duel = None
@@ -2577,7 +2602,10 @@ def duels_home():
     whatsapp_share = None
     telegram_share = None
 
-    unlocked_lessons = get_unlocked_lessons(current_user.id)
+    if (current_user.role or "").lower() == "student":
+        unlocked_lessons = get_unlocked_lessons(current_user.id)
+    else:
+        unlocked_lessons = list(Lesson.objects().all())
     lesson_groups = []
     section_ids = []
     for lesson in unlocked_lessons:
@@ -2677,7 +2705,11 @@ def duels_home():
             .first()
         )
 
-        opponent = User.objects(username=opponent_username, role="student").first() if opponent_username else None
+        opponent = (
+            User.objects(username=opponent_username, role__in=["student", "admin"]).first()
+            if opponent_username
+            else None
+        )
         if not opponent:
             flash("اسم المستخدم غير موجود.", "error")
             return redirect(url_for("student.duels_home"))
@@ -2826,7 +2858,7 @@ def duels_home():
 @student_bp.route("/duels/pending-popup", methods=["GET"])
 @login_required
 def duels_pending_popup():
-    if (current_user.role or "").lower() != "student":
+    if not _duel_role_allowed(current_user):
         return jsonify({"ok": True, "invites": []})
 
     rows = list(
@@ -3024,6 +3056,10 @@ def duel_play(duel_id):
 
     _duel_expire_if_needed(duel)
     _duel_autosubmit_timeout(duel)
+    if duel.status == "live":
+        live_challenger_score, live_opponent_score = _duel_compute_live_scores(duel)
+        duel.challenger_score = live_challenger_score
+        duel.opponent_score = live_opponent_score
 
     if duel.status in {"pending", "declined", "expired", "canceled"}:
         return render_template(
@@ -3041,6 +3077,25 @@ def duel_play(duel_id):
     questions = list(Question.objects(id__in=[qid for qid in question_ids if ObjectId.is_valid(str(qid))]).all()) if question_ids else []
     qmap = {str(q.id): q for q in questions}
     ordered_questions = [qmap[qid] for qid in question_ids if qid in qmap]
+
+    questions_payload = []
+    for q in ordered_questions:
+        questions_payload.append(
+            {
+                "id": str(q.id),
+                "text": q.text,
+                "images": list(q.question_images or []),
+                "correct_choice_id": str(q.correct_choice_id) if q.correct_choice_id else "",
+                "choices": [
+                    {
+                        "choice_id": str(c.choice_id) if c.choice_id else "",
+                        "text": c.text,
+                        "image_url": c.image_url,
+                    }
+                    for c in (q.choices or [])
+                ],
+            }
+        )
 
     player_answers = list(DuelAnswer.objects(duel_id=duel.id, player_id=current_user.id).all())
     answers_by_qid = {str(a.question_id.id): str(a.choice_id) if a.choice_id else "" for a in player_answers if a.question_id}
@@ -3060,6 +3115,7 @@ def duel_play(duel_id):
         slot=slot,
         opponent_user=opponent_user,
         questions=ordered_questions,
+        questions_payload=questions_payload,
         answers_by_qid=answers_by_qid,
         my_left=my_left,
         opp_left=opp_left,
@@ -3082,6 +3138,11 @@ def duel_state(duel_id):
 
     _duel_expire_if_needed(duel)
     _duel_autosubmit_timeout(duel)
+    if duel.status == "live":
+        live_challenger_score, live_opponent_score = _duel_compute_live_scores(duel)
+    else:
+        live_challenger_score = int(duel.challenger_score or 0)
+        live_opponent_score = int(duel.opponent_score or 0)
     state = _duel_build_play_state(duel, slot)
     opp_slot = "opponent" if slot == "challenger" else "challenger"
     opponent_perfect_first_warning = (
@@ -3102,10 +3163,79 @@ def duel_state(duel_id):
             "opp_submitted": bool(state["opp_submitted"]),
             "slot_joined": bool(state["slot_joined"]),
             "both_joined": bool(state["both_joined"]),
-            "challenger_score": int(duel.challenger_score or 0),
-            "opponent_score": int(duel.opponent_score or 0),
+            "challenger_score": int(live_challenger_score or 0),
+            "opponent_score": int(live_opponent_score or 0),
             "opponent_perfect_first_warning": opponent_perfect_first_warning,
             "opponent_time_deduction_seconds": 60 if opponent_perfect_first_warning else 0,
+        }
+    )
+
+
+@student_bp.route("/duels/<duel_id>/answer", methods=["POST"])
+@login_required
+def duel_answer(duel_id):
+    duel = Duel.objects(id=duel_id).first() if ObjectId.is_valid(duel_id) else None
+    if not duel:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+
+    slot = _duel_player_slot(duel, current_user.id)
+    if not slot:
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+
+    if duel.status != "live":
+        return jsonify({"ok": False, "error": "not_live"}), 409
+
+    if _duel_slot_submitted(duel, slot):
+        return jsonify({"ok": False, "error": "already_submitted"}), 409
+
+    payload = request.get_json(silent=True) or {}
+    question_id_raw = str(payload.get("question_id") or "").strip()
+    choice_id_raw = str(payload.get("choice_id") or "").strip()
+    if not ObjectId.is_valid(question_id_raw) or not ObjectId.is_valid(choice_id_raw):
+        return jsonify({"ok": False, "error": "invalid_payload"}), 400
+
+    try:
+        question_ids = json.loads(duel.question_ids_json or "[]")
+    except Exception:
+        question_ids = []
+
+    if question_id_raw not in question_ids:
+        return jsonify({"ok": False, "error": "question_not_in_duel"}), 400
+
+    question = Question.objects(id=question_id_raw).first()
+    if not question:
+        return jsonify({"ok": False, "error": "question_not_found"}), 404
+
+    is_correct = bool(question.correct_choice_id and str(question.correct_choice_id) == choice_id_raw)
+    existing = DuelAnswer.objects(duel_id=duel.id, player_id=current_user.id, question_id=question.id).first()
+    if existing:
+        existing.choice_id = ObjectId(choice_id_raw)
+        existing.is_correct = is_correct
+        existing.save()
+    else:
+        DuelAnswer(
+            duel_id=duel.id,
+            player_id=current_user.id,
+            question_id=question.id,
+            choice_id=ObjectId(choice_id_raw),
+            is_correct=is_correct,
+        ).save()
+
+    challenger_score, opponent_score = _duel_compute_live_scores(duel)
+    duel.challenger_score = int(challenger_score or 0)
+    duel.opponent_score = int(opponent_score or 0)
+    duel.save()
+
+    my_score = duel.challenger_score if slot == "challenger" else duel.opponent_score
+    opp_score = duel.opponent_score if slot == "challenger" else duel.challenger_score
+    return jsonify(
+        {
+            "ok": True,
+            "is_correct": bool(is_correct),
+            "my_score": int(my_score or 0),
+            "opponent_score": int(opp_score or 0),
+            "challenger_score": int(duel.challenger_score or 0),
+            "opponent_score_global": int(duel.opponent_score or 0),
         }
     )
 
