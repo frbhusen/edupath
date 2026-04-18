@@ -3085,6 +3085,7 @@ def duel_play(duel_id):
                 "id": str(q.id),
                 "text": q.text,
                 "images": list(q.question_images or []),
+                "correct_choice_id": str(q.correct_choice_id) if q.correct_choice_id else "",
                 "choices": [
                     {
                         "choice_id": str(c.choice_id) if c.choice_id else "",

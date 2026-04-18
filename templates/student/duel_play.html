@@ -37,11 +37,11 @@
         <div id="test-timer" class="duel-stat-value badge text-bg-warning" data-left-seconds="{{ my_left }}">--:--</div>
       </div>
       <div class="duel-stat-box">
-        <div class="small text-muted">Me</div>
-        <div class="duel-stat-value">Me</div>
+        <div class="small text-muted">سائقك</div>
+        <div class="duel-stat-value">أنت</div>
       </div>
       <div class="duel-stat-box">
-        <div class="small text-muted">Opponent</div>
+        <div class="small text-muted">الخصم</div>
         <div class="duel-stat-value">{{ opponent_user.full_name if opponent_user else 'لاعب' }}</div>
       </div>
       <div class="duel-stat-box">
@@ -65,12 +65,12 @@
     <section class="duel-track-stage" aria-label="سباق التحدي">
       <div class="duel-track-legend">
         <span class="badge text-bg-primary">سيارتك زرقاء</span>
-        <span class="badge text-bg-danger">سيارة Opponent حمراء</span>
+        <span class="badge text-bg-danger">سيارة الخصم حمراء</span>
       </div>
       <div class="duel-track-board">
         <div class="duel-track-lane duel-track-lane-blue">
           <div class="duel-lane-head">
-            <span>Me</span>
+            <span>أنت</span>
             <span class="duel-lane-score" id="myLiveScore">{{ duel.challenger_score if slot == 'challenger' else duel.opponent_score }}</span>
           </div>
           <div class="duel-track-runway">
@@ -80,7 +80,7 @@
         </div>
         <div class="duel-track-lane duel-track-lane-red">
           <div class="duel-lane-head">
-            <span>Opponent</span>
+            <span>الخصم</span>
             <span class="duel-lane-score" id="opponentLiveScore">{{ duel.opponent_score if slot == 'challenger' else duel.challenger_score }}</span>
           </div>
           <div class="duel-track-runway">
@@ -124,17 +124,15 @@
     <div class="card">
       <div class="card-body text-center">
         <h5 class="mb-2">تم تسليم إجاباتك</h5>
-        <p class="text-muted mb-0">ننتظر انتهاء Opponent وسيتم تحديث الصفحة تلقائياً.</p>
+        <p class="text-muted mb-0">ننتظر انتهاء الخصم وسيتم تحديث الصفحة تلقائياً.</p>
       </div>
     </div>
   {% elif phase == 'completed' %}
     <div class="card">
       <div class="card-body">
-        {% set me_score = duel.challenger_score if slot == 'challenger' else duel.opponent_score %}
-        {% set opponent_score_value = duel.opponent_score if slot == 'challenger' else duel.challenger_score %}
         <h5 class="card-title">انتهت المباراة</h5>
-        <p class="mb-1">نتيجة Me: {{ me_score }}</p>
-        <p class="mb-1">نتيجة Opponent: {{ opponent_score_value }}</p>
+        <p class="mb-1">نتيجة المتحدي: {{ duel.challenger_score }}</p>
+        <p class="mb-1">نتيجة الخصم: {{ duel.opponent_score }}</p>
         <p class="mb-0">الفائز: {{ duel.winner_id.full_name if duel.winner_id else 'لم يحدد بعد' }}</p>
 
         {% set first_slot = duel.first_submitter_slot %}
@@ -143,15 +141,15 @@
           {% if duel.first_submitter_perfect and first_slot == slot %}
             <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>مكافأة 100% (المنهي الأول): +5</span>
           {% elif duel.first_submitter_perfect and first_slot and first_slot != slot %}
-            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>Opponent حصل على مكافأة 100% الأولى: +5</span>
+            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم حصل على مكافأة 100% الأولى: +5</span>
           {% endif %}
 
           {% if duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot == slot %}
             <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>استرجاع رسوم الدخول: +20</span>
             <span class="badge text-bg-success"><i class="fa-solid fa-gem me-1"></i>مكافأة 100% (المنهي الثاني): +3</span>
           {% elif duel.first_submitter_perfect and duel.second_submitter_perfect and second_slot and second_slot != slot %}
-            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>Opponent استرجع الرسوم: +20</span>
-            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>Opponent حصل على مكافأة المنهي الثاني: +3</span>
+            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم استرجع الرسوم: +20</span>
+            <span class="badge text-bg-info"><i class="fa-solid fa-gem me-1"></i>الخصم حصل على مكافأة المنهي الثاني: +3</span>
           {% endif %}
         </div>
 
@@ -166,7 +164,7 @@
 
   <div id="duelFinishOverlay" class="duel-finish-overlay d-none" aria-hidden="true">
     <div class="duel-finish-popup shadow-lg" role="alertdialog" aria-live="assertive" aria-modal="true">
-      <div id="duelFinishOverlayTitle" class="duel-finish-title">Opponent أنهى التحدي</div>
+      <div id="duelFinishOverlayTitle" class="duel-finish-title">الخصم أنهى التحدي</div>
       <p id="duelFinishOverlayBody" class="mb-3">تسليمك الآن مهم. الوقت عندك ما زال يعمل.</p>
       <button id="duelFinishOverlayBtn" type="button" class="btn btn-cta">متابعة الحل</button>
     </div>
@@ -819,7 +817,7 @@
     const xpDeltaEl = document.getElementById('duelXpDelta');
     const xpTotalsEl = document.getElementById('duelXpTotals');
     const xpBreakdownEl = document.getElementById('duelXpBreakdown');
-    const xpSummary = JSON.parse(String.raw`{{ (xp_summary or {})|tojson }}`);
+    const xpSummary = JSON.parse(String.raw`{{ (xp_summary or {})|tojson|safe }}`);
     const questionArea = document.getElementById('duelQuestionArea');
     const questionIndexLabel = document.getElementById('questionIndexLabel');
     const questionStateEl = document.getElementById('duelQuestionState');
@@ -936,7 +934,14 @@
     }
 
     function recomputeCorrectCount() {
-      return Math.max(0, parseInt(myScoreLive || 0, 10) || 0);
+      let count = 0;
+      questionsData.forEach((question) => {
+        const selected = selectedAnswers[question.id];
+        if (selected && String(selected) === String(question.correct_choice_id || '')) {
+          count += 1;
+        }
+      });
+      return count;
     }
 
     function syncHiddenAnswer(questionId, choiceId) {
@@ -1054,23 +1059,18 @@
         myScoreLive = Math.max(0, parseInt(data.my_score || 0, 10) || 0);
         opponentScore = Math.max(0, parseInt(data.opponent_score || 0, 10) || 0);
         updateTrack();
-        return data;
       } catch (_err) {
-        return null;
       }
-      return null;
     }
 
-    async function chooseAnswer(question, choiceId, buttonEl) {
+    function chooseAnswer(question, choiceId, buttonEl) {
       if (locked || !question) return;
       locked = true;
       ensureAudioContext();
 
+      const isCorrect = String(choiceId || '') === String(question.correct_choice_id || '');
       selectedAnswers[question.id] = String(choiceId || '');
       syncHiddenAnswer(question.id, choiceId || '');
-
-      const saveResult = await persistAnswer(question.id, choiceId || '');
-      const isCorrect = !!(saveResult && saveResult.is_correct);
 
       const choiceButtons = questionArea ? questionArea.querySelectorAll('.duel-choice-btn') : [];
       choiceButtons.forEach((btn) => {
@@ -1078,11 +1078,11 @@
         btn.classList.remove('is-selected', 'is-correct', 'is-wrong');
         if (btn.dataset.choiceId === String(choiceId || '')) {
           btn.classList.add('is-selected');
-          btn.classList.add(isCorrect ? 'is-correct' : 'is-wrong');
-        } else if (!isCorrect) {
-          btn.disabled = true;
         }
-        if (!isCorrect && btn.dataset.choiceId === String(choiceId || '')) {
+        if (btn.dataset.choiceId === String(question.correct_choice_id || '')) {
+          btn.classList.add('is-correct');
+        }
+        if (btn.dataset.choiceId === String(choiceId || '') && !isCorrect) {
           btn.classList.add('is-wrong');
         }
       });
@@ -1099,6 +1099,7 @@
 
       myScoreLive = recomputeCorrectCount();
       updateTrack();
+      persistAnswer(question.id, choiceId || '');
       pollState();
 
       window.setTimeout(() => {
@@ -1190,7 +1191,7 @@
       } else if (oppWin) {
         setCarProgress(oppCarEl, 97);
         setCarProgress(myCarEl, Math.max(80, scoreToProgress(myScoreNow)));
-        setFeedback('Opponent عبر خط النهاية أولاً.', 'is-wrong');
+        setFeedback('الخصم عبر خط النهاية أولاً.', 'is-wrong');
       } else {
         setCarProgress(myCarEl, 97);
         setCarProgress(oppCarEl, 97);
@@ -1308,8 +1309,6 @@
     function applyState(data) {
       if (!data || !data.ok) return;
 
-      const previousPhase = currentPhase;
-
       if (data.phase && data.phase !== currentPhase) {
         if ((currentPhase === 'live' || currentPhase === 'submitted_waiting') && data.phase === 'completed') {
           currentPhase = data.phase;
@@ -1344,13 +1343,13 @@
           );
         } else {
           showOpponentFinishedNotice(
-            'Opponent أنهى التحدي',
+            'الخصم أنهى التحدي',
             'تسليمك الآن مهم. الوقت عندك ما زال يعمل.'
           );
         }
       }
 
-      if (data.status === 'completed' && (previousPhase === 'live' || previousPhase === 'submitted_waiting')) {
+      if (data.status === 'completed') {
         animateFinishAndReload(data);
       }
     }

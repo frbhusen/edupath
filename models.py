@@ -19,11 +19,6 @@ class User(Document, UserMixin):
     role = StringField(required=True, default="student", choices=['admin', 'teacher', 'question_editor', 'student'])
     created_at = DateTimeField(default=datetime.utcnow)
     current_session_token = StringField(max_length=64, null=True)
-    failed_login_attempts = IntField(default=0, required=True)
-    failed_login_window_start = DateTimeField(null=True)
-    last_failed_login_at = DateTimeField(null=True)
-    login_locked_until = DateTimeField(null=True)
-    lockout_cleared_by_admin_at = DateTimeField(null=True)
     
     meta = {
         'collection': 'users',
