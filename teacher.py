@@ -2278,14 +2278,20 @@ def edit_student(user_id):
         raise NotFound()
     form = StudentEditForm()
     if form.validate_on_submit():
+        student.first_name = form.first_name.data
+        student.last_name = form.last_name.data
         student.username = form.username.data
+        student.password_hash = form.password_hash.data
         student.phone = form.phone.data
         student.role = form.role.data
         student.save()
         flash("تم تحديث بيانات الطالب بنجاح.", "success")
         return redirect(url_for("teacher.students"))
     elif request.method == "GET":
+        form.first_name.data = student.first_name
+        form.last_name.data = student.last_name
         form.username.data = student.username
+        form.password_hash.data = student.password_hash
         form.phone.data = student.phone
         form.role.data = student.role
     return render_template("teacher/student_form.html", form=form, student=student)
@@ -2293,7 +2299,7 @@ def edit_student(user_id):
 
 @teacher_bp.route("/subjects/<subject_id>/access", methods=["GET", "POST"])
 @login_required
-@role_required("teacher")
+@role_required("teacher", "admin")
 def manage_subject_access(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:

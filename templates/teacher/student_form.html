@@ -17,13 +17,21 @@
         {{ form.username(class="form-control") }}
       </div>
       <div class="mb-3">
+        {{ form.first_name.label(class="form-label") }}
+        {{ form.first_name(class="form-control") }}
+      </div>
+      <div class="mb-3">
+        {{ form.last_name.label(class="form-label") }}
+        {{ form.last_name(class="form-control") }}
+      </div>
+      
+      <div class="mb-3">
         {{ form.phone.label(class="form-label") }}
         {{ form.phone(class="form-control") }}
       </div>
       <div class="mb-3">
-        {{ form.password.label(class="form-label") }}
-        {{ form.password(class="form-control", placeholder="اترك فارغاً للإبقاء على كلمة السر الحالية") }}
-        <div class="form-text">اترك فارغاً للإبقاء على كلمة السر الحالية.</div>
+        {{ form.password_hash.label(class="form-label") }}
+        {{ form.password_hash(class="form-control") }}
       </div>
       <div class="mb-3">
         {{ form.role.label(class="form-label") }}

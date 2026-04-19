@@ -131,6 +131,7 @@
     <div class="card">
       <div class="card-body">
         <h5 class="card-title">انتهت المباراة</h5>
+        
         <p class="mb-1">نتيجة المتحدي: {{ duel.challenger_score }}</p>
         <p class="mb-1">نتيجة الخصم: {{ duel.opponent_score }}</p>
         <p class="mb-0">الفائز: {{ duel.winner_id.full_name if duel.winner_id else 'لم يحدد بعد' }}</p>

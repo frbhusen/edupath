@@ -76,9 +76,11 @@ class ChoiceForm(FlaskForm):
 
 
 class StudentEditForm(FlaskForm):
+    first_name = StringField("الاسم الأول", validators=[DataRequired(), Length(min=2, max=80)])
+    last_name = StringField("اسم العائلة", validators=[DataRequired(), Length(min=2, max=80)])
     username = StringField("اسم المستخدم", validators=[DataRequired(), Length(min=3, max=80)])
     phone = StringField("رقم الهاتف", validators=[DataRequired(), Length(min=7, max=20)])
-    password = PasswordField("كلمة مرور جديدة", validators=[Optional(), Length(min=6)])
+    password_hash = StringField("كلمة مرور جديدة", validators=[Optional(), Length(min=6)])
     role = SelectField(
         "الدور",
         choices=[
