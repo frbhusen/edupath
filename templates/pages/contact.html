@@ -1,81 +1,276 @@
-{% extends 'base.html' %}
-{% block title %}تواصل معنا | EduPath{% endblock %}
-{% block meta_description %}تواصل مع فريق EduPath للاستفسارات والدعم والتعاون والشراكات التعليمية.{% endblock %}
-{% block meta_robots %}index,follow{% endblock %}
-{% block content %}
-<div
-  class="dashboard-hero mb-4 d-flex justify-content-between align-items-center"
->
-  <div>
-    <h1 class="h4 mb-1">مرحباً بك في EduPath</h1>
-    <p class="mb-0">تعلم من خلال دروس منظمة، مارس الاختبارات، وتتبع تقدمك.</p>
+{% extends 'base.html' %} {% block title %}تواصل معنا | EduPath{% endblock %} {%
+block content %}
+
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap");
+
+  :root {
+    --contact-bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --accent-color: #0f172a;
+    --border-color: #e2e8f0;
+  }
+
+  .contact-wrapper {
+    font-family: "Tajawal", sans-serif;
+    background-color: var(--contact-bg);
+    padding: 3rem 1rem;
+    direction: rtl;
+  }
+
+  .hero-banner {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+
+  .hero-banner h1 {
+    font-weight: 800;
+    font-size: 2.5rem;
+    color: var(--accent-color);
+    margin-bottom: 1rem;
+  }
+
+  .section-container {
+    margin-bottom: 4rem;
+  }
+
+  .section-title {
+    font-weight: 800;
+    font-size: 1.75rem;
+    color: var(--accent-color);
+    margin-bottom: 2rem;
+    padding-right: 1rem;
+    border-right: 5px solid var(--accent-color);
+  }
+
+  .team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .member-card {
+    background: var(--card-bg);
+    border-radius: 1.25rem;
+    padding: 2rem 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .member-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+
+  .member-img {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 1.5rem;
+    border: 4px solid var(--contact-bg);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .member-name {
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: var(--text-main);
+    margin-bottom: 0.25rem;
+  }
+
+  .member-role {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .contact-details {
+    width: 100%;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.2rem;
+    margin-top: auto;
+  }
+
+  .info-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    margin-bottom: 0.5rem;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .info-link:hover {
+    color: var(--text-muted);
+  }
+
+  .social-group {
+    display: flex;
+    gap: 0.8rem;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+
+  .social-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--contact-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-color);
+    text-decoration: none;
+    transition: all 0.2s;
+    font-size: 1.1rem;
+  }
+
+  .social-icon:hover {
+    background: var(--accent-color);
+    color: white;
+    transform: scale(1.1);
+  }
+</style>
+
+<div class="contact-wrapper">
+  <div class="container">
+    <div class="hero-banner">
+      <h1>فريق العمل</h1>
+      <p class="text-muted">نحن هنا لدعم رحلتك التعليمية في كل خطوة</p>
+    </div>
+
+    <div class="section-container">
+      <h2 class="section-title">الإدارة العلمية</h2>
+      <div class="team-grid" id="ceo-grid"></div>
+    </div>
+
+    <div class="section-container">
+      <h2 class="section-title">الإدارة التقنية</h2>
+      <div class="team-grid" id="tech-grid"></div>
+    </div>
+
+    <div class="section-container">
+      <h2 class="section-title">القسم التقني</h2>
+      <div class="team-grid" id="tech2-grid"></div>
+    </div>
+
+    <div class="section-container">
+      <h2 class="section-title">الطاقم التعليمي</h2>
+      <div class="team-grid" id="teachers-grid"></div>
+    </div>
   </div>
-  <div class="d-flex gap-2"></div>
-</div>
-
-<div class="container">
-  <div class="row g-3" id="teamContainer"></div>
-</div>
-
-<div class="container">
-  <div class="row g-3" id="teamContainer"></div>
 </div>
 
 <script>
-  const people = [
+  const teamData = [
     {
+      category: "ceo",
       name: "د. محمد سامح منلا",
-      role: "المؤسس والمدير الأكاديمي",
+      role: "المؤسس والمدير العلمي",
       phone: "0988349910",
       email: "",
-      image: "https://ui-avatars.com/api/?name=SM&background=7d7d7d",
+      image: "https://ui-avatars.com/api/?name=SM&background=0f172a&color=fff",
       socials: {
         facebook: "https://www.facebook.com/sameh.monlla",
       },
     },
     {
+      category: "tech",
       name: "م. حسين رجب",
-      role: "المبرمج والمطور",
+      role: "المطور الرئيسي ومدير التقنية",
       phone: "0950052045",
       email: "husen_rajb@outlook.com",
-      image: "https://ui-avatars.com/api/?name=HR&background=7d7d7d",
+      image: "https://ui-avatars.com/api/?name=HR&background=0f172a&color=fff",
       socials: {
-        website: "https://www.husr0.codes/", 
+        website: "https://www.husr0.codes/",
         instagram: "https://www.instagram.com/husr0/",
         github: "https://github.com/frbhusen",
       },
     },
+    {
+      category: "tech2",
+      name: "م. بيان مقداد",
+      role: " مساعدة تطوير ذكاء اصطناعي ",
+      phone: "",
+      email: "",
+      image: "https://ui-avatars.com/api/?name=BM&background=0f172a&color=fff",
+      socials: {},
+    },
+    {
+      category: "teacher",
+      name: "د. محمد سامح منلا",
+      role: "مدرس مادة الكيمياء",
+      phone: "0988349910",
+      email: "",
+      image: "https://ui-avatars.com/api/?name=MN&background=0f172a&color=fff",
+      socials: {
 
+      },
+    },
+    {
+      category: "teacher",
+      name: "د. محمد نور الكردي",
+      role: "مدرس مادة اللغة العربية",
+      phone: "0951277537",
+      email: "",
+      image: "https://ui-avatars.com/api/?name=MN&background=0f172a&color=fff",
+      socials: {
+
+      },
+    },
   ];
 
-  const container = document.getElementById("teamContainer");
+  function createMemberCard(person) {
+    let socialIcons = "";
+    if (person.socials.facebook)
+      socialIcons += `<a href="${person.socials.facebook}" class="social-icon"><i class="bi bi-facebook"></i></a>`;
+    if (person.socials.instagram)
+      socialIcons += `<a href="${person.socials.instagram}" class="social-icon"><i class="bi bi-instagram"></i></a>`;
+    if (person.socials.github)
+      socialIcons += `<a href="${person.socials.github}" class="social-icon"><i class="bi bi-github"></i></a>`;
+    if (person.socials.website)
+      socialIcons += `<a href="${person.socials.website}" class="social-icon"><i class="bi bi-globe"></i></a>`;
 
-  people.forEach((p) => {
-    container.innerHTML += `
-    <div class="col-12">
-      <div class="profile-card d-flex flex-column flex-md-row align-items-center justify-content-between">
-
-        <div class="d-flex align-items-center">
-          <img src="${p.image}" class="profile-img" alt="profile">
-
-          <div class="text-end me-3">
-            <h5 class="mb-1">${p.name}</h5>
-            <small class="text-muted">${p.role}</small><br>
-            <small><a class="text-decoration-none text-muted" href="mailto:${p.email}">${p.email}</a></small><br>
-            <small><a class="text-decoration-none text-muted" href="tel:${p.phone}">${p.phone}</a></small>
-
-            <div class="social mt-2">
-              ${p.socials.instagram ? `<a href="${p.socials.instagram}"><i class="bi bi-instagram"></i></a>` : ""}
-              ${p.socials.github ? `<a href="${p.socials.github}"><i class="bi bi-github"></i></a>` : ""}
-              ${p.socials.facebook ? `<a href="${p.socials.facebook}"><i class="bi bi-facebook"></i></a>` : ""}
-              ${p.socials.website ? `<a href="${p.socials.website}"><i class="bi bi-globe"></i></a>` : ""}
-            </div>
+    return `
+      <div class="member-card">
+        <img src="${person.image}" class="member-img" alt="${person.name}">
+        <h3 class="member-name">${person.name}</h3>
+        <p class="member-role">${person.role}</p>
+        <div class="contact-details">
+          ${person.phone ? `<a href="tel:${person.phone}" class="info-link"><i class="bi bi-telephone"></i> ${person.phone}</a>` : ""}
+          ${person.email ? `<a href="mailto:${person.email}" class="info-link"><i class="bi bi-envelope"></i> ${person.email}</a>` : ""}
+          <div class="social-group">
+            ${socialIcons}
           </div>
         </div>
-
       </div>
-    </div>
-  `;
+    `;
+  }
+
+  // توزيع البيانات على الأقسام
+  teamData.forEach((person) => {
+    const card = createMemberCard(person);
+    if (person.category === "ceo")
+      document.getElementById("ceo-grid").innerHTML += card;
+    else if (person.category === "tech")
+      document.getElementById("tech-grid").innerHTML += card;
+    else if (person.category === "tech2")
+      document.getElementById("tech2-grid").innerHTML += card;
+
+    else if (person.category === "teacher")
+      document.getElementById("teachers-grid").innerHTML += card;
   });
 </script>
 

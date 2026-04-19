@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}من نحن | EduPath{% endblock %}
+{% block content %}
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap");
+
+  .about-shell {
+    --about-bg-1: #f8fafc;
+    --about-bg-2: #f1f5f9;
+    --about-ink: #1e293b;
+    --about-muted: #64748b;
+    --about-accent: #0f172a;
+    --about-card: #ffffff;
+    font-family: "Tajawal", sans-serif;
+    color: var(--about-ink);
+    border-radius: 1.5rem;
+    background: linear-gradient(135deg, var(--about-bg-1), var(--about-bg-2));
+    padding: 2.5rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    direction: rtl;
+  }
+
+  .about-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .about-title {
+    font-weight: 800;
+    font-size: 2.2rem;
+    color: var(--about-accent);
+    margin-bottom: 1rem;
+  }
+
+  .about-section {
+    background: var(--about-card);
+    padding: 2rem;
+    border-radius: 1rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  }
+
+  .about-section h2 {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--about-accent);
+    margin-bottom: 1.2rem;
+    border-right: 4px solid var(--about-accent);
+    padding-right: 1rem;
+  }
+
+  .about-text {
+    line-height: 1.8;
+    color: var(--about-muted);
+    font-size: 1.05rem;
+  }
+
+  .role-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .role-card {
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.8rem;
+    background: #fdfdfd;
+  }
+
+  .role-card h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .ai-bubble-info {
+    background: #e0f2fe;
+    color: #0369a1;
+    padding: 1rem;
+    border-radius: 0.8rem;
+    margin-top: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+</style>
+
+<div class="about-shell">
+  <div class="about-header">
+    <h1 class="about-title">حول منصة EduPath</h1>
+    <p class="about-text">المنصة التعليمية الرائدة المخصصة لطلاب الشهادة الثانوية في سوريا.</p>
+  </div>
+
+  <div class="about-section">
+    <h2>رؤيتنا وهدفنا</h2>
+    <p class="about-text">
+      تم تصميم <strong>EduPath</strong> لتكون الرفيق الأكاديمي الدائم لطلاب البكالوريا في سوريا. نحن نهدف إلى حل تحديات الدراسة التقليدية من خلال توفير محتوى منظم (مادة، قسم، درس) مع نظام تقييم ذكي وشامل. تتميز المنصة بتقديم مساعد ذكاء اصطناعي متاح على مدار الساعة للإجابة على التساؤلات العلمية في المناهج (مثل الفيزياء والرياضيات) والمساعدة في تصفح المنصة.
+    </p>
+    <div class="ai-bubble-info">
+      <i class="bi bi-chat-dots-fill"></i>
+      ستجد مساعدنا الذكي دائماً في فقرة منبثقة على يمين الشاشة لخدمتك في أي وقت.
+    </div>
+  </div>
+
+  <div class="about-section">
+    <h2>نظام الأدوار والصلاحيات</h2>
+    <p class="about-text">تعتمد المنصة تقنيات <strong>Flask</strong> و <strong>MongoDB</strong> لإدارة أربعة أدوار أساسية تضمن انسيابية العملية التعليمية:</p>
+    <div class="role-grid">
+      <div class="role-card">
+        <h3>الطالب</h3>
+        <p class="about-text">تصفح المحتوى، حل الاختبارات، متابعة لوحة الصدارة، والمشاركة في التحديات الودية باستخدام الجواهر.</p>
+      </div>
+      <div class="role-card">
+        <h3>المعلم</h3>
+        <p class="about-text">إدارة المواد الخاصة به، تعديل المحتوى، ومتابعة أداء الطلاب المسجلين في مواده.</p>
+      </div>
+      <div class="role-card">
+        <h3>محرر الأسئلة</h3>
+        <p class="about-text">تعديل وإدارة بنوك الأسئلة للاختبارات التي يحددها المسؤول بدقة.</p>
+      </div>
+      <div class="role-card">
+        <h3>المسؤول (Admin)</h3>
+        <p class="about-text">إدارة النظام بشكل عام، وتحديث المحتوى، ومتابعة أداء المستخدمين.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="about-section">
+    <h2>مميزات التعلم الذكي</h2>
+    <p class="about-text">
+      نحن لا نقدم مجرد دروس، بل تجربة تعليمية متكاملة تشمل:
+    </p>
+    <ul class="about-text" style="margin-top: 1rem;">
+      <li><strong>اختبارات شاملة:</strong> اختبارات مؤتمتة وغير مؤتمتة لكل درس مع ميزة التصحيح الذاتي والمراجعة.</li>
+      <li><strong>التحديات الودية:</strong> نظام منافسة متزامن بين الطلاب يعتمد على سرعة ودقة الحل مقابل رسوم رمزية من الجواهر.</li>
+      <li><strong>مراجعة الأخطاء المتكررة:</strong> خوارزمية ذكية تحصر الأسئلة التي يخطئ بها الطالب باستمرار لتركيز المراجعة عليها.</li>
+      <li><strong>محتوى مرئي متنوع:</strong> دروس تشمل مقاطع تعليمية قصيرة ومحاضرات كاملة لتناسب كافة أساليب التعلم.</li>
+      <li><strong>نظام الجواهر:</strong> عملة افتراضية للمنصة تستخدم في التحديات وتحدد الترتيب في لوحة الصدارة.</li>
+    </ul>
+  </div>
+
+  <div class="about-section" style="text-align: center; border-right: none;">
+    <p class="about-text" style="font-weight: 700; color: var(--about-accent);">
+      نحن هنا لنرسم معك طريق النجاح، بأسلوب احترافي وودود في آن واحد.
+    </p>
+  </div>
+</div>
+{% endblock %}
