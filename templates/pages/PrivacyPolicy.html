@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block title %}سياسة الخصوصية | EduPath{% endblock %}
+{% block meta_description %}سياسة الخصوصية وشروط الاستخدام لمنصة EduPath التعليمية.{% endblock %}
+{% block meta_robots %}index,follow{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+
+  .privacy-shell {
+    --priv-bg-1: #f8fafc;
+    --priv-bg-2: #f1f5f9;
+    --priv-ink: #0f172a;
+    --priv-muted: #475569;
+    --priv-accent: #0f766e; /* Matching the Teal accent from services */
+    --priv-card: #ffffff;
+    font-family: 'Tajawal', sans-serif;
+    color: var(--priv-ink);
+    border-radius: 1.2rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, var(--priv-bg-1), var(--priv-bg-2));
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    direction: rtl;
+  }
+
+  .priv-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .priv-title {
+    font-weight: 800;
+    color: var(--priv-accent);
+    margin-bottom: 0.5rem;
+  }
+
+  .priv-section {
+    background: var(--priv-card);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    border-right: 5px solid var(--priv-accent);
+  }
+
+  .priv-section-title {
+    font-weight: 700;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .priv-text {
+    color: var(--priv-muted);
+    line-height: 1.8;
+    margin-bottom: 0;
+  }
+
+  .priv-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .priv-list li {
+    position: relative;
+    padding-right: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--priv-muted);
+  }
+
+  .priv-list li::before {
+    content: "•";
+    color: var(--priv-accent);
+    font-weight: bold;
+    position: absolute;
+    right: 0;
+  }
+
+  .priv-footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding: 1rem;
+    font-size: 0.9rem;
+    color: var(--priv-muted);
+    border-top: 1px solid #e2e8f0;
+  }
+
+  @media (max-width: 768px) {
+    .privacy-shell {
+      padding: 1.2rem;
+    }
+  }
+</style>
+
+<div class="privacy-shell">
+  <div class="priv-header">
+    <h1 class="h3 priv-title">سياسة الخصوصية</h1>
+    <p class="text-muted">آخر تحديث: أبريل 2024</p>
+  </div>
+
+  <div class="priv-section">
+    <div class="priv-section-title">
+      <i class="bi bi-shield-check"></i> 1. نظرة عامة
+    </div>
+    <p class="priv-text">
+      تلتزم منصة EduPath بحماية بيانات جميع المستخدمين. توضح هذه السياسة كيفية التعامل مع البيانات لضمان بيئة تعليمية آمنة ومستقرة لجميع الأطراف.
+    </p>
+  </div>
+
+  <div class="priv-section">
+    <div class="priv-section-title">
+      <i class="bi bi-database"></i> 2. البيانات التي يتم جمعها
+    </div>
+    <ul class="priv-list">
+      <li>بيانات الحساب الأساسية: الاسم الأول والأخير، اسم المستخدم، ورقم الهاتف.</li>
+      <li>ملفات تعريف الارتباط: تُستخدم لإدارة الجلسات فقط.</li>
+      <li>سجلات النشاط: يتم تسجيل نشاطات المدرسين ومحرري الأسئلة لأغراض الرقابة والجودة.</li>
+      <li>البيانات التعليمية: نتائج الاختبارات، الجواهر (Gems)، والمستويات لتقديم تقارير الأداء.</li>
+    </ul>
+  </div>
+
+  <div class="priv-section">
+    <div class="priv-section-title">
+      <i class="bi bi-lock"></i> 3. صلاحيات الوصول والأمن
+    </div>
+    <p class="priv-text">
+      يتم تقييد الوصول للبيانات بناءً على الأدوار:
+    </p>
+    <ul class="priv-list">
+      <li><b>المسؤول:</b> يمتلك الصلاحية الكاملة لإدارة قاعدة البيانات يدوياً.</li>
+      <li><b>المدرسون:</b> يمكنهم عرض بيانات الطلاب (الاسم، الهاتف) للمتابعة، دون صلاحية تصديرها.</li>
+      <li><b>الجلسات:</b> يُسمح بتسجيل الدخول من جهاز واحد فقط؛ أي دخول جديد يلغي الجلسة السابقة فوراً.</li>
+    </ul>
+  </div>
+
+  <div class="priv-section">
+    <div class="priv-section-title">
+      <i class="bi bi-camera-video"></i> 4. حماية المحتوى والوسائط
+    </div>
+    <p class="priv-text">
+      تُستضاف الوسائط التعليمية عبر Google Drive. يُحظر تماماً تصوير أو مشاركة المحتوى التعليمي خارج المنصة. في حال المخالفة، يتم حظر الحساب وحذف بياناته نهائياً دون حق استرداد الرسوم.
+    </p>
+  </div>
+
+  <div class="priv-section">
+    <div class="priv-section-title">
+      <i class="bi bi-trash"></i> 5. حذف البيانات
+    </div>
+    <p class="priv-text">
+      عند رغبة المستخدم في حذف حسابه أو عند اتخاذ قرار إداري بالحظر، يتم حذف كافة البيانات المرتبطة بالحساب من قاعدة البيانات بشكل نهائي ودائم يدوياً من قبل المسؤول.
+    </p>
+  </div>
+
+  <div class="priv-section">
+    <div class="priv-section-title">
+      <i class="bi bi-chat-dots"></i> 6. التواصل والدعم
+    </div>
+    <p class="priv-text">
+      لأغراض الدعم التقني أو طلبات حذف البيانات، يتم التواصل مع الإدارة أو المعلم عبر تطبيق WhatsApp.
+    </p>
+  </div>
+
+  <div class="priv-footer">
+    حقوق الطبع والنشر © 2026 EduPath. جميع الحقوق محفوظة.
+  </div>
+</div>
+{% endblock %}
