@@ -1,3 +1,5 @@
+from fileinput import filename
+
 from flask import Flask, render_template, session, request, redirect, url_for, flash, send_from_directory, g, jsonify
 from pathlib import Path
 from werkzeug.exceptions import NotFound
@@ -375,6 +377,17 @@ def create_app():
                 app.logger.debug(f"{request.method} {request.path} took {elapsed:.3f}s")
         log_staff_activity_from_request(response)
         return response
+
+    @app.route('/media/videos/<filename>')
+    @login_required
+    def serve_video(filename):
+        # Optional: Verify if the current_user has access to this specific video here
+        return send_from_directory(
+            app.config['VIDEO_UPLOAD_FOLDER'], 
+            filename, 
+            mimetype='video/mp4'
+        )
+
 
     return app
 

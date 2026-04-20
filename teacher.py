@@ -1,12 +1,14 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, Response
+from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, current_app
 import json
 import os
 from datetime import datetime, timedelta
 from flask_login import login_required, current_user
 from werkzeug.exceptions import NotFound
+from werkzeug.utils import secure_filename
 from mongoengine.errors import DoesNotExist
 from bson import ObjectId
 from bson.dbref import DBRef
+import uuid
 
 try:
     from fpdf import FPDF
@@ -3592,7 +3594,7 @@ def lesson_detail(lesson_id):
 
 @teacher_bp.route("/lessons/<lesson_id>/edit", methods=["GET", "POST"])
 @login_required
-@role_required("teacher")
+@role_required("admin")
 def edit_lesson(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
@@ -3601,6 +3603,7 @@ def edit_lesson(lesson_id):
     if scope_response:
         return scope_response
     form = LessonForm()
+    
     if form.validate_on_submit():
         resource_labels = request.form.getlist("resource_label[]")
         resource_urls = request.form.getlist("resource_url[]")
@@ -3611,6 +3614,26 @@ def edit_lesson(lesson_id):
             if lbl.strip() and url.strip()
         ]
 
+        # --- LOCAL VIDEO UPLOAD LOGIC ---
+        if form.video_file.data:
+            video_file = form.video_file.data
+            ext = video_file.filename.split('.')[-1]
+            new_filename = f"{uuid.uuid4().hex}.{ext}"
+            
+            # Optional but recommended: Delete the old video file to save disk space
+            if getattr(lesson, 'video_filename', None):
+                old_path = os.path.join(current_app.config['VIDEO_UPLOAD_FOLDER'], lesson.video_filename)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            
+            # Save the new video file
+            save_path = os.path.join(current_app.config['VIDEO_UPLOAD_FOLDER'], new_filename)
+            video_file.save(save_path)
+            
+            # Update the lesson document
+            lesson.video_filename = new_filename
+        # --------------------------------
+
         lesson.title = form.title.data
         lesson.content = form.content.data
         lesson.requires_code = form.requires_code.data
@@ -3618,6 +3641,7 @@ def edit_lesson(lesson_id):
         lesson.link_url = form.link_url.data
         lesson.link_label_2 = form.link_label_2.data
         lesson.link_url_2 = form.link_url_2.data
+        
         lesson.save()
 
         # Replace resources from form
@@ -3633,6 +3657,7 @@ def edit_lesson(lesson_id):
             res.save()
         flash("تم تحديث الدرس بنجاح.", "success")
         return redirect(url_for("teacher.lesson_detail", lesson_id=lesson.id))
+        
     elif request.method == "GET":
         form.title.data = lesson.title
         form.content.data = lesson.content
@@ -3641,8 +3666,9 @@ def edit_lesson(lesson_id):
         form.link_url.data = lesson.link_url
         form.link_label_2.data = lesson.link_label_2
         form.link_url_2.data = lesson.link_url_2
+        # Note: We do not populate form.video_file on GET because HTML file inputs cannot be pre-populated with server files.
+        
     return render_template("teacher/lesson_form.html", form=form, lesson=lesson)
-
 
 @teacher_bp.route("/lessons/<lesson_id>/delete", methods=["POST"])
 @login_required

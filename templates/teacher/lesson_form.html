@@ -10,7 +10,7 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post">
+    <form method="post" action="" enctype="multipart/form-data">
       {{ form.hidden_tag() }}
       <div class="mb-3">
         {{ form.title.label(class="form-label") }}
@@ -30,7 +30,19 @@
           <label class="form-label mb-0">موارد الدرس</label>
           <button type="button" class="btn btn-sm btn-outline-primary" id="add-resource">إضافة مورد</button>
         </div>
-        <div id="resource-list">
+        <div class="form-group mb-3">
+    {{ form.video_file.label(class="form-label font-weight-bold text-primary") }}
+    {{ form.video_file(class="form-control-file", accept="video/mp4,video/webm") }}
+    <small class="form-text text-muted">
+        قم برفع ملف الفيديو من جهازك (بصيغة MP4 أو WebM). سيتم تجاهل رابط Google Drive إذا قمت برفع ملف هنا.
+    </small>
+</div>
+
+{% if lesson and lesson.video_filename %}
+<div class="badge bg-info mb-3">
+<strong>الفيديو الحالي:</strong> {{ lesson.video_filename }}
+</div>
+{% endif %}
           {% set existing = lesson.resources if lesson else [] %}
           {% if existing %}
             {% for res in existing %}

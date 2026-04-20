@@ -43,7 +43,7 @@ def register():
                 user.current_session_token = new_token
                 user.save()
                 session.clear()
-                login_user(user)
+                login_user(user, remember=form.remember_me.data)
                 session['session_token'] = new_token
                 session.modified = True
                 

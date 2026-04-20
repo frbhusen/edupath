@@ -1,3 +1,4 @@
+from datetime import timedelta
 import os
 from urllib.parse import quote_plus
 from urllib.parse import urlsplit, urlunsplit
@@ -85,7 +86,7 @@ class Config:
     MONGODB_URI = os.environ.get("MONGODB_URI", "mongodb://localhost:27017/study_platform")
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").strip().lower() in {"1", "true", "yes", "on"}
-
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)
     _cache_redis_url = _detect_cache_redis_url()
     _cache_type = (os.environ.get("CACHE_TYPE") or "").strip()
     if not _cache_type:
@@ -109,3 +110,8 @@ class Config:
     ]
     COMPRESS_LEVEL = int(os.environ.get("COMPRESS_LEVEL", "6"))
     COMPRESS_MIN_SIZE = int(os.environ.get("COMPRESS_MIN_SIZE", "500"))
+
+    ##Host videos on the server instead of google drive
+    VIDEO_UPLOAD_FOLDER = os.environ.get("VIDEO_UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads", "videos"))
+    # Set a max upload size to prevent server memory crashes (e.g., 500 MB)
+    MAX_CONTENT_LENGTH = 500 * 1024 * 1024

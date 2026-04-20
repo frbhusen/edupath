@@ -1,54 +1,65 @@
-{% extends 'base.html' %}
-{% block title %}تسجيل الدخول | EduPath{% endblock %}
-{% block meta_description %}تسجيل الدخول إلى EduPath للوصول إلى الدروس والاختبارات والتقدم الدراسي.{% endblock %}
-{% block meta_robots %}noindex,nofollow{% endblock %}
-{% block content %}
+{% extends 'base.html' %} {% block title %}تسجيل الدخول | EduPath{% endblock %}
+{% block meta_description %}تسجيل الدخول إلى EduPath للوصول إلى الدروس
+والاختبارات والتقدم الدراسي.{% endblock %} {% block meta_robots
+%}noindex,nofollow{% endblock %} {% block content %}
 <div class="row justify-content-center gx-0 pb-5 col-lg-12">
-    <div class="col-12 col-md-6 col-lg-4 px-0 px-sm-2">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h2 class="h4 mb-3">تسجيل الدخول</h2>
-                <form method="post">
-                    {{ form.hidden_tag() }}
-                    <div class="mb-3">
-                        {{ form.username_or_phone.label(class="form-label") }}
-                        {{ form.username_or_phone(class="form-control") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.password.label(class="form-label") }}
-                        <div class="position-relative">
-                            {{ form.password(class="form-control pe-5", id="login-password") }}
-                            <button class="btn btn-link position-absolute end-0 top-50 translate-middle-y me-2 p-0" type="button" id="toggle-login-password" aria-label="إظهار كلمة المرور">
-                                <i class="bi bi-eye" id="login-password-icon"></i>
-                            </button>
-                        </div>
-                    </div>
-                    {{ form.submit(class="btn btn-primary w-100 login-btn") }}
-                </form>
+  <div class="col-12 col-md-6 col-lg-4 px-0 px-sm-2">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h4 mb-3">تسجيل الدخول</h2>
+        <form method="post">
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+            {{ form.username_or_phone.label(class="form-label") }} {{
+            form.username_or_phone(class="form-control") }}
+          </div>
+          <div class="mb-3">
+            {{ form.password.label(class="form-label") }}
+            <div class="position-relative">
+              {{ form.password(class="form-control pe-5", id="login-password")
+              }}
+              <button
+                class="btn btn-link position-absolute end-0 top-50 translate-middle-y me-2 p-0"
+                type="button"
+                id="toggle-login-password"
+                aria-label="إظهار كلمة المرور"
+              >
+                <i class="bi bi-eye" id="login-password-icon"></i>
+              </button>
             </div>
-            <div class="card-footer text-center">
-                <p class="mb-0">
-                    <a href="{{ url_for('auth.register') }}" class="text-decoration-none d-inline-block text-break">
-                        ليس لديك حساب في المنصة؟ انضم الان
-                    </a>
-                </p>
-            </div>
-        </div>
+          </div>
+          <div class="form-group mb-3 form-check">
+            {{ form.remember_me(class="form-check-input") }} {{
+            form.remember_me.label(class="form-check-label") }}
+          </div>
+          {{ form.submit(class="btn btn-primary w-100 login-btn") }}
+        </form>
+      </div>
+      <div class="card-footer text-center">
+        <p class="mb-0">
+          <a
+            href="{{ url_for('auth.register') }}"
+            class="text-decoration-none d-inline-block text-break"
+          >
+            ليس لديك حساب في المنصة؟ انضم الان
+          </a>
+        </p>
+      </div>
     </div>
- </div>
-{% endblock %}
-{% block scripts %}
+  </div>
+</div>
+{% endblock %} {% block scripts %}
 <script>
-    (function () {
-        const btn = document.getElementById('toggle-login-password');
-        const input = document.getElementById('login-password');
-        const icon = document.getElementById('login-password-icon');
-        if (!btn || !input || !icon) return;
-        btn.addEventListener('click', () => {
-            const isHidden = input.type === 'password';
-            input.type = isHidden ? 'text' : 'password';
-            icon.className = isHidden ? 'bi bi-eye-slash' : 'bi bi-eye';
-        });
-    })();
+  (function () {
+    const btn = document.getElementById("toggle-login-password");
+    const input = document.getElementById("login-password");
+    const icon = document.getElementById("login-password-icon");
+    if (!btn || !input || !icon) return;
+    btn.addEventListener("click", () => {
+      const isHidden = input.type === "password";
+      input.type = isHidden ? "text" : "password";
+      icon.className = isHidden ? "bi bi-eye-slash" : "bi bi-eye";
+    });
+  })();
 </script>
 {% endblock %}

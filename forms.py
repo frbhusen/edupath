@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, TextAreaField, PasswordField, SelectField, SubmitField, IntegerField, BooleanField
 from wtforms.validators import DataRequired, Length, EqualTo, Optional, Regexp, ValidationError
 
@@ -34,6 +35,7 @@ class LoginForm(FlaskForm):
     username_or_phone = StringField("اسم المستخدم أو رقم الهاتف", filters=[_strip_edges], validators=[DataRequired()])
     password = PasswordField("كلمة المرور", validators=[DataRequired()])
     submit = SubmitField("تسجيل الدخول")
+    remember_me = BooleanField("تذكرني")
 
 class SubjectForm(FlaskForm):
     name = StringField("الاسم", validators=[DataRequired(), Length(max=120)])
@@ -56,6 +58,9 @@ class LessonForm(FlaskForm):
     link_url = StringField("رابط URL", validators=[Length(max=500)])
     link_label_2 = StringField("تسمية الرابط 2", validators=[Length(max=120)])
     link_url_2 = StringField("رابط URL 2", validators=[Length(max=500)])
+    video_file = FileField('رفع فيديو الدرس (MP4)', validators=[
+        FileAllowed(['mp4', 'webm'], 'فقط ملفات الفيديو مسموحة!')
+    ])
     submit = SubmitField("حفظ")
 
 class TestForm(FlaskForm):

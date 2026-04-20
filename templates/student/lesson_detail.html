@@ -59,7 +59,22 @@
     <div class="text-muted mb-3">لا يوجد محتوى.</div>
     {% endif %}
     <div class="d-flex flex-wrap gap-2">
-      {% if lesson.link_label and lesson.link_url %}
+      {% if lesson.video_filename %}
+      <div class="video-container" style="max-width: 100%; margin: 0 auto">
+        <video
+          controls
+          preload="metadata"
+          style="width: 100%; border-radius: 8px"
+          controlsList="nodownload"
+        >
+          <source
+            src="{{ url_for('serve_video', filename=lesson.video_filename) }}"
+            type="video/mp4"
+          />
+          متصفحك لا يدعم تشغيل الفيديو.
+        </video>
+      </div>
+      {% elif lesson.link_label and lesson.link_url%}
       <a
         class="btn btn-cta btn-sm"
         href="{{ lesson.link_url }}"
