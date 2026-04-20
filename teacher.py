@@ -3670,6 +3670,42 @@ def edit_lesson(lesson_id):
         
     return render_template("teacher/lesson_form.html", form=form, lesson=lesson)
 
+@teacher_bp.route("/lesson/<lesson_id>/delete_video", methods=["POST"])
+@login_required
+def delete_lesson_video(lesson_id):
+    # 1. Fetch the lesson and verify permissions
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        raise NotFound()
+    
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response:
+        return scope_response
+
+    # 2. Check if a video actually exists
+    if getattr(lesson, 'video_filename', None):
+        # 3. Construct the absolute path to the file on the Ubuntu server
+        file_path = os.path.join(current_app.config['VIDEO_UPLOAD_FOLDER'], lesson.video_filename)
+        
+        # 4. Safely delete the physical file from the SSD
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            current_app.logger.error(f"Failed to delete video file {file_path}: {e}")
+            flash("حدث خطأ أثناء حذف ملف الفيديو من الخادم.", "error")
+            return redirect(url_for("teacher.edit_lesson", lesson_id=lesson.id))
+
+        # 5. Remove the reference from the MongoDB document
+        lesson.video_filename = None
+        lesson.save()
+        
+        flash("تم حذف الفيديو بنجاح.", "success")
+    else:
+        flash("لا يوجد فيديو لحذفه.", "warning")
+
+    # 6. Redirect back to the edit page
+    return redirect(url_for("teacher.edit_lesson", lesson_id=lesson.id))
 @teacher_bp.route("/lessons/<lesson_id>/delete", methods=["POST"])
 @login_required
 @role_required("teacher")
