@@ -113,5 +113,6 @@ class Config:
 
     ##Host videos on the server instead of google drive
     VIDEO_UPLOAD_FOLDER = os.environ.get("VIDEO_UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads", "videos"))
+    AUDIO_UPLOAD_FOLDER = os.environ.get("AUDIO_UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads", "audio"))
     # Set a max upload size to prevent server memory crashes (e.g., 500 MB)
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024

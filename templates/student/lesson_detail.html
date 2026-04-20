@@ -74,7 +74,33 @@
           متصفحك لا يدعم تشغيل الفيديو.
         </video>
       </div>
-      {% elif lesson.link_label and lesson.link_url%}
+      {% endif %} {% if lesson.audio_filename %}
+      <div
+        class="audio-container mt-4 mb-4"
+        style="
+          max-width: 100%;
+          padding: 15px;
+          background: #f8f9fa;
+          border-radius: 8px;
+        "
+      >
+        <h5 class="mb-3 text-primary">
+          <i class="fas fa-headphones"></i> الاستماع للدرس
+        </h5>
+        <audio
+          controls
+          preload="metadata"
+          style="width: 100%"
+          controlsList="nodownload"
+        >
+          <source
+            src="/media/audio/{{ lesson.audio_filename }}"
+            type="audio/mpeg"
+          />
+          متصفحك لا يدعم تشغيل الصوتيات.
+        </audio>
+      </div>
+      {% endif %} {% if lesson.link_label and lesson.link_url%}
       <a
         class="btn btn-cta btn-sm"
         href="{{ lesson.link_url }}"

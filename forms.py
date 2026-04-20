@@ -61,6 +61,10 @@ class LessonForm(FlaskForm):
     video_file = FileField('رفع فيديو الدرس (MP4)', validators=[
         FileAllowed(['mp4', 'webm'], 'فقط ملفات الفيديو مسموحة!')
     ])
+    audio_file = FileField('رفع ملف صوتي (MP3)', validators=[
+        FileAllowed(['mp3','wav','ogg','m4a','flac'], 'فقط ملفات الصوت مسموحة!')
+    ])
+
     submit = SubmitField("حفظ")
 
 class TestForm(FlaskForm):

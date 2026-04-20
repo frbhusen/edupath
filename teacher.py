@@ -3633,6 +3633,24 @@ def edit_lesson(lesson_id):
             # Update the lesson document
             lesson.video_filename = new_filename
         # --------------------------------
+        # --- LOCAL AUDIO UPLOAD LOGIC ---
+        if form.audio_file.data:
+            audio_file = form.audio_file.data
+            ext = audio_file.filename.split('.')[-1]
+            new_audio_filename = f"audio_{uuid.uuid4().hex}.{ext}"
+            
+            # Delete old audio if it exists
+            if getattr(lesson, 'audio_filename', None):
+                old_audio_path = os.path.join(current_app.config['AUDIO_UPLOAD_FOLDER'], lesson.audio_filename)
+                if os.path.exists(old_audio_path):
+                    os.remove(old_audio_path)
+            
+            # Save the new audio file
+            save_audio_path = os.path.join(current_app.config['AUDIO_UPLOAD_FOLDER'], new_audio_filename)
+            audio_file.save(save_audio_path)
+            
+            lesson.audio_filename = new_audio_filename
+        # --------------------------------
 
         lesson.title = form.title.data
         lesson.content = form.content.data
@@ -3706,6 +3724,34 @@ def delete_lesson_video(lesson_id):
 
     # 6. Redirect back to the edit page
     return redirect(url_for("teacher.edit_lesson", lesson_id=lesson.id))
+
+@teacher_bp.route("/lesson/<lesson_id>/delete_audio", methods=["POST"])
+@login_required
+def delete_lesson_audio(lesson_id):
+    lesson = Lesson.objects(id=lesson_id).first()
+    if not lesson:
+        raise NotFound()
+    scope_response = _ensure_scope_for_lesson(lesson)
+    if scope_response: return scope_response
+
+    if getattr(lesson, 'audio_filename', None):
+        file_path = os.path.join(current_app.config['AUDIO_UPLOAD_FOLDER'], lesson.audio_filename)
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            current_app.logger.error(f"Failed to delete audio file {file_path}: {e}")
+            flash(f"حدث خطأ أثناء حذف الملف الصوتي: {str(e)}", "error")
+            return redirect(url_for("teacher.edit_lesson", lesson_id=lesson.id))
+
+        lesson.audio_filename = None
+        lesson.save()
+        flash("تم حذف الملف الصوتي بنجاح.", "success")
+    else:
+        flash("لا يوجد ملف صوتي لحذفه.", "warning")
+
+    return redirect(url_for("teacher.edit_lesson", lesson_id=lesson.id))
+
 @teacher_bp.route("/lessons/<lesson_id>/delete", methods=["POST"])
 @login_required
 @role_required("teacher")

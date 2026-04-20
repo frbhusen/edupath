@@ -66,6 +66,42 @@
         </div>
       </div>
 
+      <div class="card mb-4 border-info">
+        <div class="card-header bg-info text-white font-weight-bold">
+          إدارة الملفات الصوتية
+        </div>
+        <div class="card-body">
+
+          <div class="form-group mb-3">
+            {{ form.audio_file.label(class="form-label font-weight-bold") }}
+            {{ form.audio_file(class="form-control-file", id="audio_file", accept="audio/*") }}
+          </div>
+
+          <div id="audio-upload-progress-container" class="mt-3 mb-3" style="display: none;">
+            <label class="font-weight-bold text-success">جاري رفع الملف الصوتي...</label>
+            <div class="progress" style="height: 25px;">
+              <div id="audio-upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                0%
+              </div>
+            </div>
+          </div>
+
+          {% if lesson and lesson.audio_filename %}
+          <hr>
+          <div class="d-flex justify-content-between align-items-center mb-0">
+            <div>
+              <strong>الملف الصوتي الحالي:</strong> {{ lesson.audio_filename }}
+            </div>
+            <button type="submit" form="deleteAudioForm" class="btn btn-danger btn-sm" onclick="return confirm('هل أنت متأكد أنك تريد حذف هذا الملف الصوتي نهائياً؟');">
+              <i class="fas fa-trash"></i> حذف الصوت
+            </button>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
       <div class="mt-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <label class="form-label mb-0">موارد الدرس</label>
@@ -144,9 +180,16 @@
 </div>
 {% endif %}
 
+
 {% if lesson and lesson.video_filename %}
 <form id="deleteVideoForm" action="{{ url_for('teacher.delete_lesson_video', lesson_id=lesson.id) }}" method="POST" style="display: none;">
-    <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}" />
+    {{ form.csrf_token }}
+</form>
+{% endif %}
+
+{% if lesson and lesson.audio_filename %}
+<form id="deleteAudioForm" action="{{ url_for('teacher.delete_lesson_audio', lesson_id=lesson.id) }}" method="POST" style="display: none;">
+    {{ form.csrf_token }}
 </form>
 {% endif %}
 
@@ -196,23 +239,40 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('lessonUploadForm');
-    const videoInput = document.getElementById('video_file');
-    const progressContainer = document.getElementById('upload-progress-container');
-    const progressBar = document.getElementById('upload-progress-bar');
     const submitBtn = document.getElementById('submitLessonBtn');
+    
+    // Video Elements
+    const videoInput = document.getElementById('video_file');
+    const videoProgressContainer = document.getElementById('upload-progress-container');
+    const videoProgressBar = document.getElementById('upload-progress-bar');
+    
+    // Audio Elements
+    const audioInput = document.getElementById('audio_file');
+    const audioProgressContainer = document.getElementById('audio-upload-progress-container');
+    const audioProgressBar = document.getElementById('audio-upload-progress-bar');
 
-    if (form && videoInput) {
+    if (form) {
       form.addEventListener('submit', function (e) {
-        // Only use AJAX if a new video file is actually selected
-        if (videoInput.files.length > 0) {
+        
+        const isUploadingVideo = videoInput && videoInput.files.length > 0;
+        const isUploadingAudio = audioInput && audioInput.files.length > 0;
+
+        // Only use AJAX if a new video or audio file is actually selected
+        if (isUploadingVideo || isUploadingAudio) {
           e.preventDefault();
 
           // Lock UI
           if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerText = 'جاري الحفظ...';
+            submitBtn.innerText = 'جاري الحفظ والرفع...';
           }
-          progressContainer.style.display = 'block';
+          
+          if (isUploadingVideo && videoProgressContainer) {
+            videoProgressContainer.style.display = 'block';
+          }
+          if (isUploadingAudio && audioProgressContainer) {
+            audioProgressContainer.style.display = 'block';
+          }
 
           const formData = new FormData(form);
           const xhr = new XMLHttpRequest();
@@ -223,9 +283,18 @@
           xhr.upload.onprogress = function (event) {
             if (event.lengthComputable) {
               const percentComplete = Math.round((event.loaded / event.total) * 100);
-              progressBar.style.width = percentComplete + '%';
-              progressBar.setAttribute('aria-valuenow', percentComplete);
-              progressBar.innerText = percentComplete + '%';
+              
+              if (isUploadingVideo && videoProgressBar) {
+                videoProgressBar.style.width = percentComplete + '%';
+                videoProgressBar.setAttribute('aria-valuenow', percentComplete);
+                videoProgressBar.innerText = percentComplete + '%';
+              }
+              
+              if (isUploadingAudio && audioProgressBar) {
+                audioProgressBar.style.width = percentComplete + '%';
+                audioProgressBar.setAttribute('aria-valuenow', percentComplete);
+                audioProgressBar.innerText = percentComplete + '%';
+              }
             }
           };
 
@@ -246,7 +315,7 @@
 
           xhr.send(formData);
         }
-        // If no video is selected, let the form submit normally (instant page load)
+        // If no file is selected, let the form submit normally (instant page load)
       });
     }
 
@@ -255,9 +324,22 @@
         submitBtn.disabled = false;
         submitBtn.innerText = 'حفظ الدرس';
       }
-      progressContainer.style.display = 'none';
-      progressBar.style.width = '0%';
-      progressBar.innerText = '0%';
+      
+      if (videoProgressContainer) {
+        videoProgressContainer.style.display = 'none';
+        if (videoProgressBar) {
+          videoProgressBar.style.width = '0%';
+          videoProgressBar.innerText = '0%';
+        }
+      }
+      
+      if (audioProgressContainer) {
+        audioProgressContainer.style.display = 'none';
+        if (audioProgressBar) {
+          audioProgressBar.style.width = '0%';
+          audioProgressBar.innerText = '0%';
+        }
+      }
     }
   });
 </script>
