@@ -3693,7 +3693,7 @@ def delete_lesson_video(lesson_id):
                 os.remove(file_path)
         except Exception as e:
             current_app.logger.error(f"Failed to delete video file {file_path}: {e}")
-            flash("حدث خطأ أثناء حذف ملف الفيديو من الخادم.", "error")
+            flash(f"حدث خطأ أثناء حذف ملف الفيديو من الخادم. : {file_path}: {e}", "error")
             return redirect(url_for("teacher.edit_lesson", lesson_id=lesson.id))
 
         # 5. Remove the reference from the MongoDB document
