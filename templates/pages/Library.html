@@ -1,8 +1,416 @@
 {% extends 'base.html' %}
+{% block title %}EduPath | المكتبة الشاملة{% endblock %}
+{% block meta_description %}
+  المكتبة الشاملة لمنصة EduPath - تحميل الكتب المدرسية، المذكرات، ونماذج الاختبارات
+{% endblock %}
 {% block content %}
-<div class="text-center py-5">
-  <h1 class="display-6 mb-3"> مكتبة EduPath </h1>
-  <p class="text-muted mb-4">نحن نعمل على إضافة المزيد من المحتوى</p>
-  <a class="btn btn-cta" href="{{ url_for('index') }}">العودة للرئيسية</a>
-</div>
+  {# ========================================== #}
+  {# إعدادات البيانات - يمكنك الإضافة والتعديل هنا بسهولة #}
+  {# ========================================== #}
+  {% set library_books = [
+    {
+      "name": "كتاب الفيزياء - الصف الثاني عشر",
+      "meta": "15 MB",
+      "url": "#"
+    },
+    {
+      "name": "كتاب الرياضيات - الصف الحادي عشر",
+      "meta": "12 MB",
+      "url": "#"
+    }
+  ] %}
+  {% set library_notebooks = [
+    {
+      "name": "ملخص الكيمياء العضوية",
+      "teacher": "أ. أحمد محمد",
+      "meta": "5 MB",
+      "url": "#"
+    },
+    {
+      "name": "قواعد اللغة الإنجليزية",
+      "teacher": "أ. سارة خالد",
+      "meta": "3.2 MB",
+      "url": "#"
+    }
+  ] %}
+  {% set library_tests = [
+    {
+      "name": "اختبار نهاية الفصل الأول 2024",
+      "meta": "مادة الأحياء | 2 MB",
+      "url": "#"
+    },
+    {
+      "name": "نموذج تجريبي للغة العربية",
+      "meta": "الصف العاشر | 1.5 MB",
+      "url": "#"
+    }
+  ] %}
+  {% set test_templates = [
+      {"name": "قالب امتحان رياضيات - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/الرياضيات.pdf')},
+      {"name": "قالب امتحان الفيزياء - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/الفيزياء.pdf')},
+      {"name": "قالب امتحان الكيمياء - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/الكيمياء.pdf')},
+      {"name": "قالب امتحان اللغة العربية - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/اللغة العربية.pdf')},
+      {"name": "قالب امتحان العلوم - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/العلوم.pdf')},
+      {"name": "قالب امتحان التربية الدينية الإسلامية - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/التربية الدينية الإسلامية.pdf')},
+      {"name": "قالب امتحان اللغة الإنجليزية - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/اللغة الإنجليزية.pdf')},
+      {"name": "قالب امتحان اللغة الفرنسية - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/اللغة الفرنسية.pdf')},
+      {"name": "قالب الامتحان الشامل  - الصف الثاني عشر", "meta": "PDF", "url": url_for('serve_uploads', filename='library/templates/الفرع العلمي.pdf')},
+    ] %}
+  {# ========================================== #}
+  <style>
+  /* تصميم المكتبة */
+  .hero-library {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-right: 5px solid #0d6efd;
+    border-radius: 0.75rem;
+  }
+
+  /* أزرار التبويب */
+  .nav-pills .nav-link {
+    color: #495057;
+    font-weight: 600;
+    border-radius: 2rem;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .nav-pills .nav-link:hover {
+    background-color: #f1f5f9;
+  }
+  .nav-pills .nav-link.active {
+    background-color: #0d6efd;
+    color: #fff;
+    border-color: #0d6efd;
+    box-shadow: 0 4px 10px rgba(13, 110, 253, 0.2);
+  }
+
+  /* إخفاء وتأثيرات التبويبات */
+  .tab-pane {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+  }
+  .tab-pane.active.show {
+    display: block;
+    opacity: 1;
+  }
+
+  /* بطاقات الملفات */
+  .doc-card {
+    background: #fff;
+    border: 1px solid #eef0f2;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  }
+  .doc-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+    border-color: #dee2e6;
+  }
+
+  .doc-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 0.5rem;
+    flex-shrink: 0;
+  }
+  .icon-book {
+    background: #e0f2fe;
+    color: #0284c7;
+  }
+  .icon-notebook {
+    background: #fef08a;
+    color: #ca8a04;
+  }
+  .icon-test {
+    background: #fce7f3;
+    color: #db2777;
+  }
+  .icon-template {
+    background: #c0ecc4;
+    color: #22af2e;
+  }
+
+  .doc-info {
+    flex-grow: 1;
+  }
+  .doc-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 0.25rem;
+  }
+  .doc-meta {
+    font-size: 0.85rem;
+    color: #6c757d;
+  }
+  .doc-meta span {
+    display: inline-block;
+    margin-left: 0.75rem;
+  }
+  .download-btn {
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    color: #0d6efd;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+  }
+  .doc-card:hover .download-btn {
+    background: #0d6efd;
+    color: #fff;
+    border-color: #0d6efd;
+  }
+  </style>
+  <div class="hero-library mb-4 p-4 d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="h3 mb-2 fw-bold text-dark">المكتبة الشاملة</h1>
+      <p class="mb-0 text-muted">
+        وجهتك الأولى لتحميل الكتب الدراسية، مذكرات المعلمين، ونماذج الاختبارات
+        السابقة.
+      </p>
+    </div>
+  </div>
+  <ul class="nav nav-pills mb-4 justify-content-sm-between justify-content-md-center gap-2"
+      id="library-tabs"
+      role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active custom-tab-btn"
+              data-target="#books"
+              type="button">📚 الكتب المدرسية</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link custom-tab-btn"
+              data-target="#notebooks"
+              type="button">📝 مذكرات المعلمين</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link custom-tab-btn" data-target="#tests" type="button">📑 نماذج الاختبارات</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link custom-tab-btn"
+              data-target="#test_templates"
+              type="button">📃 القوالب الامتحانية</button>
+    </li>
+  </ul>
+  <div class="tab-content" id="library-tabContent">
+    <div class="tab-pane active show" id="books">
+      <h3 class="h5 mb-3 text-primary fw-bold">الكتب الدراسية المعتمدة</h3>
+      <div class="row g-3">
+        {% for book in library_books %}
+          <div class="col-12 col-md-6 col-lg-4">
+            <a href="{{ book.url }}"
+               class="doc-card text-decoration-none"
+               target="_blank">
+              <div class="doc-icon icon-book">
+                <svg width="28"
+                     height="28"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     viewBox="0 0 24 24">
+                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
+                </svg>
+              </div>
+              <div class="doc-info">
+                <div class="doc-title">{{ book.name }}</div>
+                <div class="doc-meta">
+                  <span><i class="fa fa-file-pdf"></i> PDF</span>
+                  <span><i class="fa fa-hdd"></i> {{ book.meta }}</span>
+                </div>
+              </div>
+              <div class="download-btn">
+                <svg width="20"
+                     height="20"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
+                </svg>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="tab-pane" id="notebooks">
+      <h3 class="h5 mb-3 fw-bold" style="color: #ca8a04">مذكرات وملخصات المعلمين</h3>
+      <div class="row g-3">
+        {% for notebook in library_notebooks %}
+          <div class="col-12 col-md-6 col-lg-4">
+            <a href="{{ notebook.url }}"
+               class="doc-card text-decoration-none"
+               target="_blank">
+              <div class="doc-icon icon-notebook">
+                <svg width="28"
+                     height="28"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     viewBox="0 0 24 24">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+              </div>
+              <div class="doc-info">
+                <div class="doc-title">{{ notebook.name }}</div>
+                <div class="doc-meta">
+                  <span>{{ notebook.teacher }}</span>
+                  <span><i class="fa fa-file-pdf"></i> {{ notebook.meta }}</span>
+                </div>
+              </div>
+              <div class="download-btn">
+                <svg width="20"
+                     height="20"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
+                </svg>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="tab-pane" id="tests">
+      <h3 class="h5 mb-3 fw-bold" style="color: #db2777">نماذج اختبارات سابقة</h3>
+      <div class="row g-3">
+        {% for test in library_tests %}
+          <div class="col-12 col-md-6 col-lg-4">
+            <a href="{{ test.url }}"
+               class="doc-card text-decoration-none"
+               target="_blank">
+              <div class="doc-icon icon-test">
+                <svg width="28"
+                     height="28"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     viewBox="0 0 24 24">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="9" y1="15" x2="9.01" y2="15"></line>
+                  <line x1="9" y1="11" x2="9.01" y2="11"></line>
+                  <line x1="13" y1="15" x2="15" y2="15"></line>
+                  <line x1="13" y1="11" x2="15" y2="11"></line>
+                </svg>
+              </div>
+              <div class="doc-info">
+                <div class="doc-title">{{ test.name }}</div>
+                <div class="doc-meta">
+                  <span><i class="fa fa-file-pdf"></i> {{ test.meta }}</span>
+                </div>
+              </div>
+              <div class="download-btn">
+                <svg width="20"
+                     height="20"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
+                </svg>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="tab-pane" id="test_templates">
+      <h3 class="h5 mb-3 fw-bold" style="color: #22af2e">القوالب الامتحانية</h3>
+      <div class="row g-3">
+        {% for template in test_templates %}
+          <div class="col-12 col-md-6 col-lg-4">
+            <a href="{{ template.url }}"
+               class="doc-card text-decoration-none"
+               target="_blank">
+              <div class="doc-icon icon-template">
+                <svg width="28"
+                     height="28"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     viewBox="0 0 24 24">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="9" y1="15" x2="9.01" y2="15"></line>
+                  <line x1="9" y1="11" x2="9.01" y2="11"></line>
+                  <line x1="13" y1="15" x2="15" y2="15"></line>
+                  <line x1="13" y1="11" x2="15" y2="11"></line>
+                </svg>
+              </div>
+              <div class="doc-info">
+                <div class="doc-title">{{ template.name }}</div>
+                <div class="doc-meta">
+                  <span><i class="fa fa-file-pdf"></i> {{ template.meta }}</span>
+                </div>
+              </div>
+              <div class="download-btn">
+                <svg width="20"
+                     height="20"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
+                </svg>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tabButtons = document.querySelectorAll(".custom-tab-btn");
+    const tabPanes = document.querySelectorAll(".tab-pane");
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        // إزالة الكلاس 'active' من جميع الأزرار
+        tabButtons.forEach((btn) => btn.classList.remove("active"));
+        // إضافة الكلاس 'active' للزر المضغوط
+        this.classList.add("active");
+
+        // إخفاء جميع الأقسام
+        tabPanes.forEach((pane) => {
+          pane.classList.remove("show", "active");
+        });
+
+        // إظهار القسم المستهدف
+        const targetId = this.getAttribute("data-target");
+        const targetPane = document.querySelector(targetId);
+        if (targetPane) {
+          // استخدام setTimeout بسيط لإعطاء تأثير الظهور (Fade)
+          targetPane.classList.add("active");
+          setTimeout(() => {
+            targetPane.classList.add("show");
+          }, 10);
+        }
+      });
+    });
+  });
+  </script>
 {% endblock %}

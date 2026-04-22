@@ -674,8 +674,15 @@ def _aggregate_scope_rankings(scope: str, page: int, per_page: int):
     if start_dt is None:
         return [], 0
 
+    # استخراج معرّفات أي حساب ليس طالباً (معلمين، مدراء، الخ)
+    non_student_ids = [u.id for u in User.objects(role__ne="student").only("id").all()]
+
     events_coll = XPEvent._get_collection()
     match_stage = {"created_at": {"$gte": start_dt}}
+    
+    # استثناء المعلمين والمدراء من التجميع
+    if non_student_ids:
+        match_stage["student_id"] = {"$nin": non_student_ids}
 
     count_pipeline = [
         {"$match": match_stage},
@@ -763,35 +770,50 @@ def _build_leaderboard_page(page: int, per_page: int, scope: str = "all"):
     if cached:
         return cached
 
+    # استخراج معرّفات الموظفين لاستثنائهم
+    non_student_ids = [u.id for u in User.objects(role__ne="student").only("id").all()]
+
     if scope == "all":
-        total_users = StudentGamification.objects.count()
+        total_users = StudentGamification.objects(student_id__nin=non_student_ids).count()
         total_pages = max(1, math.ceil(total_users / per_page)) if total_users else 1
         if page > total_pages:
             page = total_pages
 
         start_rank = ((page - 1) * per_page) + 1
         profiles = list(
-            StudentGamification.objects
+            StudentGamification.objects(student_id__nin=non_student_ids)
             .order_by("-xp_total", "student_id")
             .skip((page - 1) * per_page)
             .limit(per_page)
             .all()
         )
 
-        student_ids = [p.student_id.id for p in profiles if p.student_id]
+        student_ids = []
+        valid_profiles = []
+        for p in profiles:
+            try:
+                if p.student_id:
+                    student_ids.append(p.student_id.id)
+                    valid_profiles.append(p)
+            except DoesNotExist:
+                pass
+
         users = User.objects(id__in=student_ids).only("id", "username", "first_name", "last_name").all() if student_ids else []
         users_by_id = {u.id: u for u in users}
         cert_counts = _certificate_counts_for_students(student_ids)
 
         entries = []
-        for i, profile in enumerate(profiles):
-            user = users_by_id.get(profile.student_id.id) if profile.student_id else None
-            sid = profile.student_id.id if profile.student_id else None
+        for i, profile in enumerate(valid_profiles):
+            try:
+                user = users_by_id.get(profile.student_id.id) if profile.student_id else None
+                sid = profile.student_id.id if profile.student_id else None
+            except DoesNotExist:
+                continue
             entries.append(
                 _serialize_leaderboard_entry(
                     profile,
                     user,
-                    start_rank + i,
+                    start_rank + len(entries),
                     certificates_count=cert_counts.get(sid, 0),
                 )
             )
@@ -806,8 +828,16 @@ def _build_leaderboard_page(page: int, per_page: int, scope: str = "all"):
         student_ids = [row.get("_id") for row in rows if row.get("_id")]
         users = User.objects(id__in=student_ids).only("id", "username", "first_name", "last_name").all() if student_ids else []
         users_by_id = {u.id: u for u in users}
+        
         profiles = StudentGamification.objects(student_id__in=student_ids).only("student_id", "level", "badges").all() if student_ids else []
-        profiles_by_student_id = {p.student_id.id: p for p in profiles if p.student_id}
+        profiles_by_student_id = {}
+        for p in profiles:
+            try:
+                if p.student_id:
+                    profiles_by_student_id[p.student_id.id] = p
+            except DoesNotExist:
+                pass
+
         cert_counts = _certificate_counts_for_students(student_ids)
 
         entries = []
@@ -820,7 +850,7 @@ def _build_leaderboard_page(page: int, per_page: int, scope: str = "all"):
                 _serialize_leaderboard_entry(
                     profile=profile,
                     user=user,
-                    rank=start_rank + i,
+                    rank=start_rank + len(entries),
                     xp_override=xp_value,
                     student_id_override=sid,
                     certificates_count=cert_counts.get(sid, 0),
@@ -845,12 +875,15 @@ def _calculate_student_rank(student_id, scope: str = "all"):
         return None
     scope = _normalize_leaderboard_scope(scope)
 
+    non_student_ids = [u.id for u in User.objects(role__ne="student").only("id").all()]
+
     if scope == "all":
         profile = StudentGamification.objects(student_id=student_id).first()
         if not profile:
             return None
 
         higher_count = StudentGamification.objects(
+            student_id__nin=non_student_ids,
             __raw__={
                 "$or": [
                     {"xp_total": {"$gt": int(profile.xp_total or 0)}},
@@ -869,8 +902,12 @@ def _calculate_student_rank(student_id, scope: str = "all"):
 
     start_dt = _scope_start_datetime(scope)
     events_coll = XPEvent._get_collection()
+    match_stage = {"created_at": {"$gte": start_dt}}
+    if non_student_ids:
+        match_stage["student_id"] = {"$nin": non_student_ids}
+
     pipeline = [
-        {"$match": {"created_at": {"$gte": start_dt}}},
+        {"$match": match_stage},
         {"$group": {"_id": "$student_id", "xp_total": {"$sum": "$xp"}}},
         {
             "$match": {
@@ -2812,7 +2849,8 @@ def duels_home():
         opponent_user = _duel_safe_user(getattr(duel, "opponent_id", None))
         duel._opponent_name = (opponent_user.username if opponent_user else None) or (getattr(duel, "opponent_username_snapshot", None) or "لاعب")
 
-    stats_top = list(DuelStats.objects().order_by("-wins", "-current_win_streak", "student_id").limit(10).all())
+    non_student_ids = [u.id for u in User.objects(role__ne="student").only("id").all()]
+    stats_top = list(DuelStats.objects(student_id__nin=non_student_ids).order_by("-wins", "-current_win_streak", "student_id").limit(10).all())
     top_ids = []
     for s in stats_top:
         sid = _duel_safe_user_id(getattr(s, "student_id", None))
@@ -3421,7 +3459,8 @@ def duel_submit(duel_id):
 @login_required
 @cache.cached(timeout=20, key_prefix="duels_leaderboard")
 def duel_leaderboard():
-    stats_top = list(DuelStats.objects().order_by("-wins", "-current_win_streak", "student_id").limit(10).all())
+    non_student_ids = [u.id for u in User.objects(role__ne="student").only("id").all()]
+    stats_top = list(DuelStats.objects(student_id__nin=non_student_ids).order_by("-wins", "-current_win_streak", "student_id").limit(10).all())
     student_ids = [s.student_id.id for s in stats_top if s.student_id]
     users = User.objects(id__in=student_ids).only("id", "username", "first_name", "last_name").all() if student_ids else []
     users_by_id = {u.id: u for u in users}

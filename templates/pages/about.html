@@ -1,151 +1,170 @@
 {% extends 'base.html' %}
-{% block title %}من نحن | EduPath{% endblock %}
+{% block title %}EduPath | من نحن{% endblock %}
+{% block meta_description %}تعرف على منصة EduPath، رؤيتنا، ومهمتنا في تقديم تجربة تعليمية تفاعلية ومبتكرة.{% endblock %}
+
 {% block content %}
 <style>
-  @import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap");
-
-  .about-shell {
-    --about-bg-1: #f8fafc;
-    --about-bg-2: #f1f5f9;
-    --about-ink: #1e293b;
-    --about-muted: #64748b;
-    --about-accent: #0f172a;
-    --about-card: #ffffff;
-    font-family: "Tajawal", sans-serif;
-    color: var(--about-ink);
-    border-radius: 1.5rem;
-    background: linear-gradient(135deg, var(--about-bg-1), var(--about-bg-2));
-    padding: 2.5rem;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-    direction: rtl;
+  /* ========================================== */
+  /* تصميم صفحة من نحن المتجاوب مع الموبايل */
+  /* ========================================== */
+  .guest-wrapper {
+    font-family: inherit;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
-
-  .about-header {
+  .about-hero {
+    background: linear-gradient(135deg, #084298 0%, #0d6efd 100%);
+    color: white;
+    padding: 3rem 1.5rem; /* حواف متجاوبة للموبايل */
+    border-radius: 1rem;
     text-align: center;
-    margin-bottom: 3rem;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(13, 110, 253, 0.15);
+    margin-bottom: 2rem;
   }
-
+  @media (min-width: 768px) {
+    .about-hero {
+      padding: 4.5rem 2rem;
+      border-radius: 1.25rem;
+      margin-bottom: 3rem;
+    }
+  }
+  .about-hero::before {
+    content: "";
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  }
   .about-title {
     font-weight: 800;
-    font-size: 2.2rem;
-    color: var(--about-accent);
+    font-size: clamp(1.6rem, 5vw, 2.5rem); /* تصغير الخط تلقائياً في الموبايل */
     margin-bottom: 1rem;
   }
-
-  .about-section {
-    background: var(--about-card);
-    padding: 2rem;
-    border-radius: 1rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  .about-subtitle {
+    font-size: clamp(1rem, 3vw, 1.15rem);
+    opacity: 0.9;
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.6;
   }
-
-  .about-section h2 {
-    font-weight: 700;
-    font-size: 1.5rem;
-    color: var(--about-accent);
-    margin-bottom: 1.2rem;
-    border-right: 4px solid var(--about-accent);
-    padding-right: 1rem;
+  .about-card {
+    background: white;
+    border-radius: 1.25rem;
+    padding: 1.5rem; /* حواف داخلية مناسبة للموبايل */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid #eef0f2;
+    height: 100%;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
-
-  .about-text {
-    line-height: 1.8;
-    color: var(--about-muted);
-    font-size: 1.05rem;
+  @media (min-width: 768px) {
+    .about-card {
+      padding: 2rem;
+    }
   }
-
-  .role-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1.5rem;
+  .about-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
   }
-
-  .role-card {
-    padding: 1.5rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.8rem;
-    background: #fdfdfd;
+  .about-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    margin-bottom: 1.25rem;
+    font-size: 1.75rem;
   }
-
-  .role-card h3 {
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
+  .icon-blue { background: #e0f2fe; color: #0284c7; }
+  .icon-green { background: #d1e7dd; color: #198754; }
+  .icon-orange { background: #ffe5d0; color: #fd7e14; }
+  
+  .team-section {
+    background: #f8f9fa;
+    border-radius: 1.25rem;
+    padding: 2rem 1.5rem;
+    margin-top: 3rem;
   }
-
-  .ai-bubble-info {
-    background: #e0f2fe;
-    color: #0369a1;
-    padding: 1rem;
-    border-radius: 0.8rem;
-    margin-top: 1rem;
-    font-weight: 600;
+  .team-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #0d6efd;
+    color: white;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 1rem;
+    font-weight: bold;
   }
 </style>
 
-<div class="about-shell">
-  <div class="about-header">
-    <h1 class="about-title">حول منصة EduPath</h1>
-    <p class="about-text">المنصة التعليمية الرائدة المخصصة لطلاب الشهادة الثانوية في سوريا.</p>
-  </div>
-
-  <div class="about-section">
-    <h2>رؤيتنا وهدفنا</h2>
-    <p class="about-text">
-      تم تصميم <strong>EduPath</strong> لتكون الرفيق الأكاديمي الدائم لطلاب البكالوريا في سوريا. نحن نهدف إلى حل تحديات الدراسة التقليدية من خلال توفير محتوى منظم (مادة، قسم، درس) مع نظام تقييم ذكي وشامل. تتميز المنصة بتقديم مساعد ذكاء اصطناعي متاح على مدار الساعة للإجابة على التساؤلات العلمية في المناهج (مثل الفيزياء والرياضيات) والمساعدة في تصفح المنصة.
+<div class="guest-wrapper">
+  
+  <div class="about-hero" dir="rtl">
+    <h1 class="about-title">عن <span class="text-success">EduPath</span></h1>
+    <p class="about-subtitle">
+      نحن نؤمن بأن التعليم هو مفتاح المستقبل. لذلك، بنينا منصة تجمع بين التكنولوجيا المتقدمة والأساليب التعليمية المبتكرة لجعل رحلة التعلم ممتعة وفعالة.
     </p>
-    <div class="ai-bubble-info">
-      <i class="bi bi-chat-dots-fill"></i>
-      ستجد مساعدنا الذكي دائماً في فقرة منبثقة على يمين الشاشة لخدمتك في أي وقت.
-    </div>
   </div>
 
-  <div class="about-section">
-    <h2>نظام الأدوار والصلاحيات</h2>
-    <p class="about-text">تعتمد المنصة تقنيات <strong>Flask</strong> و <strong>MongoDB</strong> لإدارة أربعة أدوار أساسية تضمن انسيابية العملية التعليمية:</p>
-    <div class="role-grid">
-      <div class="role-card">
-        <h3>الطالب</h3>
-        <p class="about-text">تصفح المحتوى، حل الاختبارات، متابعة لوحة الصدارة، والمشاركة في التحديات الودية باستخدام الجواهر.</p>
-      </div>
-      <div class="role-card">
-        <h3>المعلم</h3>
-        <p class="about-text">إدارة المواد الخاصة به، تعديل المحتوى، ومتابعة أداء الطلاب المسجلين في مواده.</p>
-      </div>
-      <div class="role-card">
-        <h3>محرر الأسئلة</h3>
-        <p class="about-text">تعديل وإدارة بنوك الأسئلة للاختبارات التي يحددها المسؤول بدقة.</p>
-      </div>
-      <div class="role-card">
-        <h3>المسؤول (Admin)</h3>
-        <p class="about-text">إدارة النظام بشكل عام، وتحديث المحتوى، ومتابعة أداء المستخدمين.</p>
+  <div class="row g-4 m-0 w-100" dir="rtl">
+    
+    <div class="col-12 col-md-6 col-lg-4 px-2">
+      <div class="about-card text-center">
+        <div class="about-icon icon-blue">
+          <i class="bi bi-info-circle-fill"></i>
+        </div>
+        <h2 class="h5 fw-bold mb-3">من نحن؟</h2>
+        <p class="text-muted" style="font-size: 0.95rem; line-height: 1.7;">
+          EduPath هي بيئة تعليمية ذكية مصممة لربط الطلاب والمعلمين في مساحة تفاعلية واحدة. نوفر أدوات تقييم لحظية، مسارات تعلم مخصصة، ومكتبة شاملة تلبي كافة احتياجات الطالب الأكاديمية.
+        </p>
       </div>
     </div>
+
+    <div class="col-12 col-md-6 col-lg-4 px-2">
+      <div class="about-card text-center">
+        <div class="about-icon icon-green">
+          <i class="bi bi-eye-fill"></i>
+        </div>
+        <h2 class="h5 fw-bold mb-3">رؤيتنا</h2>
+        <p class="text-muted" style="font-size: 0.95rem; line-height: 1.7;">
+          نسعى لأن نكون المنصة التعليمية الرائدة في العالم العربي، حيث يحصل كل طالب على الفرصة لاكتشاف إمكاناته الكاملة من خلال تجربة تعليمية تعتمد على الألعاب (Gamification) والتفاعل الإيجابي.
+        </p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-12 col-lg-4 px-2">
+      <div class="about-card text-center">
+        <div class="about-icon icon-orange">
+          <i class="bi bi-rocket-takeoff-fill"></i>
+        </div>
+        <h2 class="h5 fw-bold mb-3">مهمتنا</h2>
+        <p class="text-muted" style="font-size: 0.95rem; line-height: 1.7;">
+          تسهيل عملية التعلم والتدريس بتقديم نظام تقييم ذكي، وتحفيز الطلاب على الاستمرارية عبر نظام الجواهر، وإتاحة محتوى تعليمي عالي الجودة يمكن الوصول إليه من أي مكان وفي أي وقت.
+        </p>
+      </div>
+    </div>
+
   </div>
 
-  <div class="about-section">
-    <h2>مميزات التعلم الذكي</h2>
-    <p class="about-text">
-      نحن لا نقدم مجرد دروس، بل تجربة تعليمية متكاملة تشمل:
-    </p>
-    <ul class="about-text" style="margin-top: 1rem;">
-      <li><strong>اختبارات شاملة:</strong> اختبارات مؤتمتة وغير مؤتمتة لكل درس مع ميزة التصحيح الذاتي والمراجعة.</li>
-      <li><strong>التحديات الودية:</strong> نظام منافسة متزامن بين الطلاب يعتمد على سرعة ودقة الحل مقابل رسوم رمزية من الجواهر.</li>
-      <li><strong>مراجعة الأخطاء المتكررة:</strong> خوارزمية ذكية تحصر الأسئلة التي يخطئ بها الطالب باستمرار لتركيز المراجعة عليها.</li>
-      <li><strong>محتوى مرئي متنوع:</strong> دروس تشمل مقاطع تعليمية قصيرة ومحاضرات كاملة لتناسب كافة أساليب التعلم.</li>
-      <li><strong>نظام الجواهر:</strong> عملة افتراضية للمنصة تستخدم في التحديات وتحدد الترتيب في لوحة الصدارة.</li>
-    </ul>
+  <div class="text-center mt-5 mb-3 px-3">
+    <h3 class="h4 fw-bold mb-3">هل أنت مستعد للبدء؟</h3>
+    <p class="text-muted mb-4">انضم إلى آلاف الطلاب والمعلمين الذين يستخدمون EduPath يومياً.</p>
+    {% if not current_user.is_authenticated %}
+    <div class="d-flex gap-2 justify-content-center flex-wrap">
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary rounded-pill px-4 py-2 fw-bold">إنشاء حساب مجاني</a>
+      <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary rounded-pill px-4 py-2 fw-bold">تسجيل الدخول</a>
+    </div>
+    {% else %}
+    <a href="{{ url_for('index') }}" class="btn btn-primary rounded-pill px-4 py-2 fw-bold">الذهاب إلى لوحة التحكم</a>
+    {% endif %}
   </div>
 
-  <div class="about-section" style="text-align: center; border-right: none;">
-    <p class="about-text" style="font-weight: 700; color: var(--about-accent);">
-      نحن هنا لنرسم معك طريق النجاح، بأسلوب احترافي وودود في آن واحد.
-    </p>
-  </div>
 </div>
 {% endblock %}

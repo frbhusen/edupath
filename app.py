@@ -332,7 +332,17 @@ def create_app():
                 return render_template(f"pages/{filename}")
             except Exception:
                 return render_template("pages/404.html"), 404
-    
+            
+    @app.route("/uploads/<path:filename>")
+    @app.route("/study_platform/uploads/<path:filename>")
+    def serve_uploads(filename):
+        # Maps the URL to the physical 'uploads' folder (assuming it's next to your 'pages' folder)
+        uploads_dir = Path(app.root_path) / "uploads"
+        try:
+            return send_from_directory(str(uploads_dir), filename)
+        except NotFound:
+            return render_template("pages/404.html"), 404
+        
     @app.before_request
     def start_timer():
         """Track request start time for performance monitoring"""
