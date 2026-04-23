@@ -29,6 +29,7 @@ class RegisterForm(FlaskForm):
     )
     password = PasswordField("كلمة المرور (على الأقل 6 أحرف)", validators=[DataRequired(), Length(min=6)])
     confirm = PasswordField("تأكيد كلمة المرور", validators=[DataRequired(), EqualTo("password")])
+    remember_me = BooleanField("تذكرني")
     submit = SubmitField("تسجيل")
 
 class LoginForm(FlaskForm):

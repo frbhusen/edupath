@@ -640,7 +640,7 @@ class CourseAnswer(Document):
 class StudentGamification(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     student_id = ReferenceField(User, required=True, unique=True)
-    xp_total = IntField(default=0, required=True)
+    xp_total = IntField(default=25, required=True)
     level = IntField(default=1, required=True)
     current_streak = IntField(default=0, required=True)
     best_streak = IntField(default=0, required=True)
