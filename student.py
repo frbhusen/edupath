@@ -440,7 +440,7 @@ def _extract_attempt_question_ids(attempt):
 def _calculate_level(xp_total: int) -> int:
     if xp_total < 0:
         xp_total = 0
-    return (xp_total // 200) + 1
+    return (xp_total // 150) + 1
 
 
 def _get_or_create_gamification_profile(student_id):
