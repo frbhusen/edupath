@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Directory: All Tests</h2>
+    
+    {% for subject in subjects %}
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">{{ subject.title }}</h4>
+        </div>
+        <div class="card-body">
+            {% for section in sections_by_subject[subject._id|string] %}
+            <div class="mb-3">
+                <h5 class="text-secondary border-bottom pb-2">{{ section.title }}</h5>
+                <div class="list-group">
+                    {% for test in tests_by_section[section._id|string] %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ test.title }}
+                        <a href="{{ url_for('admin.export_test_pdf', test_id=test._id) }}" class="btn btn-sm btn-outline-primary">
+                            Export PDF
+                        </a>
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0">No tests in this section.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

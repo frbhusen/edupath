@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, current_app, make_response, session
 import json
 import os
 from datetime import datetime, timedelta
@@ -8,6 +8,8 @@ from werkzeug.utils import secure_filename
 from mongoengine.errors import DoesNotExist
 from bson import ObjectId
 from bson.dbref import DBRef
+from bson.objectid import ObjectId
+from weasyprint import HTML
 import uuid
 
 try:
@@ -291,6 +293,129 @@ def _aggregate_question_counts_by_test(model_cls, test_ids):
         # Fall back to zero counts on aggregation edge-cases instead of blocking dashboard rendering.
         return {}
     return counts
+@teacher_bp.route("/tests-directory")
+@login_required
+@role_required("teacher", "admin")
+def tests_directory():
+    # Uses your existing scope checker
+    allowed_subject_ids = _allowed_subject_ids_for_current_user()
+    
+    if allowed_subject_ids is not None:
+        subjects = list(Subject.objects(id__in=list(allowed_subject_ids)).order_by('created_at'))
+    else:
+        subjects = list(Subject.objects().order_by('created_at'))
+        
+    subject_ids = [s.id for s in subjects]
+    sections = list(Section.objects(subject_id__in=subject_ids).order_by('created_at'))
+    section_ids = [s.id for s in sections]
+    tests = list(Test.objects(section_id__in=section_ids).order_by('created_at'))
+    
+    # Group sections by subject
+    sections_by_subject = {}
+    for sec in sections:
+        try:
+            sid = sec.subject_id.id if sec.subject_id else None
+        except DoesNotExist:
+            continue
+        if sid:
+            sections_by_subject.setdefault(str(sid), []).append(sec)
+            
+    # Group tests by section
+    tests_by_section = {}
+    for t in tests:
+        try:
+            sec_id = t.section_id.id if t.section_id else None
+        except DoesNotExist:
+            continue
+        if sec_id:
+            tests_by_section.setdefault(str(sec_id), []).append(t)
+            
+    return render_template("teacher/tests_directory.html", 
+                           subjects=subjects, 
+                           sections_by_subject=sections_by_subject, 
+                           tests_by_section=tests_by_section)
+
+@teacher_bp.route("/tests/<test_id>/export-pdf")
+@login_required
+@role_required("teacher", "admin")
+def export_test_pdf(test_id):
+    if FPDF is None:
+        flash("مكتبة PDF غير متوفرة. ثبت fpdf2 أولاً.", "error")
+        return redirect(url_for('teacher.tests_directory'))
+        
+    test = Test.objects(id=test_id).first()
+    if not test:
+        raise NotFound()
+        
+    # Ensure they own this subject
+    scope_response = _ensure_scope_for_test(test)
+    if scope_response:
+        return scope_response
+        
+    questions = list(Question.objects(test_id=test.id).order_by('created_at'))
+    
+    pdf = FPDF()
+    
+    # 1. Explicitly define all margins to prevent FPDF boundary calculation errors
+    pdf.set_margins(left=15, top=15, right=15)
+    
+    if hasattr(pdf, "set_auto_page_break"):
+        pdf.set_auto_page_break(auto=True, margin=15)
+        
+    regular_font, bold_font = _pdf_pick_font_paths()
+    using_ar_font = False
+    if regular_font:
+        try:
+            pdf.add_font("Arabic", "", regular_font)
+            pdf.add_font("Arabic", "B", bold_font or regular_font)
+            using_ar_font = True
+        except Exception:
+            pass
+            
+    pdf.add_page()
+    
+    if using_ar_font and hasattr(pdf, "set_text_shaping"):
+        try:
+            pdf.set_text_shaping(True)
+        except Exception:
+            pass
+            
+    title_font = "Arabic" if using_ar_font else "Helvetica"
+    
+    # Print Test Title
+    title_text = _shape_arabic_text(test.title) if using_ar_font else _latin_safe_text(test.title)
+    pdf.set_font(title_font, "B", 16)
+    
+    # 2. Reset X cursor and use pdf.epw (Effective Page Width)
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(pdf.epw, 10, title_text, ln=1, align="R" if using_ar_font else "L")
+    pdf.ln(5)
+    
+    # Print Questions and Choices
+    pdf.set_font(title_font, "", 12)
+    for idx, q in enumerate(questions, 1):
+        q_text = _shape_arabic_text(f"{idx}. {q.text}") if using_ar_font else _latin_safe_text(f"{idx}. {q.text}")
+        
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw, 8, q_text, align="R" if using_ar_font else "L")
+        
+        for c in q.choices:
+            c_text = _shape_arabic_text(f"   [ ] {c.text}") if using_ar_font else _latin_safe_text(f"   [ ] {c.text}")
+            
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(pdf.epw, 6, c_text, align="R" if using_ar_font else "L")
+        
+        pdf.ln(4) # Space between questions
+        
+    out = pdf.output(dest="S")
+    if isinstance(out, bytearray):
+        out = bytes(out)
+    elif isinstance(out, str):
+        out = out.encode("latin-1", errors="ignore")
+
+    filename = f"Test_{test.id}.pdf"
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    return Response(out, mimetype="application/pdf", headers=headers)
 
 @teacher_bp.route("/dashboard")
 @login_required
@@ -4537,3 +4662,4 @@ def revoke_lesson_activation(lesson_id, student_id):
     for activation in LessonActivation.objects(lesson_id=lesson_id, student_id=student_id, active=True).all():
         activation.active = False
         activation.save()
+

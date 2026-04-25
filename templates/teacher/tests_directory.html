@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" dir="rtl">
+    <h2 class="mb-4 text-primary">فهرس الاختبارات وتصدير PDF</h2>
+    
+    {% for subject in subjects %}
+    <div class="card mb-4 shadow-sm border-primary">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">{{ subject.name }}</h4>
+        </div>
+        <div class="card-body">
+            {% for section in sections_by_subject.get(subject.id|string, []) %}
+            <div class="mb-3">
+                <h5 class="text-secondary border-bottom pb-2">{{ section.title }}</h5>
+                <div class="list-group">
+                    {% for test in tests_by_section.get(section.id|string, []) %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">{{ test.title }}</span>
+                        <a href="{{ url_for('teacher.export_test_pdf', test_id=test.id) }}" class="btn btn-sm btn-outline-danger">
+                            <i class="fas fa-file-pdf"></i> تصدير PDF
+                        </a>
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0 py-2">لا توجد اختبارات في هذا القسم.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">لا توجد مواد متاحة لعرض اختباراتها.</div>
+    {% endfor %}
+</div>
+{% endblock %}

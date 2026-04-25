@@ -1,3 +1,5 @@
+from flask import render_template, session, make_response
+from weasyprint import HTML
 import json
 from datetime import datetime, timedelta
 from bson import ObjectId
@@ -112,7 +114,6 @@ def apply_payload(obj, payload):
             if isinstance(raw_val, str):
                 raw_val = datetime.fromisoformat(raw_val)
         setattr(obj, field_name, raw_val)
-
 
 @admin_bp.route("/")
 @login_required

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ test.title }}</title>
+    <style>
+        @page { size: A4; margin: 20mm; }
+        body { font-family: sans-serif; color: #101828; }
+        .question-block { margin-bottom: 20px; page-break-inside: avoid; }
+        .options-list { list-style-type: none; padding: 0; }
+    </style>
+</head>
+<body>
+    <h1>{{ test.title }}</h1>
+    <hr>
+    {% for q in questions %}
+    <div class="question-block">
+        <p><strong>{{ loop.index }}.</strong> {{ q.text }}</p>
+        <ul class="options-list">
+            {% for option in q.options %}
+            <li>[ ] {{ option }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+</body>
+</html>

@@ -1,9 +1,7 @@
-{% extends 'base.html' %} 
-{% block title %}EduPath | الصفحة الرئيسية{% endblock %} 
-{% block meta_description %}EduPath منصة تعليمية تفاعلية للدروس والاختبارات وتتبع التقدم للطلاب والمعلمين.{% endblock %} 
-{% block meta_robots %}index,follow{% endblock %} 
-
-{% block content %}
+{% extends 'base.html' %} {% block title %}EduPath | الصفحة الرئيسية{% endblock
+%} {% block meta_description %}EduPath منصة تعليمية تفاعلية للدروس والاختبارات
+وتتبع التقدم للطلاب والمعلمين.{% endblock %} {% block meta_robots
+%}index,follow{% endblock %} {% block content %}
 <style>
   /* ========================================== */
   /* تصميم صفحة الزوار (غير المسجلين) - معزول بالكامل */
@@ -39,7 +37,11 @@
     left: -10%;
     width: 300px;
     height: 300px;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    background: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.1) 0%,
+      transparent 70%
+    );
   }
   .guest-wrapper .hero-title {
     font-weight: 800;
@@ -103,7 +105,9 @@
     padding: 1.5rem; /* تصغير المسافات الداخلية للجوال */
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
     border: 1px solid #eef0f2;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition:
+      transform 0.3s ease,
+      box-shadow 0.3s ease;
   }
   @media (min-width: 768px) {
     .guest-wrapper .feature-card {
@@ -228,12 +232,14 @@
   }
 </style>
 
-{# Hero header shown to all visitors with role-aware greeting/actions #}
-{% if current_user.is_authenticated %}
-<div class="dashboard-hero hero-premium mb-4 p-4 d-flex justify-content-between align-items-center">
+{# Hero header shown to all visitors with role-aware greeting/actions #} {% if
+current_user.is_authenticated %}
+<div
+  class="dashboard-hero hero-premium mb-4 p-4 d-flex justify-content-between align-items-center"
+>
   <div>
-    {# Greeting text depends on current user role #} 
-    {% if current_user.role == 'student' %}
+    {# Greeting text depends on current user role #} {% if current_user.role ==
+    'student' %}
     <h1 class="h4 mb-1 fw-bold text-dark">
       مرحباً {{ current_user.first_name }} في EduPath
     </h1>
@@ -249,13 +255,24 @@
 {% else %}
 <div class="guest-wrapper">
   <div class="hero-section mb-5" dir="rtl">
-    <h1 class="hero-title">ارتقِ بمستواك التعليمي مع <span class="text-success">EduPath</span></h1>
+    <h1 class="hero-title">
+      ارتقِ بمستواك التعليمي مع <span class="text-success">EduPath</span>
+    </h1>
     <p class="hero-subtitle">
-      منصة تعليمية متكاملة توفر لك الدروس التفاعلية، الاختبارات الذكية، والمناقشات الفعالة لتصل إلى التفوق الأكاديمي بخطوات واثقة.
+      منصة تعليمية متكاملة توفر لك الدروس التفاعلية، الاختبارات الذكية،
+      والمناقشات الفعالة لتصل إلى التفوق الأكاديمي بخطوات واثقة.
     </p>
     <div class="d-flex gap-2 justify-content-center flex-wrap">
-      <a href="{{ url_for('auth.login') }}" class="btn btn-login text-decoration-none">تسجيل الدخول</a>
-      <a href="{{ url_for('auth.register') }}" class="btn btn-register text-decoration-none">إنشاء حساب جديد</a>
+      <a
+        href="{{ url_for('auth.login') }}"
+        class="btn btn-login text-decoration-none"
+        >تسجيل الدخول</a
+      >
+      <a
+        href="{{ url_for('auth.register') }}"
+        class="btn btn-register text-decoration-none"
+        >إنشاء حساب جديد</a
+      >
     </div>
   </div>
 
@@ -263,15 +280,25 @@
     <div class="col-12 col-lg-7 px-2">
       <div class="feature-card h-100">
         <div class="d-flex align-items-center mb-4 gap-2">
-          <span class="badge bg-danger px-3 py-2 rounded-pill fs-6">فيديو توضيحي</span>
+          <span class="badge bg-danger px-3 py-2 rounded-pill fs-6"
+            >فيديو توضيحي</span
+          >
           <h2 class="h5 m-0 fw-bold text-dark">كيف تبدأ رحلتك معنا؟</h2>
         </div>
         <div class="video-container ratio ratio-16x9">
-          <iframe 
-            src="https://www.youtube.com/embed/-cFecER39io" 
-            title="شرح تسجيل الدخول" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-            allowfullscreen>
+          <iframe
+            src="https://www.youtube.com/embed/-cFecER39io"
+            title="شرح تسجيل الدخول"
+            allow="
+              accelerometer;
+              autoplay;
+              clipboard-write;
+              encrypted-media;
+              gyroscope;
+              picture-in-picture;
+            "
+            allowfullscreen
+          >
           </iframe>
         </div>
       </div>
@@ -280,19 +307,44 @@
     <div class="col-12 col-lg-5 px-2">
       <div class="feature-card h-100 d-flex flex-column text-center">
         <div class="mb-4 mt-3">
-          <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-4" style="width: 80px; height: 80px;">
-            <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path><path d="M16 2v20"></path></svg>
+          <div
+            class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-4"
+            style="width: 80px; height: 80px"
+          >
+            <svg
+              width="40"
+              height="40"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"
+              ></path>
+              <path d="M16 2v20"></path>
+            </svg>
           </div>
           <h2 class="h4 fw-bold mb-3 text-dark">المكتبة الشاملة المجانية</h2>
-          <p class="text-muted mb-4 px-2" style="font-size: 0.95rem; line-height: 1.6;">
-            لا تحتاج إلى حساب لتصفح بعض مصادرنا! استكشف الكتب المدرسية، مذكرات المعلمين، ونماذج الاختبارات المجانية الآن.
+          <p
+            class="text-muted mb-4 px-2"
+            style="font-size: 0.95rem; line-height: 1.6"
+          >
+            لا تحتاج إلى حساب لتصفح بعض مصادرنا! استكشف الكتب المدرسية، مذكرات
+            المعلمين، ونماذج الاختبارات المجانية الآن.
           </p>
         </div>
         <div class="d-flex flex-column gap-3 mt-auto">
-          <a class="btn btn-outline-primary fw-bold py-2 rounded-pill transition" href="{{ url_for('student.subjects') }}">
+          <a
+            class="btn btn-outline-primary fw-bold py-2 rounded-pill transition"
+            href="{{ url_for('student.subjects') }}"
+          >
             استعرض المواد الدراسية
           </a>
-          <a class="btn btn-primary fw-bold py-2 rounded-pill shadow-sm transition" href="{{ url_for('pages', filename='Library.html') }}">
+          <a
+            class="btn btn-primary fw-bold py-2 rounded-pill shadow-sm transition"
+            href="{{ url_for('pages', filename='Library.html') }}"
+          >
             الدخول للمكتبة الشاملة
           </a>
         </div>
@@ -300,265 +352,318 @@
     </div>
   </div>
 </div>
-{% endif %}
-
-{# Show the welcome page for new users #} 
-{# dashboard links for staff, login/register for guests #} 
-
-{% if current_user.is_authenticated %} 
-  {% if current_user.role in ['teacher', 'admin'] %}
-  <a class="btn btn-cta btn-sm mb-3" href="{{ url_for('teacher.dashboard') }}">الذهاب إلى لوحة التحكم</a>
-  {% elif current_user.role == 'question_editor' %}
-  <a class="btn btn-cta btn-sm mb-3" href="{{ url_for('teacher.question_editor_dashboard') }}">الذهاب إلى لوحة محرر الأسئلة</a>
-  {% endif %} 
-
-  {# Main quick-action hub (role-based shortcuts) #}
-  <div class="action-hub mb-5 mb-lg-2">
-    <div class="action-hub-head border-bottom pb-2 mb-4">
-      <h2 class="h5 mb-1">الصفحة الرئيسية</h2>
-      <p class="mb-0 text-muted">كل الأدوات المهمة في مكان واحد.</p>
-    </div>
-
-    {# Student shortcuts #} 
-    {% if current_user.role == 'student' %}
-    <h3 class="category-title text-primary">
-      <span class="me-2">📘</span>التعلم والمراجعة
-    </h3>
-    <div class="action-grid mb-4">
-      <a class="action-card card-learning" href="{{ url_for('student.subjects') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
-          </svg>
-        </div>
-        <span class="card-label">المواد</span>
-      </a>
-      <a class="action-card card-learning" href="{{ url_for('student.favorites') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-          </svg>
-        </div>
-        <span class="card-label">الأسئلة المفضلة</span>
-      </a>
-      <a class="action-card card-learning" href="{{ url_for('student.pinned_discussions') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <path d="M21.16 3.63a3.5 3.5 0 1 0-4.79-4.79l-8.62 8.62a1 1 0 0 0-.25.46l-1.37 5.48a1 1 0 0 0 1.22 1.22l5.48-1.37a1 1 0 0 0 .46-.25l8.62-8.62z"></path>
-            <path d="M12 22H3a2 2 0 0 1-2-2V11"></path>
-          </svg>
-        </div>
-        <span class="card-label">الأسئلة المثبتة</span>
-      </a>
-      <a class="action-card card-learning" href="{{ url_for('student.frequently_wrong') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.92-5.27l-3.42-3.42"></path>
-          </svg>
-        </div>
-        <span class="card-label">الأخطاء المتكررة</span>
-      </a>
-      <a class="action-card card-learning" href="./pages/Library.html">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
-            <path d="M16 2v20"></path>
-          </svg>
-        </div>
-        <span class="card-label">المكتبة الشاملة</span>
-      </a>
-    </div>
-
-    <h3 class="category-title text-success">
-      <span class="me-2">📊</span>الأداء
-    </h3>
-    <div class="action-grid mb-4">
-      <a class="action-card card-performance" href="{{ url_for('student.results') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <path d="M22 11.08V12a10.04 10.04 0 1 1-5.93-9.14"></path>
-            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-          </svg>
-        </div>
-        <span class="card-label">النتائج</span>
-      </a>
-      <a class="action-card card-performance" href="{{ url_for('student.statistics') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-          </svg>
-        </div>
-        <span class="card-label">الإحصائيات</span>
-      </a>
-      <a class="action-card card-performance" href="{{ url_for('student.leaderboard') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
-            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
-            <path d="M4 22h16"></path>
-            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path>
-            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path>
-            <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path>
-          </svg>
-        </div>
-        <span class="card-label">لوحة الصدارة</span>
-      </a>
-    </div>
-
-    <h3 class="category-title text-warning" style="color: #fd7e14 !important">
-      <span class="me-2">⚔️</span>التفاعل
-    </h3>
-    <div class="action-grid mb-4">
-      <a class="action-card card-engagement" href="{{ url_for('student.duels_home') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-          </svg>
-        </div>
-        <span class="card-label">التحديات الودية</span>
-      </a>
-      <a class="action-card card-engagement" href="{{ url_for('notifications_inbox') }}">
-        <div class="icon-wrapper">
-          <svg class="icon-svg" viewBox="0 0 24 24">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
-        </div>
-        <span class="card-label">الإشعارات</span>
-      </a>
-    </div>
-
-    {% elif current_user.role == 'teacher' %} {# Teacher shortcuts #}
-    <div class="action-grid col-12">
-      <a class="action-card" href="{{ url_for('teacher.my_students') }}">
-        <span class="icon fs-2 mb-2">👥</span>
-        <span class="card-label">الطلاب</span>
-      </a>
-      <a class="action-card" href="{{ url_for('student.subjects') }}">
-        <span class="icon fs-2 mb-2">📚</span>
-        <span class="card-label">المواد</span>
-      </a>
-      
-      {% if teacher_home_subjects %} 
-      {# Teacher's own subjects list appears when available #}
-      <div class="w-100 mt-2">
-        <div class="small text-muted mb-2">موادي</div>
-        <div class="action-grid">
-          {% for subject in teacher_home_subjects %}
-          <a class="action-card" href="{{ url_for('teacher.subject_detail', subject_id=subject.id) }}">
-            <span class="icon fs-2 mb-2">📚</span>
-            <span class="card-label">{{ subject.name }}</span>
-          </a>
-          {% endfor %}
-        </div>
-      </div>
-      {% else %}
-      <a class="action-card" href="{{ url_for('teacher.dashboard') }}">
-        <span class="icon fs-2 mb-2">📚</span>
-        <span class="card-label">مادتي</span>
-      </a>
-      {% endif %}
-      
-      <a class="action-card" href="{{ url_for('teacher.discussions_manage', pinned='1') }}">
-        <span class="icon fs-2 mb-2">📌</span>
-        <span class="card-label">الأسئلة والأجوبة المثبتة</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}">
-        <span class="icon fs-2 mb-2">✅</span>
-        <span class="card-label">إدارة الواجبات</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.discussions_manage') }}">
-        <span class="icon fs-2 mb-2">💬</span>
-        <span class="card-label">إدارة المناقشات</span>
-      </a>
-      <a class="action-card" href="{{ url_for('notifications_inbox') }}">
-        <span class="icon fs-2 mb-2">🔔</span>
-        <span class="card-label">الإشعارات</span>
-      </a>
-    </div>
-
-    {% elif current_user.role == 'admin' %} {# Admin shortcuts #}
-    <div class="action-grid col-12">
-      <a class="action-card" href="{{ url_for('teacher.dashboard') }}">
-        <span class="icon fs-2 mb-2">🧭</span>
-        <span class="card-label">لوحة المعلم</span>
-      </a>
-      <a class="action-card" href="{{ url_for('student.subjects') }}">
-        <span class="icon fs-2 mb-2">📚</span>
-        <span class="card-label">المواد</span>
-      </a>
-      <a class="action-card" href="{{ url_for('student.pinned_discussions') }}">
-        <span class="icon fs-2 mb-2">📌</span>
-        <span class="card-label">الأسئلة والأجوبة المثبتة</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}">
-        <span class="icon fs-2 mb-2">✅</span>
-        <span class="card-label">إدارة الواجبات</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.discussions_manage') }}">
-        <span class="icon fs-2 mb-2">💬</span>
-        <span class="card-label">إدارة المناقشات</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.certificates_manage') }}">
-        <span class="icon fs-2 mb-2">🎓</span>
-        <span class="card-label">إدارة الشهادات</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.certificates_verification') }}">
-        <span class="icon fs-2 mb-2">✅</span>
-        <span class="card-label">التحقق من الشهادات</span>
-      </a>
-      <a class="action-card" href="{{ url_for('notifications_inbox') }}">
-        <span class="icon fs-2 mb-2">🔔</span>
-        <span class="card-label">الإشعارات</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.analytics_dashboard') }}">
-        <span class="icon fs-2 mb-2">📈</span>
-        <span class="card-label">التحليلات</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.study_plans_manage') }}">
-        <span class="icon fs-2 mb-2">🗓️</span>
-        <span class="card-label">إدارة الخطط</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.reports_dashboard') }}">
-        <span class="icon fs-2 mb-2">📄</span>
-        <span class="card-label">التقارير</span>
-      </a>
-      <a class="action-card" href="{{ url_for('student.statistics') }}">
-        <span class="icon fs-2 mb-2">📈</span>
-        <span class="card-label">إحصائيات الطلاب</span>
-      </a>
-      <a class="action-card" href="{{ url_for('student.duels_home') }}">
-        <span class="icon fs-2 mb-2">⚔️</span>
-        <span class="card-label">التحديات الودية</span>
-      </a>
-      <a class="action-card" href="{{ url_for('teacher.gamification_admin') }}">
-        <span class="icon fs-2 mb-2">💎</span>
-        <span class="card-label">إدارة الجواهر</span>
-      </a>
-      <a class="action-card" href="{{ url_for('admin.notifications_manage') }}">
-        <span class="icon fs-2 mb-2">📣</span>
-        <span class="card-label">إرسال إشعار</span>
-      </a>
-      <a class="action-card" href="{{ url_for('admin.dashboard') }}">
-        <span class="icon fs-2 mb-2">⚙️</span>
-        <span class="card-label">الإدارة</span>
-      </a>
-    </div>
-
-    {% elif current_user.role == 'question_editor' %} {# Question editor shortcuts #}
-    <div class="action-grid col-12">
-      <a class="action-card" href="{{ url_for('teacher.question_editor_dashboard') }}">
-        <span class="icon fs-2 mb-2">🧩</span>
-        <span class="card-label">لوحة محرر الأسئلة</span>
-      </a>
-      <a class="action-card" href="{{ url_for('notifications_inbox') }}">
-        <span class="icon fs-2 mb-2">🔔</span>
-        <span class="card-label">الإشعارات</span>
-      </a>
-    </div>
-    {% endif %}
+{% endif %} {# Show the welcome page for new users #} {# dashboard links for
+staff, login/register for guests #} {% if current_user.is_authenticated %} {% if
+current_user.role in ['teacher', 'admin'] %}
+<a class="btn btn-cta btn-sm mb-3" href="{{ url_for('teacher.dashboard') }}"
+  >الذهاب إلى لوحة التحكم</a
+>
+{% elif current_user.role == 'question_editor' %}
+<a
+  class="btn btn-cta btn-sm mb-3"
+  href="{{ url_for('teacher.question_editor_dashboard') }}"
+  >الذهاب إلى لوحة محرر الأسئلة</a
+>
+{% endif %} {# Main quick-action hub (role-based shortcuts) #}
+<div class="action-hub mb-5 mb-lg-2">
+  <div class="action-hub-head border-bottom pb-2 mb-4">
+    <h2 class="h5 mb-1">الصفحة الرئيسية</h2>
+    <p class="mb-0 text-muted">كل الأدوات المهمة في مكان واحد.</p>
   </div>
-{% endif %} 
-{% endblock %}
+
+  {# Student shortcuts #} {% if current_user.role == 'student' %}
+  <h3 class="category-title text-primary">
+    <span class="me-2">📘</span>التعلم والمراجعة
+  </h3>
+  <div class="action-grid mb-4">
+    <a
+      class="action-card card-learning"
+      href="{{ url_for('student.subjects') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path
+            d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"
+          ></path>
+        </svg>
+      </div>
+      <span class="card-label">المواد</span>
+    </a>
+    <a
+      class="action-card card-learning"
+      href="{{ url_for('student.favorites') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <polygon
+            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+          ></polygon>
+        </svg>
+      </div>
+      <span class="card-label">الأسئلة المفضلة</span>
+    </a>
+    <a
+      class="action-card card-learning"
+      href="{{ url_for('student.pinned_discussions') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path
+            d="M21.16 3.63a3.5 3.5 0 1 0-4.79-4.79l-8.62 8.62a1 1 0 0 0-.25.46l-1.37 5.48a1 1 0 0 0 1.22 1.22l5.48-1.37a1 1 0 0 0 .46-.25l8.62-8.62z"
+          ></path>
+          <path d="M12 22H3a2 2 0 0 1-2-2V11"></path>
+        </svg>
+      </div>
+      <span class="card-label">الأسئلة المثبتة</span>
+    </a>
+    <a
+      class="action-card card-learning"
+      href="{{ url_for('student.frequently_wrong') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path
+            d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.92-5.27l-3.42-3.42"
+          ></path>
+        </svg>
+      </div>
+      <span class="card-label">الأخطاء المتكررة</span>
+    </a>
+    <a class="action-card card-learning" href="./pages/Library.html">
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path
+            d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"
+          ></path>
+          <path d="M16 2v20"></path>
+        </svg>
+      </div>
+      <span class="card-label">المكتبة الشاملة</span>
+    </a>
+  </div>
+
+  <h3 class="category-title text-success">
+    <span class="me-2">📊</span>الأداء
+  </h3>
+  <div class="action-grid mb-4">
+    <a
+      class="action-card card-performance"
+      href="{{ url_for('student.results') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M22 11.08V12a10.04 10.04 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      </div>
+      <span class="card-label">النتائج</span>
+    </a>
+    <a
+      class="action-card card-performance"
+      href="{{ url_for('student.statistics') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+      </div>
+      <span class="card-label">الإحصائيات</span>
+    </a>
+    <a
+      class="action-card card-performance"
+      href="{{ url_for('student.leaderboard') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+          <path d="M4 22h16"></path>
+          <path
+            d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"
+          ></path>
+          <path
+            d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"
+          ></path>
+          <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path>
+        </svg>
+      </div>
+      <span class="card-label">لوحة الصدارة</span>
+    </a>
+  </div>
+
+  <h3 class="category-title text-warning" style="color: #fd7e14 !important">
+    <span class="me-2">⚔️</span>التفاعل
+  </h3>
+  <div class="action-grid mb-4">
+    <a
+      class="action-card card-engagement"
+      href="{{ url_for('student.duels_home') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </div>
+      <span class="card-label">التحديات الودية</span>
+    </a>
+    <a
+      class="action-card card-engagement"
+      href="{{ url_for('notifications_inbox') }}"
+    >
+      <div class="icon-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+      </div>
+      <span class="card-label">الإشعارات</span>
+    </a>
+  </div>
+
+  {% elif current_user.role == 'teacher' %} {# Teacher shortcuts #}
+  <div class="action-grid col-12">
+    <a class="action-card" href="{{ url_for('teacher.my_students') }}">
+      <span class="icon fs-2 mb-2">👥</span>
+      <span class="card-label">الطلاب</span>
+    </a>
+    <a class="action-card" href="{{ url_for('student.subjects') }}">
+      <span class="icon fs-2 mb-2">📚</span>
+      <span class="card-label">المواد</span>
+    </a>
+
+    {% if teacher_home_subjects %} {# Teacher's own subjects list appears when
+    available #}
+    <div class="w-100 mt-2">
+      <div class="small text-muted mb-2">موادي</div>
+      <div class="action-grid">
+        {% for subject in teacher_home_subjects %}
+        <a
+          class="action-card"
+          href="{{ url_for('teacher.subject_detail', subject_id=subject.id) }}"
+        >
+          <span class="icon fs-2 mb-2">📚</span>
+          <span class="card-label">{{ subject.name }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <a class="action-card" href="{{ url_for('teacher.dashboard') }}">
+      <span class="icon fs-2 mb-2">📚</span>
+      <span class="card-label">مادتي</span>
+    </a>
+    {% endif %}
+
+    <a
+      class="action-card"
+      href="{{ url_for('teacher.discussions_manage', pinned='1') }}"
+    >
+      <span class="icon fs-2 mb-2">📌</span>
+      <span class="card-label">الأسئلة والأجوبة المثبتة</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}">
+      <span class="icon fs-2 mb-2">✅</span>
+      <span class="card-label">إدارة الواجبات</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.discussions_manage') }}">
+      <span class="icon fs-2 mb-2">💬</span>
+      <span class="card-label">إدارة المناقشات</span>
+    </a>
+    <a class="action-card" href="{{ url_for('notifications_inbox') }}">
+      <span class="icon fs-2 mb-2">🔔</span>
+      <span class="card-label">الإشعارات</span>
+    </a>
+  </div>
+
+  {% elif current_user.role == 'admin' %} {# Admin shortcuts #}
+  <div class="action-grid col-12">
+    <a class="action-card" href="{{ url_for('teacher.dashboard') }}">
+      <span class="icon fs-2 mb-2">🧭</span>
+      <span class="card-label">لوحة المعلم</span>
+    </a>
+    <a class="action-card" href="{{ url_for('student.subjects') }}">
+      <span class="icon fs-2 mb-2">📚</span>
+      <span class="card-label">المواد</span>
+    </a>
+    <a class="action-card" href="{{ url_for('student.pinned_discussions') }}">
+      <span class="icon fs-2 mb-2">📌</span>
+      <span class="card-label">الأسئلة والأجوبة المثبتة</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.assignments_manage') }}">
+      <span class="icon fs-2 mb-2">✅</span>
+      <span class="card-label">إدارة الواجبات</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.discussions_manage') }}">
+      <span class="icon fs-2 mb-2">💬</span>
+      <span class="card-label">إدارة المناقشات</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.certificates_manage') }}">
+      <span class="icon fs-2 mb-2">🎓</span>
+      <span class="card-label">إدارة الشهادات</span>
+    </a>
+    <a
+      class="action-card"
+      href="{{ url_for('teacher.certificates_verification') }}"
+    >
+      <span class="icon fs-2 mb-2">✅</span>
+      <span class="card-label">التحقق من الشهادات</span>
+    </a>
+    <a class="action-card" href="{{ url_for('notifications_inbox') }}">
+      <span class="icon fs-2 mb-2">🔔</span>
+      <span class="card-label">الإشعارات</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.analytics_dashboard') }}">
+      <span class="icon fs-2 mb-2">📈</span>
+      <span class="card-label">التحليلات</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.study_plans_manage') }}">
+      <span class="icon fs-2 mb-2">🗓️</span>
+      <span class="card-label">إدارة الخطط</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.reports_dashboard') }}">
+      <span class="icon fs-2 mb-2">📄</span>
+      <span class="card-label">التقارير</span>
+    </a>
+    <a class="action-card" href="{{ url_for('student.statistics') }}">
+      <span class="icon fs-2 mb-2">📈</span>
+      <span class="card-label">إحصائيات الطلاب</span>
+    </a>
+    <a class="action-card" href="{{ url_for('student.duels_home') }}">
+      <span class="icon fs-2 mb-2">⚔️</span>
+      <span class="card-label">التحديات الودية</span>
+    </a>
+    <a class="action-card" href="{{ url_for('teacher.gamification_admin') }}">
+      <span class="icon fs-2 mb-2">💎</span>
+      <span class="card-label">إدارة الجواهر</span>
+    </a>
+    <a class="action-card" href="{{ url_for('admin.notifications_manage') }}">
+      <span class="icon fs-2 mb-2">📣</span>
+      <span class="card-label">إرسال إشعار</span>
+    </a>
+    <a class="action-card" href="{{ url_for('admin.dashboard') }}">
+      <span class="icon fs-2 mb-2">⚙️</span>
+      <span class="card-label">الإدارة</span>
+    </a>
+    
+  </div>
+
+  {% elif current_user.role == 'question_editor' %} {# Question editor shortcuts
+  #}
+  <div class="action-grid col-12">
+    <a
+      class="action-card"
+      href="{{ url_for('teacher.question_editor_dashboard') }}"
+    >
+      <span class="icon fs-2 mb-2">🧩</span>
+      <span class="card-label">لوحة محرر الأسئلة</span>
+    </a>
+    <a class="action-card" href="{{ url_for('notifications_inbox') }}">
+      <span class="icon fs-2 mb-2">🔔</span>
+      <span class="card-label">الإشعارات</span>
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endif %} {% endblock %}

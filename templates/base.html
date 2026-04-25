@@ -156,7 +156,8 @@
         font-weight: 600;
         transition: all 0.2s ease;
       }
-      .drawer-nav-link:hover, .drawer-nav-link.active {
+      .drawer-nav-link:hover,
+      .drawer-nav-link.active {
         background: #f1f5f9;
         color: #0d6efd;
       }
@@ -179,7 +180,9 @@
       }
     </style>
   </head>
-  <body class="d-flex flex-column min-vh-100 {% if request.endpoint == 'student.profile' %}profile-page{% endif %}">
+  <body
+    class="d-flex flex-column min-vh-100 {% if request.endpoint == 'student.profile' %}profile-page{% endif %}"
+  >
     <div id="navOverlay" class="nav-overlay" onclick="toggleNav(event)"></div>
     <nav class="navbar navbar-expand-lg navbar-dark site-nav">
       <div class="container">
@@ -193,8 +196,14 @@
             class="brand-logo"
           />
           <span>EduPath</span>
+          <button
+                id="theme-toggle"
+                class="btn btn-outline-secondary btn-sm rounded-circle"
+              >
+                🌗
+              </button>
         </a>
-        
+
         <button
           class="navbar-toggler"
           type="button"
@@ -203,8 +212,7 @@
           aria-label="Toggle navigation"
           onclick="toggleNav(event)"
         >
-            <span class="bi bi-person-circle"></span>
-          
+          <span class="bi bi-person-circle"></span>
         </button>
 
         <div class="collapse navbar-collapse offcanvas-collapse" id="navbarNav">
@@ -218,134 +226,189 @@
                 class="brand-logo"
               />
               <span class="fw-bold">EduPath</span>
+              
             </div>
             <button
               type="button"
               class="btn-close text-reset"
               aria-label="إغلاق"
               onclick="closeNav(event)"
-              style="filter: invert(1) grayscale(100%) brightness(200%);"
+              style="filter: invert(1) grayscale(100%) brightness(200%)"
             ></button>
           </div>
 
           <div class="drawer-body d-lg-none">
-            
             {% if current_user.is_authenticated %}
             <div class="drawer-user-profile">
-                <div class="drawer-avatar">
-                    <i class="bi bi-person"></i>
-                </div>
-                <div class="drawer-user-info">
-                    <h6 class="mb-0 fw-bold">{{ current_user.first_name or current_user.username }}</h6>
-                    <small class="text-primary fw-bold">
-                        {% if current_user.role == 'student' %}طالب
-                        {% elif current_user.role == 'teacher' %}معلم
-                        {% elif current_user.role == 'admin' %}مدير
-                        {% elif current_user.role == 'question_editor' %}محرر أسئلة
-                        {% else %}{{ current_user.role }}{% endif %}
-                    </small>
-                </div>
+              <div class="drawer-avatar">
+                <i class="bi bi-person"></i>
+              </div>
+              <div class="drawer-user-info">
+                <h6 class="mb-0 fw-bold">
+                  {{ current_user.first_name or current_user.username }}
+                </h6>
+                <small class="text-primary fw-bold">
+                  {% if current_user.role == 'student' %}طالب {% elif
+                  current_user.role == 'teacher' %}معلم {% elif
+                  current_user.role == 'admin' %}مدير {% elif current_user.role
+                  == 'question_editor' %}محرر أسئلة {% else %}{{
+                  current_user.role }}{% endif %}
+                </small>
+              </div>
             </div>
             {% else %}
-            <div class="drawer-user-profile" style="background: #f8f9fa; border-color: #eef0f2;">
-                <div class="drawer-avatar bg-secondary">
-                    <i class="bi bi-person-x"></i>
-                </div>
-                <div class="drawer-user-info">
-                    <h6 class="mb-0 fw-bold text-dark">زائر</h6>
-                    <small class="text-muted">مرحباً بك في EduPath</small>
-                </div>
+            <div
+              class="drawer-user-profile"
+              style="background: #f8f9fa; border-color: #eef0f2"
+            >
+              <div class="drawer-avatar bg-secondary">
+                <i class="bi bi-person-x"></i>
+              </div>
+              <div class="drawer-user-info">
+                <h6 class="mb-0 fw-bold text-dark">زائر</h6>
+                <small class="text-muted">مرحباً بك في EduPath</small>
+              </div>
             </div>
             {% endif %}
 
             <ul class="drawer-nav-list">
-                <li class="drawer-nav-item">
-                    <a class="drawer-nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
-                        <i class="bi bi-house drawer-nav-icon"></i> الرئيسية
-                    </a>
-                </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if request.endpoint == 'index' %}active{% endif %}"
+                  href="{{ url_for('index') }}"
+                >
+                  <i class="bi bi-house drawer-nav-icon"></i> الرئيسية
+                </a>
+              </li>
 
-                {% if current_user.is_authenticated %}
-                    {% if current_user.role == 'student' %}
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link {% if 'subjects' in request.endpoint %}active{% endif %}" href="{{ url_for('student.subjects') }}">
-                            <i class="bi bi-book drawer-nav-icon"></i> المواد الدراسية
-                        </a>
-                    </li>
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link {% if 'results' in request.endpoint %}active{% endif %}" href="{{ url_for('student.results') }}">
-                            <i class="bi bi-journal-check drawer-nav-icon"></i> النتائج
-                        </a>
-                    </li>
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link {% if 'statistics' in request.endpoint %}active{% endif %}" href="{{ url_for('student.statistics') }}">
-                            <i class="bi bi-bar-chart drawer-nav-icon"></i> الإحصائيات
-                        </a>
-                    </li>
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link {% if 'favorites' in request.endpoint %}active{% endif %}" href="{{ url_for('student.favorites') }}">
-                            <i class="bi bi-star drawer-nav-icon"></i> الأسئلة المفضلة
-                        </a>
-                    </li>
-                    
-                    <div class="drawer-divider"></div>
-                    
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link {% if 'profile' in request.endpoint %}active{% endif %}" href="{{ url_for('student.profile') }}">
-                            <i class="bi bi-person-gear drawer-nav-icon"></i> الملف الشخصي
-                        </a>
-                    </li>
-                    
-                    {% elif current_user.role in ['teacher', 'admin', 'question_editor'] %}
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link" href="{{ url_for('teacher.dashboard') }}">
-                            <i class="bi bi-speedometer2 drawer-nav-icon"></i> لوحة التحكم
-                        </a>
-                    </li>
-                        {% if current_user.role == 'admin' %}
-                        <li class="drawer-nav-item">
-                            <a class="drawer-nav-link" href="{{ url_for('student.duels_home') }}">
-                                <i class="bi bi-controller drawer-nav-icon"></i> التحديات الودية
-                            </a>
-                        </li>
-                        <li class="drawer-nav-item">
-                            <a class="drawer-nav-link" href="{{ url_for('student.statistics') }}">
-                                <i class="bi bi-graph-up drawer-nav-icon"></i> إحصائيات الطلاب
-                            </a>
-                        </li>
-                        {% endif %}
-                    {% endif %}
-                    
-                    <div class="drawer-divider"></div>
-                    
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link logout-link" href="{{ url_for('auth.logout') }}">
-                            <i class="bi bi-box-arrow-right drawer-nav-icon"></i> تسجيل الخروج
-                        </a>
-                    </li>
+              {% if current_user.is_authenticated %} {% if current_user.role ==
+              'student' %}
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'subjects' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.subjects') }}"
+                >
+                  <i class="bi bi-book drawer-nav-icon"></i> المواد الدراسية
+                </a>
+              </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'results' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.results') }}"
+                >
+                  <i class="bi bi-journal-check drawer-nav-icon"></i> النتائج
+                </a>
+              </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'statistics' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.statistics') }}"
+                >
+                  <i class="bi bi-bar-chart drawer-nav-icon"></i> الإحصائيات
+                </a>
+              </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'favorites' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.favorites') }}"
+                >
+                  <i class="bi bi-star drawer-nav-icon"></i> الأسئلة المفضلة
+                </a>
+              </li>
 
-                {% else %}
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link" href="{{ url_for('pages', filename='Library.html') }}">
-                            <i class="bi bi-collection drawer-nav-icon"></i> المكتبة الشاملة
-                        </a>
-                    </li>
-                    <li class="drawer-nav-item">
-                        <a class="drawer-nav-link" href="{{ url_for('pages', filename='FAQ.html') }}">
-                            <i class="bi bi-question-circle drawer-nav-icon"></i> الأسئلة الشائعة
-                        </a>
-                    </li>
-                    
-                    <div class="drawer-divider"></div>
-                    
-                    <div class="p-3 mt-2">
-                        <a href="{{ url_for('auth.login') }}" class="btn btn-primary w-100 mb-2 fw-bold rounded-pill">تسجيل الدخول</a>
-                        <a href="{{ url_for('auth.register') }}" class="btn btn-outline-primary w-100 fw-bold rounded-pill">إنشاء حساب مجاني</a>
-                    </div>
-                {% endif %}
+              <div class="drawer-divider"></div>
+
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'profile' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.profile') }}"
+                >
+                  <i class="bi bi-person-gear drawer-nav-icon"></i> الملف الشخصي
+                </a>
+              </li>
+
+              {% elif current_user.role in ['teacher', 'admin',
+              'question_editor'] %}
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link"
+                  href="{{ url_for('teacher.dashboard') }}"
+                >
+                  <i class="bi bi-speedometer2 drawer-nav-icon"></i> لوحة التحكم
+                </a>
+              </li>
+              {% if current_user.role == 'admin' %}
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link"
+                  href="{{ url_for('student.duels_home') }}"
+                >
+                  <i class="bi bi-controller drawer-nav-icon"></i> التحديات
+                  الودية
+                </a>
+              </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link"
+                  href="{{ url_for('student.statistics') }}"
+                >
+                  <i class="bi bi-graph-up drawer-nav-icon"></i> إحصائيات الطلاب
+                </a>
+              </li>
+              {% endif %} {% endif %}
+
+              <div class="drawer-divider"></div>
+
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link logout-link"
+                  href="{{ url_for('auth.logout') }}"
+                >
+                  <i class="bi bi-box-arrow-right drawer-nav-icon"></i> تسجيل
+                  الخروج
+                </a>
+              </li>
+
+              {% else %}
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link"
+                  href="{{ url_for('pages', filename='Library.html') }}"
+                >
+                  <i class="bi bi-collection drawer-nav-icon"></i> المكتبة
+                  الشاملة
+                </a>
+              </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link"
+                  href="{{ url_for('pages', filename='FAQ.html') }}"
+                >
+                  <i class="bi bi-question-circle drawer-nav-icon"></i> الأسئلة
+                  الشائعة
+                </a>
+              </li>
+
+              <div class="drawer-divider"></div>
+
+              <div class="p-3 mt-2">
+                <a
+                  href="{{ url_for('auth.login') }}"
+                  class="btn btn-primary w-100 mb-2 fw-bold rounded-pill"
+                  >تسجيل الدخول</a
+                >
+                <a
+                  href="{{ url_for('auth.register') }}"
+                  class="btn btn-outline-primary w-100 fw-bold rounded-pill"
+                  >إنشاء حساب مجاني</a
+                >
+              </div>
+              {% endif %}
             </ul>
           </div>
-          <ul class="navbar-nav align-items-center gap-2 d-none d-lg-flex ms-auto">
+          <ul
+            class="navbar-nav align-items-center gap-2 d-none d-lg-flex ms-auto"
+          >
             {% if current_user.is_authenticated %}
             <li class="nav-item drawer-focus-item">
               <a
@@ -507,10 +570,6 @@
 
     <footer class="text-body bg-body mt-auto mt-5" data-bs-theme="dark">
       <div class="container py-2">
-        <span
-          class="fs-6 text-center text-body d-flex justify-content-center align-items-center"
-          >روابط</span
-        >
         <div class="row justify-content-center">
           <div
             class="col-5 col-sm-5 col-lg-3 col-xl-2 col-xxl-2 text-center text-lg-start d-flex flex-column align-items-start"
@@ -565,7 +624,7 @@
               >
             </p>
           </div>
-          
+
           <div
             class="col-sm-6 col-md-5 col-lg-3 col-xl-2 text-center text-lg-start d-flex flex-column align-items-lg-start"
           >
@@ -1180,6 +1239,24 @@
         setInterval(poll, 12000);
       })();
       {% endif %}
+    </script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const themeToggle = document.getElementById("theme-toggle");
+
+        // Check local storage for user preference, default to light
+        const currentTheme = localStorage.getItem("theme") || "light";
+        document.documentElement.setAttribute("data-theme", currentTheme);
+
+        // Toggle event
+        themeToggle.addEventListener("click", () => {
+          let theme = document.documentElement.getAttribute("data-theme");
+          let switchToTheme = theme === "dark" ? "light" : "dark";
+
+          document.documentElement.setAttribute("data-theme", switchToTheme);
+          localStorage.setItem("theme", switchToTheme); // Save preference
+        });
+      });
     </script>
     {% block scripts %}{% endblock %}
   </body>
