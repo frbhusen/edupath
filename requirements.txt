@@ -11,3 +11,5 @@ Flask-Compress==1.17
 fpdf2==2.8.2
 arabic-reshaper==3.0.0
 python-bidi==0.4.2
+WeasyPrint
+Flask-WeasyPrint
