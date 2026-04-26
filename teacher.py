@@ -3721,7 +3721,7 @@ def lesson_detail(lesson_id):
 
 @teacher_bp.route("/lessons/<lesson_id>/edit", methods=["GET", "POST"])
 @login_required
-@role_required("teacher") # Changed back from "admin" to "teacher"
+@role_required("admin")
 def edit_lesson(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
