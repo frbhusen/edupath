@@ -3733,6 +3733,7 @@ def edit_lesson(lesson_id):
     allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span']
     allowed_attrs = {'*': ['class', 'style']}
     clean_content = bleach.clean(form.content.data, tags=allowed_tags, attributes=allowed_attrs)
+    
     if form.validate_on_submit():
         
         resource_labels = request.form.getlist("resource_label[]")
@@ -3743,7 +3744,13 @@ def edit_lesson(lesson_id):
             for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
             if lbl.strip() and url.strip()
         ]
-
+        raw_html = form.content.data or ""
+        allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span', 'img', 'a', 'blockquote', 'pre']
+        allowed_attrs = {
+            '*': ['class', 'style'], 
+            'img': ['src', 'alt', 'width', 'height'], 
+            'a': ['href', 'target']
+        }
         # --- LOCAL VIDEO UPLOAD LOGIC ---
         if form.video_file.data:
             video_file = form.video_file.data
@@ -3782,16 +3789,7 @@ def edit_lesson(lesson_id):
             lesson.audio_filename = new_audio_filename
         # --------------------------------
 
-        # --- 2. Safe HTML Sanitization ---
-        raw_html = form.content.data or ""
         
-        # Added img, a, blockquote, and pre so teacher formats don't break
-        allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span', 'img', 'a', 'blockquote', 'pre']
-        allowed_attrs = {
-            '*': ['class', 'style'], 
-            'img': ['src', 'alt', 'width', 'height'], 
-            'a': ['href', 'target']
-        }
         
         try:
             # Clean the HTML. If bleach fails, it will fall back to raw_html instead of crashing the server.
