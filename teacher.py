@@ -3795,7 +3795,6 @@ def edit_lesson(lesson_id):
         
         try:
             # Clean the HTML. If bleach fails, it will fall back to raw_html instead of crashing the server.
-            import bleach
             clean_content = bleach.clean(raw_html, tags=allowed_tags, attributes=allowed_attrs)
         except Exception as e:
             print(f"Bleach sanitization warning: {e}")
