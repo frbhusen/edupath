@@ -1,30 +1,49 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
+{% extends 'base.html' %} {% block content %}
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<div
+  class="dashboard-hero mb-3 d-flex justify-content-between align-items-center"
+>
   <div>
     <h1 class="h4 mb-1">{{ 'تعديل الدرس' if lesson else 'درس جديد' }}</h1>
     <p class="mb-0">إضافة محتوى وروابط موارد.</p>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">رجوع</a>
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}"
+    >رجوع</a
+  >
 </div>
 
 <div class="card shadow-sm">
   <div class="card-body">
-
-    <form method="POST" action="" enctype="multipart/form-data" id="lessonUploadForm">
+    <form
+      method="POST"
+      action=""
+      enctype="multipart/form-data"
+      id="lessonUploadForm"
+    >
       {{ form.hidden_tag() }}
-      
+
       <div class="mb-3">
-        {{ form.title.label(class="form-label") }}
-        {{ form.title(class="form-control") }}
+        {{ form.title.label(class="form-label") }} {{
+        form.title(class="form-control") }}
       </div>
       <div class="mb-3">
         {{ form.content.label(class="form-label") }}
-        {{ form.content(class="form-control", rows=8) }}
+
+        <div id="quill-editor" style="height: 300px; background: white">
+          {{ form.content.data | safe if form.content.data else '' }}
+        </div>
+
+        <div style="display: none">
+          {{ form.content(id="hidden-content-textarea") }}
+        </div>
       </div>
       <div class="form-check mb-4">
-        {{ form.requires_code(class="form-check-input", id="lesson_requires_code") }}
-        <label for="lesson_requires_code" class="form-check-label">يتطلب رمز تفعيل</label>
+        {{ form.requires_code(class="form-check-input",
+        id="lesson_requires_code") }}
+        <label for="lesson_requires_code" class="form-check-label"
+          >يتطلب رمز تفعيل</label
+        >
       </div>
 
       <div class="card mb-4 border-primary">
@@ -32,37 +51,58 @@
           إدارة فيديو الدرس
         </div>
         <div class="card-body">
-
           <div class="form-group mb-3">
-            {{ form.video_file.label(class="form-label font-weight-bold") }}
-            {{ form.video_file(class="form-control-file", id="video_file", accept="video/mp4,video/webm") }}
+            {{ form.video_file.label(class="form-label font-weight-bold") }} {{
+            form.video_file(class="form-control-file", id="video_file",
+            accept="video/mp4,video/webm") }}
             <small class="form-text text-muted">
               الحد الأقصى لحجم الملف هو 500MB.
             </small>
           </div>
 
-          <div id="upload-progress-container" class="mt-3 mb-3" style="display: none;">
-            <label class="font-weight-bold text-success">جاري الرفع... الرجاء عدم إغلاق الصفحة</label>
-            <div class="progress" style="height: 25px;">
-              <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+          <div
+            id="upload-progress-container"
+            class="mt-3 mb-3"
+            style="display: none"
+          >
+            <label class="font-weight-bold text-success"
+              >جاري الرفع... الرجاء عدم إغلاق الصفحة</label
+            >
+            <div class="progress" style="height: 25px">
+              <div
+                id="upload-progress-bar"
+                class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                role="progressbar"
+                style="width: 0%"
+                aria-valuenow="0"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
                 0%
               </div>
             </div>
           </div>
 
           {% if lesson and lesson.video_filename %}
-          <hr>
+          <hr />
           <div class="d-flex justify-content-between align-items-center mb-0">
             <div>
               <strong>الفيديو الحالي:</strong> {{ lesson.video_filename }}
             </div>
-            <button type="submit" form="deleteVideoForm" class="btn btn-danger btn-sm" onclick="return confirm('هل أنت متأكد أنك تريد حذف هذا الفيديو نهائياً؟');">
+            <button
+              type="submit"
+              form="deleteVideoForm"
+              class="btn btn-danger btn-sm"
+              onclick="
+                return confirm(
+                  'هل أنت متأكد أنك تريد حذف هذا الفيديو نهائياً؟',
+                );
+              "
+            >
               <i class="fas fa-trash"></i> حذف الفيديو
             </button>
           </div>
           {% endif %}
-
         </div>
       </div>
 
@@ -71,136 +111,273 @@
           إدارة الملفات الصوتية
         </div>
         <div class="card-body">
-
           <div class="form-group mb-3">
-            {{ form.audio_file.label(class="form-label font-weight-bold") }}
-            {{ form.audio_file(class="form-control-file", id="audio_file", accept="audio/*") }}
+            {{ form.audio_file.label(class="form-label font-weight-bold") }} {{
+            form.audio_file(class="form-control-file", id="audio_file",
+            accept="audio/*") }}
           </div>
 
-          <div id="audio-upload-progress-container" class="mt-3 mb-3" style="display: none;">
-            <label class="font-weight-bold text-success">جاري رفع الملف الصوتي...</label>
-            <div class="progress" style="height: 25px;">
-              <div id="audio-upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+          <div
+            id="audio-upload-progress-container"
+            class="mt-3 mb-3"
+            style="display: none"
+          >
+            <label class="font-weight-bold text-success"
+              >جاري رفع الملف الصوتي...</label
+            >
+            <div class="progress" style="height: 25px">
+              <div
+                id="audio-upload-progress-bar"
+                class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                role="progressbar"
+                style="width: 0%"
+                aria-valuenow="0"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
                 0%
               </div>
             </div>
           </div>
 
           {% if lesson and lesson.audio_filename %}
-          <hr>
+          <hr />
           <div class="d-flex justify-content-between align-items-center mb-0">
             <div>
               <strong>الملف الصوتي الحالي:</strong> {{ lesson.audio_filename }}
             </div>
-            <button type="submit" form="deleteAudioForm" class="btn btn-danger btn-sm" onclick="return confirm('هل أنت متأكد أنك تريد حذف هذا الملف الصوتي نهائياً؟');">
+            <button
+              type="submit"
+              form="deleteAudioForm"
+              class="btn btn-danger btn-sm"
+              onclick="
+                return confirm(
+                  'هل أنت متأكد أنك تريد حذف هذا الملف الصوتي نهائياً؟',
+                );
+              "
+            >
               <i class="fas fa-trash"></i> حذف الصوت
             </button>
           </div>
           {% endif %}
-
         </div>
       </div>
 
       <div class="mt-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <label class="form-label mb-0">موارد الدرس</label>
-          <button type="button" class="btn btn-sm btn-outline-primary" id="add-resource">إضافة مورد</button>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-primary"
+            id="add-resource"
+          >
+            إضافة مورد
+          </button>
         </div>
 
-        <div id="resource-list"> 
-          {% set existing = lesson.resources if lesson else [] %}
-          {% if existing %}
-            {% for res in existing %}
-            <div class="resource-entry row g-2 mb-2">
-              <div class="col-md-3">
-                <input class="form-control" name="resource_label[]" value="{{ res.label }}" placeholder="e.g. Lesson PDF" />
-              </div>
-              <div class="col-md-5">
-                <input class="form-control" name="resource_url[]" value="{{ res.url }}" placeholder="https://..." />
-              </div>
-              <div class="col-md-2">
-                <select class="form-select" name="resource_type[]">
-                  <option value="">Auto</option>
-                  <option value="pdf" {% if res.resource_type=='pdf' %}selected{% endif %}>PDF</option>
-                  <option value="slides" {% if res.resource_type=='slides' %}selected{% endif %}>Slides</option>
-                  <option value="video" {% if res.resource_type=='video' %}selected{% endif %}>Video (YouTube)</option>
-                  <option value="audio" {% if res.resource_type=='audio' %}selected{% endif %}>Audio</option>
-                  <option value="flashcards" {% if res.resource_type=='flashcards' %}selected{% endif %}>Flash Cards (JSON)</option>
-                  <option value="link" {% if res.resource_type=='link' %}selected{% endif %}>Link</option>
-                </select>
-              </div>
-              <div class="col-md-2 d-flex align-items-center">
-                <button type="button" class="btn btn-link text-danger p-0 remove-row">Remove</button>
-              </div>
+        <div id="resource-list">
+          {% set existing = lesson.resources if lesson else [] %} {% if existing
+          %} {% for res in existing %}
+          <div class="resource-entry row g-2 mb-2">
+            <div class="col-md-3">
+              <input
+                class="form-control"
+                name="resource_label[]"
+                value="{{ res.label }}"
+                placeholder="e.g. Lesson PDF"
+              />
             </div>
-            {% endfor %}
-          {% else %}
-            <div class="resource-entry row g-2 mb-2">
-              <div class="col-md-3">
-                <input class="form-control" name="resource_label[]" placeholder="e.g. Lesson PDF" />
-              </div>
-              <div class="col-md-5">
-                <input class="form-control" name="resource_url[]" placeholder="https://..." />
-              </div>
-              <div class="col-md-2">
-                <select class="form-select" name="resource_type[]">
-                  <option value="">Auto</option>
-                  <option value="pdf">PDF</option>
-                  <option value="slides">Slides</option>
-                  <option value="video">Video (YouTube)</option>
-                  <option value="audio">Audio</option>
-                  <option value="flashcards">Flash Cards (JSON)</option>
-                  <option value="mindmap">Mind Map (HTML)</option>
-                  <option value="link">Link</option>
-                </select>
-              </div>
-              <div class="col-md-2 d-flex align-items-center">
-                <button type="button" class="btn btn-link text-danger p-0 remove-row">Remove</button>
-              </div>
+            <div class="col-md-5">
+              <input
+                class="form-control"
+                name="resource_url[]"
+                value="{{ res.url }}"
+                placeholder="https://..."
+              />
             </div>
+            <div class="col-md-2">
+              <select class="form-select" name="resource_type[]">
+                <option value="">Auto</option>
+                <option
+                  value="pdf"
+                  {%
+                  if
+                  res.resource_type=""
+                  ="pdf"
+                  %}selected{%
+                  endif
+                  %}
+                >
+                  PDF
+                </option>
+                <option
+                  value="slides"
+                  {%
+                  if
+                  res.resource_type=""
+                  ="slides"
+                  %}selected{%
+                  endif
+                  %}
+                >
+                  Slides
+                </option>
+                <option
+                  value="video"
+                  {%
+                  if
+                  res.resource_type=""
+                  ="video"
+                  %}selected{%
+                  endif
+                  %}
+                >
+                  Video (YouTube)
+                </option>
+                <option
+                  value="audio"
+                  {%
+                  if
+                  res.resource_type=""
+                  ="audio"
+                  %}selected{%
+                  endif
+                  %}
+                >
+                  Audio
+                </option>
+                <option
+                  value="flashcards"
+                  {%
+                  if
+                  res.resource_type=""
+                  ="flashcards"
+                  %}selected{%
+                  endif
+                  %}
+                >
+                  Flash Cards (JSON)
+                </option>
+                <option
+                  value="link"
+                  {%
+                  if
+                  res.resource_type=""
+                  ="link"
+                  %}selected{%
+                  endif
+                  %}
+                >
+                  Link
+                </option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-center">
+              <button
+                type="button"
+                class="btn btn-link text-danger p-0 remove-row"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+          {% endfor %} {% else %}
+          <div class="resource-entry row g-2 mb-2">
+            <div class="col-md-3">
+              <input
+                class="form-control"
+                name="resource_label[]"
+                placeholder="e.g. Lesson PDF"
+              />
+            </div>
+            <div class="col-md-5">
+              <input
+                class="form-control"
+                name="resource_url[]"
+                placeholder="https://..."
+              />
+            </div>
+            <div class="col-md-2">
+              <select class="form-select" name="resource_type[]">
+                <option value="">Auto</option>
+                <option value="pdf">PDF</option>
+                <option value="slides">Slides</option>
+                <option value="video">Video (YouTube)</option>
+                <option value="audio">Audio</option>
+                <option value="flashcards">Flash Cards (JSON)</option>
+                <option value="mindmap">Mind Map (HTML)</option>
+                <option value="link">Link</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-center">
+              <button
+                type="button"
+                class="btn btn-link text-danger p-0 remove-row"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
           {% endif %}
         </div>
       </div>
 
       <div class="mt-4">
-        <button type="submit" class="btn btn-success btn-lg" id="submitLessonBtn">
+        <button
+          type="submit"
+          class="btn btn-success btn-lg"
+          id="submitLessonBtn"
+        >
           حفظ الدرس
         </button>
       </div>
-
     </form>
-    </div>
+  </div>
 </div>
 
 {% if lesson %}
 <div class="mt-3">
-  <a class="btn btn-outline-secondary btn-sm"
-    href="{{ url_for('teacher.manage_lesson_access', lesson_id=lesson.id) }}">إدارة الوصول للدرس</a>
+  <a
+    class="btn btn-outline-secondary btn-sm"
+    href="{{ url_for('teacher.manage_lesson_access', lesson_id=lesson.id) }}"
+    >إدارة الوصول للدرس</a
+  >
 </div>
-{% endif %}
-
-
-{% if lesson and lesson.video_filename %}
-<form id="deleteVideoForm" action="{{ url_for('teacher.delete_lesson_video', lesson_id=lesson.id) }}" method="POST" style="display: none;">
-    {{ form.csrf_token }}
+{% endif %} {% if lesson and lesson.video_filename %}
+<form
+  id="deleteVideoForm"
+  action="{{ url_for('teacher.delete_lesson_video', lesson_id=lesson.id) }}"
+  method="POST"
+  style="display: none"
+>
+  {{ form.csrf_token }}
+</form>
+{% endif %} {% if lesson and lesson.audio_filename %}
+<form
+  id="deleteAudioForm"
+  action="{{ url_for('teacher.delete_lesson_audio', lesson_id=lesson.id) }}"
+  method="POST"
+  style="display: none"
+>
+  {{ form.csrf_token }}
 </form>
 {% endif %}
-
-{% if lesson and lesson.audio_filename %}
-<form id="deleteAudioForm" action="{{ url_for('teacher.delete_lesson_audio', lesson_id=lesson.id) }}" method="POST" style="display: none;">
-    {{ form.csrf_token }}
-</form>
-{% endif %}
-
 
 <template id="resource-template">
   <div class="resource-entry row g-2 mb-2">
     <div class="col-md-3">
-      <input class="form-control" name="resource_label[]" placeholder="e.g. Lesson PDF" />
+      <input
+        class="form-control"
+        name="resource_label[]"
+        placeholder="e.g. Lesson PDF"
+      />
     </div>
     <div class="col-md-5">
-      <input class="form-control" name="resource_url[]" placeholder="https://..." />
+      <input
+        class="form-control"
+        name="resource_url[]"
+        placeholder="https://..."
+      />
     </div>
     <div class="col-md-2">
       <select class="form-select" name="resource_type[]">
@@ -215,45 +392,52 @@
       </select>
     </div>
     <div class="col-md-2 d-flex align-items-center">
-      <button type="button" class="btn btn-link text-danger p-0 remove-row">Remove</button>
+      <button type="button" class="btn btn-link text-danger p-0 remove-row">
+        Remove
+      </button>
     </div>
   </div>
 </template>
 
 <script>
-  document.getElementById('add-resource')?.addEventListener('click', () => {
-    const tpl = document.getElementById('resource-template');
-    const list = document.getElementById('resource-list');
+  document.getElementById("add-resource")?.addEventListener("click", () => {
+    const tpl = document.getElementById("resource-template");
+    const list = document.getElementById("resource-list");
     if (tpl && list) {
-      list.insertAdjacentHTML('beforeend', tpl.innerHTML);
+      list.insertAdjacentHTML("beforeend", tpl.innerHTML);
     }
   });
-  document.getElementById('resource-list')?.addEventListener('click', (e) => {
-    if (e.target.classList.contains('remove-row')) {
-      const entry = e.target.closest('.resource-entry');
+  document.getElementById("resource-list")?.addEventListener("click", (e) => {
+    if (e.target.classList.contains("remove-row")) {
+      const entry = e.target.closest(".resource-entry");
       if (entry) entry.remove();
     }
   });
 </script>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const form = document.getElementById('lessonUploadForm');
-    const submitBtn = document.getElementById('submitLessonBtn');
-    
+  document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("lessonUploadForm");
+    const submitBtn = document.getElementById("submitLessonBtn");
+
     // Video Elements
-    const videoInput = document.getElementById('video_file');
-    const videoProgressContainer = document.getElementById('upload-progress-container');
-    const videoProgressBar = document.getElementById('upload-progress-bar');
-    
+    const videoInput = document.getElementById("video_file");
+    const videoProgressContainer = document.getElementById(
+      "upload-progress-container",
+    );
+    const videoProgressBar = document.getElementById("upload-progress-bar");
+
     // Audio Elements
-    const audioInput = document.getElementById('audio_file');
-    const audioProgressContainer = document.getElementById('audio-upload-progress-container');
-    const audioProgressBar = document.getElementById('audio-upload-progress-bar');
+    const audioInput = document.getElementById("audio_file");
+    const audioProgressContainer = document.getElementById(
+      "audio-upload-progress-container",
+    );
+    const audioProgressBar = document.getElementById(
+      "audio-upload-progress-bar",
+    );
 
     if (form) {
-      form.addEventListener('submit', function (e) {
-        
+      form.addEventListener("submit", function (e) {
         const isUploadingVideo = videoInput && videoInput.files.length > 0;
         const isUploadingAudio = audioInput && audioInput.files.length > 0;
 
@@ -264,36 +448,38 @@
           // Lock UI
           if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerText = 'جاري الحفظ والرفع...';
+            submitBtn.innerText = "جاري الحفظ والرفع...";
           }
-          
+
           if (isUploadingVideo && videoProgressContainer) {
-            videoProgressContainer.style.display = 'block';
+            videoProgressContainer.style.display = "block";
           }
           if (isUploadingAudio && audioProgressContainer) {
-            audioProgressContainer.style.display = 'block';
+            audioProgressContainer.style.display = "block";
           }
 
           const formData = new FormData(form);
           const xhr = new XMLHttpRequest();
 
-          xhr.open('POST', window.location.href, true);
+          xhr.open("POST", window.location.href, true);
 
           // Update Progress Bar
           xhr.upload.onprogress = function (event) {
             if (event.lengthComputable) {
-              const percentComplete = Math.round((event.loaded / event.total) * 100);
-              
+              const percentComplete = Math.round(
+                (event.loaded / event.total) * 100,
+              );
+
               if (isUploadingVideo && videoProgressBar) {
-                videoProgressBar.style.width = percentComplete + '%';
-                videoProgressBar.setAttribute('aria-valuenow', percentComplete);
-                videoProgressBar.innerText = percentComplete + '%';
+                videoProgressBar.style.width = percentComplete + "%";
+                videoProgressBar.setAttribute("aria-valuenow", percentComplete);
+                videoProgressBar.innerText = percentComplete + "%";
               }
-              
+
               if (isUploadingAudio && audioProgressBar) {
-                audioProgressBar.style.width = percentComplete + '%';
-                audioProgressBar.setAttribute('aria-valuenow', percentComplete);
-                audioProgressBar.innerText = percentComplete + '%';
+                audioProgressBar.style.width = percentComplete + "%";
+                audioProgressBar.setAttribute("aria-valuenow", percentComplete);
+                audioProgressBar.innerText = percentComplete + "%";
               }
             }
           };
@@ -303,13 +489,13 @@
             if (xhr.status >= 200 && xhr.status < 400) {
               window.location.href = xhr.responseURL;
             } else {
-              alert('حدث خطأ أثناء الرفع. تأكد من حجم الملف وحاول مرة أخرى.');
+              alert("حدث خطأ أثناء الرفع. تأكد من حجم الملف وحاول مرة أخرى.");
               resetUI();
             }
           };
 
           xhr.onerror = function () {
-            alert('انقطع الاتصال. يرجى التحقق من الإنترنت.');
+            alert("انقطع الاتصال. يرجى التحقق من الإنترنت.");
             resetUI();
           };
 
@@ -322,26 +508,46 @@
     function resetUI() {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.innerText = 'حفظ الدرس';
+        submitBtn.innerText = "حفظ الدرس";
       }
-      
+
       if (videoProgressContainer) {
-        videoProgressContainer.style.display = 'none';
+        videoProgressContainer.style.display = "none";
         if (videoProgressBar) {
-          videoProgressBar.style.width = '0%';
-          videoProgressBar.innerText = '0%';
+          videoProgressBar.style.width = "0%";
+          videoProgressBar.innerText = "0%";
         }
       }
-      
+
       if (audioProgressContainer) {
-        audioProgressContainer.style.display = 'none';
+        audioProgressContainer.style.display = "none";
         if (audioProgressBar) {
-          audioProgressBar.style.width = '0%';
-          audioProgressBar.innerText = '0%';
+          audioProgressBar.style.width = "0%";
+          audioProgressBar.innerText = "0%";
         }
       }
     }
   });
 </script>
+<script>
+  // Initialize Quill Editor
+  var quill = new Quill("#quill-editor", {
+    theme: "snow",
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ["bold", "italic", "underline"],
+        [{ list: "ordered" }, { list: "bullet" }],
+        [{ align: [] }],
+        ["clean"],
+      ],
+    },
+  });
 
+  // Sync the HTML from Quill into the hidden WTForms textarea upon submission
+  document.querySelector("form").addEventListener("submit", function () {
+    var hiddenTextarea = document.querySelector("#hidden-content-textarea");
+    hiddenTextarea.value = quill.root.innerHTML;
+  });
+</script>
 {% endblock %}

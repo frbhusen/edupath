@@ -11,7 +11,7 @@ from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from weasyprint import HTML
 import uuid
-
+import bleach
 try:
     from fpdf import FPDF
 except Exception:  # pragma: no cover
@@ -3669,18 +3669,20 @@ def new_lesson(section_id):
         resource_labels = request.form.getlist("resource_label[]")
         resource_urls = request.form.getlist("resource_url[]")
         resource_types = request.form.getlist("resource_type[]")
+        allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span']
+        allowed_attrs = {'*': ['class', 'style']}
         resources = [
             (lbl.strip(), url.strip(), (rtype or "").strip().lower() or None)
             for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
             if lbl.strip() and url.strip()
         ]
-
+        clean_content = bleach.clean(form.content.data, tags=allowed_tags, attributes=allowed_attrs)
         requires_code = bool(form.requires_code.data)
 
         lesson = Lesson(
             section_id=section.id,
             title=form.title.data,
-            content=form.content.data,
+            content=clean_content, # Use the sanitized content here
             requires_code=requires_code,
             link_label=form.link_label.data,
             link_url=form.link_url.data,
@@ -3728,7 +3730,9 @@ def edit_lesson(lesson_id):
     if scope_response:
         return scope_response
     form = LessonForm()
-    
+    allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span']
+    allowed_attrs = {'*': ['class', 'style']}
+    clean_content = bleach.clean(form.content.data, tags=allowed_tags, attributes=allowed_attrs)
     if form.validate_on_submit():
         resource_labels = request.form.getlist("resource_label[]")
         resource_urls = request.form.getlist("resource_url[]")
@@ -3778,7 +3782,7 @@ def edit_lesson(lesson_id):
         # --------------------------------
 
         lesson.title = form.title.data
-        lesson.content = form.content.data
+        lesson.content = clean_content # Use the sanitized content here
         lesson.requires_code = form.requires_code.data
         lesson.link_label = form.link_label.data
         lesson.link_url = form.link_url.data
