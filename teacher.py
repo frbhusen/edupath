@@ -3730,12 +3730,10 @@ def edit_lesson(lesson_id):
     if scope_response:
         return scope_response
     form = LessonForm()
-    allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span']
-    allowed_attrs = {'*': ['class', 'style']}
-    clean_content = bleach.clean(form.content.data, tags=allowed_tags, attributes=allowed_attrs)
     
     if form.validate_on_submit():
-        
+        allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span']
+        allowed_attrs = {'*': ['class', 'style']}
         resource_labels = request.form.getlist("resource_label[]")
         resource_urls = request.form.getlist("resource_url[]")
         resource_types = request.form.getlist("resource_type[]")
@@ -3791,7 +3789,7 @@ def edit_lesson(lesson_id):
 
         
         
-        clean_content = bleach.clean(raw_html, tags=allowed_tags, attributes=allowed_attrs)
+        clean_content = bleach.clean(form.content.data or "", tags=allowed_tags, attributes=allowed_attrs)
             
         lesson.title = form.title.data
         lesson.content = clean_content # Use the sanitized content here
