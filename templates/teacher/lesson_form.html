@@ -1,26 +1,17 @@
 {% extends 'base.html' %} {% block content %}
 <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-<div
-  class="dashboard-hero mb-3 d-flex justify-content-between align-items-center"
->
+<div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
     <h1 class="h4 mb-1">{{ 'تعديل الدرس' if lesson else 'درس جديد' }}</h1>
     <p class="mb-0">إضافة محتوى وروابط موارد.</p>
   </div>
-  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}"
-    >رجوع</a
-  >
+  <a class="btn btn-light btn-sm" href="{{ url_for('teacher.dashboard') }}">رجوع</a>
 </div>
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form
-      method="POST"
-      action=""
-      enctype="multipart/form-data"
-      id="lessonUploadForm"
-    >
+    <form method="POST" action="" enctype="multipart/form-data" id="lessonUploadForm">
       {{ form.hidden_tag() }}
 
       <div class="mb-3">
@@ -41,9 +32,7 @@
       <div class="form-check mb-4">
         {{ form.requires_code(class="form-check-input",
         id="lesson_requires_code") }}
-        <label for="lesson_requires_code" class="form-check-label"
-          >يتطلب رمز تفعيل</label
-        >
+        <label for="lesson_requires_code" class="form-check-label">يتطلب رمز تفعيل</label>
       </div>
 
       <div class="card mb-4 border-primary">
@@ -60,24 +49,11 @@
             </small>
           </div>
 
-          <div
-            id="upload-progress-container"
-            class="mt-3 mb-3"
-            style="display: none"
-          >
-            <label class="font-weight-bold text-success"
-              >جاري الرفع... الرجاء عدم إغلاق الصفحة</label
-            >
+          <div id="upload-progress-container" class="mt-3 mb-3" style="display: none">
+            <label class="font-weight-bold text-success">جاري الرفع... الرجاء عدم إغلاق الصفحة</label>
             <div class="progress" style="height: 25px">
-              <div
-                id="upload-progress-bar"
-                class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                role="progressbar"
-                style="width: 0%"
-                aria-valuenow="0"
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
+              <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
                 0%
               </div>
             </div>
@@ -89,16 +65,11 @@
             <div>
               <strong>الفيديو الحالي:</strong> {{ lesson.video_filename }}
             </div>
-            <button
-              type="submit"
-              form="deleteVideoForm"
-              class="btn btn-danger btn-sm"
-              onclick="
+            <button type="submit" form="deleteVideoForm" class="btn btn-danger btn-sm" onclick="
                 return confirm(
                   'هل أنت متأكد أنك تريد حذف هذا الفيديو نهائياً؟',
                 );
-              "
-            >
+              ">
               <i class="fas fa-trash"></i> حذف الفيديو
             </button>
           </div>
@@ -117,24 +88,12 @@
             accept="audio/*") }}
           </div>
 
-          <div
-            id="audio-upload-progress-container"
-            class="mt-3 mb-3"
-            style="display: none"
-          >
-            <label class="font-weight-bold text-success"
-              >جاري رفع الملف الصوتي...</label
-            >
+          <div id="audio-upload-progress-container" class="mt-3 mb-3" style="display: none">
+            <label class="font-weight-bold text-success">جاري رفع الملف الصوتي...</label>
             <div class="progress" style="height: 25px">
-              <div
-                id="audio-upload-progress-bar"
-                class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                role="progressbar"
-                style="width: 0%"
-                aria-valuenow="0"
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
+              <div id="audio-upload-progress-bar"
+                class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar"
+                style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
                 0%
               </div>
             </div>
@@ -146,16 +105,11 @@
             <div>
               <strong>الملف الصوتي الحالي:</strong> {{ lesson.audio_filename }}
             </div>
-            <button
-              type="submit"
-              form="deleteAudioForm"
-              class="btn btn-danger btn-sm"
-              onclick="
+            <button type="submit" form="deleteAudioForm" class="btn btn-danger btn-sm" onclick="
                 return confirm(
                   'هل أنت متأكد أنك تريد حذف هذا الملف الصوتي نهائياً؟',
                 );
-              "
-            >
+              ">
               <i class="fas fa-trash"></i> حذف الصوت
             </button>
           </div>
@@ -166,11 +120,7 @@
       <div class="mt-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <label class="form-label mb-0">موارد الدرس</label>
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-primary"
-            id="add-resource"
-          >
+          <button type="button" class="btn btn-sm btn-outline-primary" id="add-resource">
             إضافة مورد
           </button>
         </div>
@@ -180,103 +130,37 @@
           %} {% for res in existing %}
           <div class="resource-entry row g-2 mb-2">
             <div class="col-md-3">
-              <input
-                class="form-control"
-                name="resource_label[]"
-                value="{{ res.label }}"
-                placeholder="e.g. Lesson PDF"
-              />
+              <input class="form-control" name="resource_label[]" value="{{ res.label }}"
+                placeholder="e.g. Lesson PDF" />
             </div>
             <div class="col-md-5">
-              <input
-                class="form-control"
-                name="resource_url[]"
-                value="{{ res.url }}"
-                placeholder="https://..."
-              />
+              <input class="form-control" name="resource_url[]" value="{{ res.url }}" placeholder="https://..." />
             </div>
             <div class="col-md-2">
               <select class="form-select" name="resource_type[]">
                 <option value="">Auto</option>
-                <option
-                  value="pdf"
-                  {%
-                  if
-                  res.resource_type=""
-                  ="pdf"
-                  %}selected{%
-                  endif
-                  %}
-                >
+                <option value="pdf" {% if res.resource_type=""="pdf" %}selected{% endif %}>
                   PDF
                 </option>
-                <option
-                  value="slides"
-                  {%
-                  if
-                  res.resource_type=""
-                  ="slides"
-                  %}selected{%
-                  endif
-                  %}
-                >
+                <option value="slides" {% if res.resource_type=""="slides" %}selected{% endif %}>
                   Slides
                 </option>
-                <option
-                  value="video"
-                  {%
-                  if
-                  res.resource_type=""
-                  ="video"
-                  %}selected{%
-                  endif
-                  %}
-                >
+                <option value="video" {% if res.resource_type=""="video" %}selected{% endif %}>
                   Video (YouTube)
                 </option>
-                <option
-                  value="audio"
-                  {%
-                  if
-                  res.resource_type=""
-                  ="audio"
-                  %}selected{%
-                  endif
-                  %}
-                >
+                <option value="audio" {% if res.resource_type=""="audio" %}selected{% endif %}>
                   Audio
                 </option>
-                <option
-                  value="flashcards"
-                  {%
-                  if
-                  res.resource_type=""
-                  ="flashcards"
-                  %}selected{%
-                  endif
-                  %}
-                >
+                <option value="flashcards" {% if res.resource_type=""="flashcards" %}selected{% endif %}>
                   Flash Cards (JSON)
                 </option>
-                <option
-                  value="link"
-                  {%
-                  if
-                  res.resource_type=""
-                  ="link"
-                  %}selected{%
-                  endif
-                  %}
-                >
+                <option value="link" {% if res.resource_type=""="link" %}selected{% endif %}>
                   Link
                 </option>
               </select>
             </div>
             <div class="col-md-2 d-flex align-items-center">
-              <button
-                type="button"
-                class="btn btn-link text-danger p-0 remove-row"
-              >
+              <button type="button" class="btn btn-link text-danger p-0 remove-row">
                 Remove
               </button>
             </div>
@@ -284,18 +168,10 @@
           {% endfor %} {% else %}
           <div class="resource-entry row g-2 mb-2">
             <div class="col-md-3">
-              <input
-                class="form-control"
-                name="resource_label[]"
-                placeholder="e.g. Lesson PDF"
-              />
+              <input class="form-control" name="resource_label[]" placeholder="e.g. Lesson PDF" />
             </div>
             <div class="col-md-5">
-              <input
-                class="form-control"
-                name="resource_url[]"
-                placeholder="https://..."
-              />
+              <input class="form-control" name="resource_url[]" placeholder="https://..." />
             </div>
             <div class="col-md-2">
               <select class="form-select" name="resource_type[]">
@@ -310,10 +186,7 @@
               </select>
             </div>
             <div class="col-md-2 d-flex align-items-center">
-              <button
-                type="button"
-                class="btn btn-link text-danger p-0 remove-row"
-              >
+              <button type="button" class="btn btn-link text-danger p-0 remove-row">
                 Remove
               </button>
             </div>
@@ -323,11 +196,7 @@
       </div>
 
       <div class="mt-4">
-        <button
-          type="submit"
-          class="btn btn-success btn-lg"
-          id="submitLessonBtn"
-        >
+        <button type="submit" class="btn btn-success btn-lg" id="submitLessonBtn">
           حفظ الدرس
         </button>
       </div>
@@ -337,28 +206,17 @@
 
 {% if lesson %}
 <div class="mt-3">
-  <a
-    class="btn btn-outline-secondary btn-sm"
-    href="{{ url_for('teacher.manage_lesson_access', lesson_id=lesson.id) }}"
-    >إدارة الوصول للدرس</a
-  >
+  <a class="btn btn-outline-secondary btn-sm"
+    href="{{ url_for('teacher.manage_lesson_access', lesson_id=lesson.id) }}">إدارة الوصول للدرس</a>
 </div>
 {% endif %} {% if lesson and lesson.video_filename %}
-<form
-  id="deleteVideoForm"
-  action="{{ url_for('teacher.delete_lesson_video', lesson_id=lesson.id) }}"
-  method="POST"
-  style="display: none"
->
+<form id="deleteVideoForm" action="{{ url_for('teacher.delete_lesson_video', lesson_id=lesson.id) }}" method="POST"
+  style="display: none">
   {{ form.csrf_token }}
 </form>
 {% endif %} {% if lesson and lesson.audio_filename %}
-<form
-  id="deleteAudioForm"
-  action="{{ url_for('teacher.delete_lesson_audio', lesson_id=lesson.id) }}"
-  method="POST"
-  style="display: none"
->
+<form id="deleteAudioForm" action="{{ url_for('teacher.delete_lesson_audio', lesson_id=lesson.id) }}" method="POST"
+  style="display: none">
   {{ form.csrf_token }}
 </form>
 {% endif %}
@@ -366,18 +224,10 @@
 <template id="resource-template">
   <div class="resource-entry row g-2 mb-2">
     <div class="col-md-3">
-      <input
-        class="form-control"
-        name="resource_label[]"
-        placeholder="e.g. Lesson PDF"
-      />
+      <input class="form-control" name="resource_label[]" placeholder="e.g. Lesson PDF" />
     </div>
     <div class="col-md-5">
-      <input
-        class="form-control"
-        name="resource_url[]"
-        placeholder="https://..."
-      />
+      <input class="form-control" name="resource_url[]" placeholder="https://..." />
     </div>
     <div class="col-md-2">
       <select class="form-select" name="resource_type[]">
