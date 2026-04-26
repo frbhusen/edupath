@@ -139,22 +139,22 @@
             <div class="col-md-2">
               <select class="form-select" name="resource_type[]">
                 <option value="">Auto</option>
-                <option value="pdf" {% if res.resource_type=""="pdf" %}selected{% endif %}>
+                <option value="pdf" {% if res.resource_type=="pdf" %}selected{% endif %}>
                   PDF
                 </option>
-                <option value="slides" {% if res.resource_type=""="slides" %}selected{% endif %}>
+                <option value="slides" {% if res.resource_type=="slides" %}selected{% endif %}>
                   Slides
                 </option>
-                <option value="video" {% if res.resource_type=""="video" %}selected{% endif %}>
+                <option value="video" {% if res.resource_type=="video" %}selected{% endif %}>
                   Video (YouTube)
                 </option>
-                <option value="audio" {% if res.resource_type=""="audio" %}selected{% endif %}>
+                <option value="audio" {% if res.resource_type=="audio" %}selected{% endif %}>
                   Audio
                 </option>
-                <option value="flashcards" {% if res.resource_type=""="flashcards" %}selected{% endif %}>
+                <option value="flashcards" {% if res.resource_type=="flashcards" %}selected{% endif %}>
                   Flash Cards (JSON)
                 </option>
-                <option value="link" {% if res.resource_type=""="link" %}selected{% endif %}>
+                <option value="link" {% if res.resource_type=="link" %}selected{% endif %}>
                   Link
                 </option>
               </select>
