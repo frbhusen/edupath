@@ -3721,7 +3721,7 @@ def lesson_detail(lesson_id):
 
 @teacher_bp.route("/lessons/<lesson_id>/edit", methods=["GET", "POST"])
 @login_required
-@role_required("admin")
+@role_required("teacher") # Changed back from "admin" to "teacher"
 def edit_lesson(lesson_id):
     lesson = Lesson.objects(id=lesson_id).first()
     if not lesson:
@@ -3732,8 +3732,6 @@ def edit_lesson(lesson_id):
     form = LessonForm()
     
     if form.validate_on_submit():
-        allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span']
-        allowed_attrs = {'*': ['class', 'style']}
         resource_labels = request.form.getlist("resource_label[]")
         resource_urls = request.form.getlist("resource_url[]")
         resource_types = request.form.getlist("resource_type[]")
@@ -3742,13 +3740,7 @@ def edit_lesson(lesson_id):
             for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
             if lbl.strip() and url.strip()
         ]
-        raw_html = form.content.data or ""
-        allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span', 'img', 'a', 'blockquote', 'pre']
-        allowed_attrs = {
-            '*': ['class', 'style'], 
-            'img': ['src', 'alt', 'width', 'height'], 
-            'a': ['href', 'target']
-        }
+        
         # --- LOCAL VIDEO UPLOAD LOGIC ---
         if form.video_file.data:
             video_file = form.video_file.data
@@ -3768,6 +3760,7 @@ def edit_lesson(lesson_id):
             # Update the lesson document
             lesson.video_filename = new_filename
         # --------------------------------
+
         # --- LOCAL AUDIO UPLOAD LOGIC ---
         if form.audio_file.data:
             audio_file = form.audio_file.data
@@ -3787,9 +3780,16 @@ def edit_lesson(lesson_id):
             lesson.audio_filename = new_audio_filename
         # --------------------------------
 
+        # --- BLEACH CLEANING ---
+        raw_html = form.content.data or ""
+        allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span', 'img', 'a', 'blockquote', 'pre']
+        allowed_attrs = {
+            '*': ['class', 'style'], 
+            'img': ['src', 'alt', 'width', 'height'], 
+            'a': ['href', 'target']
+        }
         
-        
-        clean_content = bleach.clean(form.content.data or "", tags=allowed_tags, attributes=allowed_attrs)
+        clean_content = bleach.clean(raw_html, tags=allowed_tags, attributes=allowed_attrs)
             
         lesson.title = form.title.data
         lesson.content = clean_content # Use the sanitized content here
@@ -3823,7 +3823,6 @@ def edit_lesson(lesson_id):
         form.link_url.data = lesson.link_url
         form.link_label_2.data = lesson.link_label_2
         form.link_url_2.data = lesson.link_url_2
-        # Note: We do not populate form.video_file on GET because HTML file inputs cannot be pre-populated with server files.
         
     return render_template("teacher/lesson_form.html", form=form, lesson=lesson)
 
