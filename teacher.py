@@ -3734,6 +3734,7 @@ def edit_lesson(lesson_id):
     allowed_attrs = {'*': ['class', 'style']}
     clean_content = bleach.clean(form.content.data, tags=allowed_tags, attributes=allowed_attrs)
     if form.validate_on_submit():
+        
         resource_labels = request.form.getlist("resource_label[]")
         resource_urls = request.form.getlist("resource_url[]")
         resource_types = request.form.getlist("resource_type[]")
@@ -3781,6 +3782,25 @@ def edit_lesson(lesson_id):
             lesson.audio_filename = new_audio_filename
         # --------------------------------
 
+        # --- 2. Safe HTML Sanitization ---
+        raw_html = form.content.data or ""
+        
+        # Added img, a, blockquote, and pre so teacher formats don't break
+        allowed_tags = ['p', 'b', 'i', 'u', 'em', 'strong', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'br', 'span', 'img', 'a', 'blockquote', 'pre']
+        allowed_attrs = {
+            '*': ['class', 'style'], 
+            'img': ['src', 'alt', 'width', 'height'], 
+            'a': ['href', 'target']
+        }
+        
+        try:
+            # Clean the HTML. If bleach fails, it will fall back to raw_html instead of crashing the server.
+            import bleach
+            clean_content = bleach.clean(raw_html, tags=allowed_tags, attributes=allowed_attrs)
+        except Exception as e:
+            print(f"Bleach sanitization warning: {e}")
+            clean_content = raw_html
+            
         lesson.title = form.title.data
         lesson.content = clean_content # Use the sanitized content here
         lesson.requires_code = form.requires_code.data
