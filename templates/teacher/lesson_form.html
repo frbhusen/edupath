@@ -31,7 +31,7 @@
         {{ form.content.label(class="form-label") }}
 
         <div id="quill-editor" style="height: 300px; background: white">
-          {{ form.content.data | safe if form.content.data else '' }}
+          {{ lesson.content | safe if lesson and lesson.content else '' }}
         </div>
 
         <div style="display: none">

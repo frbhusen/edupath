@@ -3676,7 +3676,7 @@ def new_lesson(section_id):
             for lbl, url, rtype in zip(resource_labels, resource_urls, resource_types)
             if lbl.strip() and url.strip()
         ]
-        clean_content = bleach.clean(form.content.data, tags=allowed_tags, attributes=allowed_attrs)
+        clean_content = bleach.clean(form.content.data or '', tags=allowed_tags, attributes=allowed_attrs)
         requires_code = bool(form.requires_code.data)
 
         lesson = Lesson(
