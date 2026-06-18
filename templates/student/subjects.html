@@ -7,6 +7,25 @@
     <p class="mb-0">اختر مادة للاطلاع على أقسامها ودروسها واختباراتها.</p>
   </div>
 </div>
+
+<div class="actionable-dashboard-grid">
+  <div class="actionable-tile">
+    <div class="tile-label">إجمالي المواد المتاحة</div>
+    <div class="tile-value">{{ subjects|length }}</div>
+    <a class="btn btn-outline-primary btn-sm mt-2" href="{{ url_for('student.subjects') }}">متابعة المواد</a>
+  </div>
+  <div class="actionable-tile">
+    <div class="tile-label">مهامك القادمة</div>
+    <div class="tile-value">الواجبات</div>
+    <a class="btn btn-outline-primary btn-sm mt-2" href="{{ url_for('student.assignments') }}">فتح الواجبات</a>
+  </div>
+  <div class="actionable-tile">
+    <div class="tile-label">تقييم الأداء</div>
+    <div class="tile-value">نتائجك</div>
+    <a class="btn btn-outline-primary btn-sm mt-2" href="{{ url_for('student.statistics') }}">عرض الإحصائيات</a>
+  </div>
+</div>
+
 {% if subjects %}
 <div class="row g-3">
   {% for subject in subjects %}

@@ -53,11 +53,11 @@
                   </div>
                 {% endif %}
               {% elif item.status != 'completed' %}
-                <form method="post" action="{{ url_for('student.complete_assignment', assignment_id=a.id) }}">
+                <form method="post" action="{{ url_for('student.complete_assignment', assignment_id=a.id) }}" class="sticky-mobile-actions">
                   <div class="mb-2">
                     <textarea class="form-control form-control-sm" rows="2" name="note" placeholder="ملاحظة التسليم (اختياري)"></textarea>
                   </div>
-                  <button type="submit" class="btn btn-cta btn-sm"><i class="fa-solid fa-gem me-1"></i>تسليم الواجب (+10 💎)</button>
+                  <button type="submit" class="btn btn-cta btn-sm w-100"><i class="fa-solid fa-gem me-1"></i>تسليم الواجب (+10 💎)</button>
                 </form>
               {% else %}
                 <div class="text-success small">تم التسليم {{ s.completed_at.strftime('%Y-%m-%d %H:%M') if s and s.completed_at else '' }}</div>

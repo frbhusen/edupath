@@ -134,7 +134,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-12 d-flex gap-2">
+      <div class="col-12 d-flex gap-2 sticky-mobile-actions">
         <button type="submit" class="btn btn-cta btn-sm">تطبيق الفلترة</button>
         <a href="{{ url_for('student.frequently_wrong') }}" class="btn btn-cta btn-sm">إعادة ضبط</a>
       </div>
@@ -146,7 +146,7 @@
   <div class="card-body">
     {% if rows %}
       <form method="post" action="{{ url_for('student.frequently_wrong_start_test') }}">
-        <div class="mb-3 d-flex gap-2 flex-wrap">
+        <div class="mb-3 d-flex gap-2 flex-wrap sticky-mobile-actions">
           <button type="button" class="btn btn-cta btn-sm" id="select-all-btn">تحديد الكل</button>
           <button type="button" class="btn btn-cta btn-sm" id="clear-all-btn">إلغاء الكل</button>
           <button type="submit" class="btn btn-cta btn-sm">بدء اختبار من المختار</button>

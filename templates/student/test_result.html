@@ -45,8 +45,8 @@
 					{% endif %}
 				</div>
 				{% if current_user.role == 'student' %}
-					<div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
-						<form method="post" action="{{ url_for('student.retake_test_same_questions', attempt_id=attempt.id) }}">
+					<div class="d-flex justify-content-center gap-2 mt-3 flex-wrap sticky-mobile-actions">
+						<form method="post" action="{{ url_for('student.retake_test_same_questions', attempt_id=attempt.id)}}">
 							<button type="submit" class="btn btn-outline-primary btn-sm">إعادة بنفس الأسئلة</button>
 						</form>
 						<form method="post" action="{{ url_for('student.retake_test_new_questions', attempt_id=attempt.id) }}">

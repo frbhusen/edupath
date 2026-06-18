@@ -111,7 +111,7 @@
               {% endif %}
               <div class="d-flex flex-column gap-2 mt-3">
                 {% for choice in q.choices %}
-                  <label class="border rounded p-2 d-flex gap-2 align-items-start">
+                  <label class="border rounded p-2 d-flex gap-2 align-items-start stable-choice-option">
                     <input class="form-check-input mt-1" type="radio" name="question_{{ q.id }}" value="{{ choice.choice_id }}" required>
                     <span class="flex-grow-1">
                       <span class="d-block">{{ choice.text }}</span>
@@ -172,7 +172,7 @@
     </div>
   {% endfor %}
 
-  <div class="d-grid">
+  <div class="d-grid sticky-mobile-actions">
     <button class="btn btn-cta btn-lg" type="submit">إرسال</button>
   </div>
 </form>

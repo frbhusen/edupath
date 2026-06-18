@@ -1249,7 +1249,8 @@
         document.documentElement.setAttribute("data-theme", currentTheme);
 
         // Toggle event
-        themeToggle.addEventListener("click", () => {
+        themeToggle.addEventListener("click", (e) => {
+          e.preventDefault();
           let theme = document.documentElement.getAttribute("data-theme");
           let switchToTheme = theme === "dark" ? "light" : "dark";
 

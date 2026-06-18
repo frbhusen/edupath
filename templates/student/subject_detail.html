@@ -4,7 +4,7 @@
   <div>
     <h1 class="h4 mb-1">{{ subject.name }}</h1>
   </div>
-  <div class="d-flex gap-2 align-items-center">
+  <div class="d-flex gap-2 align-items-center flex-wrap sticky-mobile-actions">
     <a class="btn btn-cta btn-sm" href="{{ url_for('student.subjects') }}">كل المواد</a>
     {% if current_user.role == 'student' %}
       {% set subject_active = subject_activation and subject_activation.active %}
@@ -43,7 +43,7 @@
               <div class="browse-card-meta">
                 <span class="badge text-bg-secondary">{{ item.lesson_count }} {{ "دروس" if item.lesson_count != 1 else "درس" }}</span>
                 {% if locked %}
-                  <span class="text-muted small">&#128274;</span>
+                  <span class="text-muted small"><i class="fa-solid fa-lock"></i></span>
                 {% else %}
                   <span class="badge text-bg-success">✓ مفتوح</span>
                 {% endif %}
@@ -79,7 +79,7 @@
         </div>
         <p class="text-muted small mb-1">أنشئ اختبار مختلط من دروس المادة المفتوحة.</p>
         <div class="text-muted small mb-2">اختبار مخصص على مستوى المادة</div>
-        <div class="mt-auto d-flex justify-content-start align-items-center">
+        <div class="mt-auto d-flex justify-content-start align-items-center sticky-mobile-actions">
           <a class="btn btn-cta btn-sm" href="{{ url_for('student.custom_test_new', subject_id=subject.id) }}">ابدأ</a>
         </div>
       </div>
@@ -94,7 +94,7 @@
         </div>
         <p class="text-muted small mb-1">دورات بصور أسئلة وصور إجابات مع زر إظهار الإجابة.</p>
         <div class="text-muted small mb-2">مجموعات يحددها المعلم لكل مادة</div>
-        <div class="mt-auto d-flex justify-content-start align-items-center">
+        <div class="mt-auto d-flex justify-content-start align-items-center sticky-mobile-actions">
           <a class="btn btn-cta btn-sm" href="{{ url_for('student.subject_courses', subject_id=subject.id) }}">ابدأ</a>
         </div>
       </div>

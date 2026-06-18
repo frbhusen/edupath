@@ -25,8 +25,8 @@
 
     {% if duel.status == 'pending' and slot == 'opponent' %}
       <form method="post" action="{{ url_for('student.duel_respond', duel_id=duel.id) }}" class="d-flex gap-2">
-        <button class="btn btn-success" type="submit" name="action" value="accept">قبول</button>
-        <button class="btn btn-outline-danger" type="submit" name="action" value="decline">رفض</button>
+        <button class="btn btn-success" type="submit" name="action" value="accept" style="min-height: 44px;">قبول</button>
+        <button class="btn btn-outline-danger" type="submit" name="action" value="decline" style="min-height: 44px;">رفض</button>
       </form>
     {% elif duel.status in ['accepted_waiting', 'live', 'completed'] %}
       <a class="btn btn-cta" href="{{ url_for('student.duel_play', duel_id=duel.id) }}">فتح المباراة</a>

@@ -75,7 +75,7 @@
             </div>
           </div>
 
-          <div class="mt-4 d-flex justify-content-end">
+          <div class="mt-4 d-flex justify-content-end sticky-mobile-actions">
             {{ form.submit(class="btn btn-cta") }}
           </div>
         </form>
@@ -130,11 +130,7 @@
                 row.activated_at else '—' }}
               </div>
             </div>
-            <a
-              class="btn btn-cta btn-sm"
-              href="{{ url_for('student.subject_detail', subject_id=row.subject.id) }}"
-              >فتح</a
-            >
+            <a class="btn btn-cta btn-sm" href="{{ url_for('student.subject_detail', subject_id=row.subject.id) }}">فتح</a>
           </li>
           {% endfor %}
         </ul>

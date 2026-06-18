@@ -58,7 +58,7 @@
               {% endfor %}
             </div>
           {% endif %}
-          <div class="list-group">
+          <div class="list-group stable-choice-list">
             {% for c in item.choices %}
               <label class="list-group-item">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -75,7 +75,7 @@
       </div>
     </div>
   {% endfor %}
-  <div class="d-grid">
+  <div class="d-grid sticky-mobile-actions">
     <button type="submit" class="btn btn-cta btn-lg">إرسال الإجابات</button>
   </div>
 </form>

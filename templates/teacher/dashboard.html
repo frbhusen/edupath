@@ -125,10 +125,28 @@
     <a class="btn btn-warning btn-sm" href="{{ url_for('admin.dashboard') }}">قاعدة البيانات</a>
     {% endif %}
   </div>
+
+  <div class="actionable-dashboard-grid mt-3">
+    <div class="actionable-tile">
+      <div class="tile-label">موادك النشطة</div>
+      <div class="tile-value">{{ subjects|length }}</div>
+      <a class="btn btn-outline-primary btn-sm mt-2" href="#subjects-list">الانتقال للمواد</a>
+    </div>
+    <div class="actionable-tile">
+      <div class="tile-label">متابعة الأداء</div>
+      <div class="tile-value">النتائج</div>
+      <a class="btn btn-outline-primary btn-sm mt-2" href="{{ url_for('teacher.results_overview') }}">فتح النتائج</a>
+    </div>
+    <div class="actionable-tile">
+      <div class="tile-label">مهام قيد التنفيذ</div>
+      <div class="tile-value">الواجبات</div>
+      <a class="btn btn-outline-primary btn-sm mt-2" href="{{ url_for('teacher.assignments_manage') }}">فتح الواجبات</a>
+    </div>
+  </div>
 </div>
 
 {% if subjects %}
-<div class="vstack gap-3">
+<div id="subjects-list" class="vstack gap-3">
   {% for subject in subjects %}
   {% set section_list = subject._cached_sections if subject._cached_sections is defined else [] %}
   <div class="card shadow-sm subject-card">

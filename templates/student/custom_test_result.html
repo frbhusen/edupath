@@ -41,11 +41,11 @@
           {% endif %}
         </div>
         {% if current_user.role == 'student' %}
-          <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
+          <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap sticky-mobile-actions">
             <form method="post" action="{{ url_for('student.custom_test_retake_same', attempt_id=attempt.id) }}">
               <button type="submit" class="btn btn-outline-primary btn-sm">إعادة بنفس الأسئلة</button>
             </form>
-            <form method="post" action="{{ url_for('student.custom_test_retake_new', attempt_id=attempt.id) }}">
+            <form method="post" action="{{ url_for('student.retake_custom_test_new', attempt_id=attempt.id) }}">
               <button type="submit" class="btn btn-cta btn-sm">إعادة بأسئلة جديدة</button>
             </form>
           </div>

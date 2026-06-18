@@ -5,7 +5,7 @@
       <div>
         <h2 class="h4 mb-1">{{ section.title }}</h2>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap sticky-mobile-actions">
         {% if section_requires_code and not section_open %}
         <a
           class="btn btn-info btn-sm"
@@ -67,7 +67,7 @@
               <h5 class="card-title browse-card-title">{{ lesson.title }}</h5>
               <div class="browse-card-meta">
                 {% if locked %}
-                <span class="text-muted small">&#128274;</span>
+                <span class="text-muted small"><i class="fa-solid fa-lock"></i></span>
                 {% else %}
                 <span class="badge text-bg-success">✓ مفتوح</span>
                 {% endif %} {% if completed %}
@@ -76,10 +76,10 @@
               </div>
             </div>
             <div class="text-muted small mb-2">درس</div>
-            <div class="mt-auto d-flex justify-content-start align-items-center">
+            <div class="mt-auto d-flex justify-content-start align-items-center sticky-mobile-actions">
               {% if locked %}
               {% if current_user.is_authenticated and current_user.role == 'student' %}
-              <div></div>
+              <span class="text-muted small">&nbsp;</span>
               {% else %}
               <a
                 class="btn btn-cta btn-sm"
@@ -129,7 +129,7 @@
                 <span class="badge text-bg-secondary"
                   >{{ test._question_count|default(0) }} أسئلة</span
                 >
-                {% if locked %}<span class="text-muted small">&#128274;</span>{%
+                {% if locked %}<span class="text-muted small"><i class="fa-solid fa-lock"></i></span>{%
                 endif %}
               </div>
             </div>
@@ -148,7 +148,7 @@
               {% endfor %}
             </div>
             {% endif %}
-            <div class="mt-auto d-flex justify-content-start align-items-center gap-2">
+            <div class="mt-auto d-flex justify-content-start align-items-center gap-2 sticky-mobile-actions">
               <span class="chip">MCQ</span>
               {% if locked %}
               {% if current_user.is_authenticated and current_user.role == 'student' %}
