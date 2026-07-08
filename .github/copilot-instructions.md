@@ -43,3 +43,4 @@ Example:
 
 ## 5) Edit Log
 - 2026-07-08 | /home/runner/work/edupath/edupath/.github/copilot-instructions.md | Added AI instructions and mandatory per-edit logging process
+- 2026-07-08 | /home/runner/work/edupath/edupath/templates/index.html, /home/runner/work/edupath/edupath/static/style.css | Moved homepage inline styles to shared stylesheet and applied small homepage UI polish classes

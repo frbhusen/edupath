@@ -2,235 +2,7 @@
 %} {% block meta_description %}EduPath منصة تعليمية تفاعلية للدروس والاختبارات
 وتتبع التقدم للطلاب والمعلمين.{% endblock %} {% block meta_robots
 %}index,follow{% endblock %} {% block content %}
-<style>
-  /* ========================================== */
-  /* تصميم صفحة الزوار (غير المسجلين) - معزول بالكامل */
-  /* ========================================== */
-  .guest-wrapper {
-    font-family: inherit;
-    /* إضافة إخفاء التمرير الأفقي لحل مشكلة التمدد على الجوال */
-    overflow-x: hidden;
-    width: 100%;
-    max-width: 100vw;
-  }
-  .guest-wrapper .hero-section {
-    background: linear-gradient(135deg, #084298 0%, #0d6efd 100%);
-    color: white;
-    padding: 3rem 1.5rem; /* تصغير الحواف للجوال */
-    border-radius: 1rem;
-    text-align: center;
-    box-shadow: 0 10px 30px rgba(13, 110, 253, 0.15);
-    position: relative;
-    overflow: hidden;
-  }
-  @media (min-width: 768px) {
-    .guest-wrapper .hero-section {
-      padding: 4.5rem 2rem; /* استعادة الحواف الطبيعية للشاشات الكبيرة */
-      border-radius: 1.25rem;
-    }
-  }
-  /* نقوش زخرفية خفيفة في الخلفية */
-  .guest-wrapper .hero-section::before {
-    content: "";
-    position: absolute;
-    top: -50%;
-    left: -10%;
-    width: 300px;
-    height: 300px;
-    background: radial-gradient(
-      circle,
-      rgba(255, 255, 255, 0.1) 0%,
-      transparent 70%
-    );
-  }
-  .guest-wrapper .hero-title {
-    font-weight: 800;
-    /* جعل الخط متجاوباً مع حجم الشاشة */
-    font-size: clamp(1.6rem, 5vw, 2.2rem);
-    margin-bottom: 1.25rem;
-  }
-  .guest-wrapper .hero-subtitle {
-    /* جعل الخط متجاوباً مع حجم الشاشة */
-    font-size: clamp(1rem, 3vw, 1.15rem);
-    opacity: 0.9;
-    margin-bottom: 2.5rem;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-    line-height: 1.6;
-  }
-  .guest-wrapper .btn-login,
-  .guest-wrapper .btn-register {
-    width: 100%; /* جعل الأزرار تأخذ العرض بالكامل على الجوال */
-    margin-bottom: 0.5rem;
-  }
-  @media (min-width: 576px) {
-    .guest-wrapper .btn-login,
-    .guest-wrapper .btn-register {
-      width: auto;
-      margin-bottom: 0;
-    }
-  }
-  .guest-wrapper .btn-login {
-    background: white;
-    color: #0d6efd;
-    font-weight: 700;
-    padding: 0.8rem 2.5rem;
-    border-radius: 50px;
-    transition: all 0.3s;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  }
-  .guest-wrapper .btn-login:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  }
-  .guest-wrapper .btn-register {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    font-weight: 700;
-    padding: 0.8rem 2.5rem;
-    border-radius: 50px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    backdrop-filter: blur(5px);
-    transition: all 0.3s;
-  }
-  .guest-wrapper .btn-register:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: translateY(-2px);
-    color: white;
-  }
-  .guest-wrapper .feature-card {
-    background: white;
-    border-radius: 1.25rem;
-    padding: 1.5rem; /* تصغير المسافات الداخلية للجوال */
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-    border: 1px solid #eef0f2;
-    transition:
-      transform 0.3s ease,
-      box-shadow 0.3s ease;
-  }
-  @media (min-width: 768px) {
-    .guest-wrapper .feature-card {
-      padding: 2rem;
-    }
-  }
-  .guest-wrapper .feature-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
-  }
-  .guest-wrapper .video-container {
-    border-radius: 1rem;
-    overflow: hidden;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    border: 3px solid #f8f9fa; /* تصغير الإطار للجوال */
-  }
-  @media (min-width: 768px) {
-    .guest-wrapper .video-container {
-      border: 5px solid #f8f9fa;
-    }
-  }
-
-  /* Colorful Dashboard Enhancements - Move to style.css in production */
-  .hero-premium {
-    background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
-    border-right: 5px solid #0d6efd;
-    border-radius: 0.75rem;
-  }
-  .action-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 1.25rem;
-  }
-  .action-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 1.5rem 1rem;
-    border-radius: 0.75rem;
-    text-decoration: none;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-  }
-  .action-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
-  }
-
-  /* Colorful Themes for Students */
-  .card-learning {
-    background-color: #f8faff;
-    border: 1px solid #cce0ff;
-    color: #084298;
-  }
-  .card-learning:hover {
-    border-color: #0d6efd;
-    background-color: #e6f2ff;
-  }
-  .card-learning .icon-wrapper {
-    background: #cfe2ff;
-    color: #0d6efd;
-  }
-
-  .card-performance {
-    background-color: #f6fdf9;
-    border: 1px solid #d1e7dd;
-    color: #0f5132;
-  }
-  .card-performance:hover {
-    border-color: #198754;
-    background-color: #d1e7dd;
-  }
-  .card-performance .icon-wrapper {
-    background: #badbcc;
-    color: #198754;
-  }
-
-  .card-engagement {
-    background-color: #fff9f4;
-    border: 1px solid #ffe5d0;
-    color: #9a4e18;
-  }
-  .card-engagement:hover {
-    border-color: #fd7e14;
-    background-color: #ffe5d0;
-  }
-  .card-engagement .icon-wrapper {
-    background: #ffdac1;
-    color: #fd7e14;
-  }
-
-  .action-card .icon-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 54px;
-    height: 54px;
-    border-radius: 50%;
-    margin-bottom: 0.75rem;
-    transition: background 0.2s ease;
-  }
-  .action-card .card-label {
-    font-weight: 700;
-    font-size: 0.95rem;
-  }
-  .icon-svg {
-    width: 28px;
-    height: 28px;
-    stroke-width: 2;
-    stroke: currentColor;
-    fill: none;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .category-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
-    color: #495057;
-  }
-</style>
+<div class="home-page">
 
 {# Hero header shown to all visitors with role-aware greeting/actions #} {% if
 current_user.is_authenticated %}
@@ -308,8 +80,7 @@ current_user.is_authenticated %}
       <div class="feature-card h-100 d-flex flex-column text-center">
         <div class="mb-4 mt-3">
           <div
-            class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-4"
-            style="width: 80px; height: 80px"
+            class="library-icon-badge d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-4"
           >
             <svg
               width="40"
@@ -326,10 +97,7 @@ current_user.is_authenticated %}
             </svg>
           </div>
           <h2 class="h4 fw-bold mb-3 text-dark">المكتبة الشاملة المجانية</h2>
-          <p
-            class="text-muted mb-4 px-2"
-            style="font-size: 0.95rem; line-height: 1.6"
-          >
+          <p class="library-description text-muted mb-4 px-2">
             لا تحتاج إلى حساب لتصفح بعض مصادرنا! استكشف الكتب المدرسية، مذكرات
             المعلمين، ونماذج الاختبارات المجانية الآن.
           </p>
@@ -493,7 +261,7 @@ current_user.role in ['teacher', 'admin'] %}
     </a>
   </div>
 
-  <h3 class="category-title text-warning" style="color: #fd7e14 !important">
+  <h3 class="category-title category-title-engagement">
     <span class="me-2">⚔️</span>التفاعل
   </h3>
   <div class="action-grid mb-4">
@@ -666,4 +434,6 @@ current_user.role in ['teacher', 'admin'] %}
   </div>
   {% endif %}
 </div>
-{% endif %} {% endblock %}
+{% endif %}
+</div>
+{% endblock %}
