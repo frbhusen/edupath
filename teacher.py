@@ -101,6 +101,55 @@ def _normalize_image_url(url: str):
             return f"https://lh3.googleusercontent.com/d/{file_id}=w2000"
     return cleaned
 
+
+_IMAGE_UPLOAD_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
+
+
+def _local_image_filename(url: str):
+    raw = (url or "").strip()
+    if "/media/images/" not in raw:
+        return None
+    return raw.rsplit("/", 1)[-1] or None
+
+
+def _delete_local_image_url(url: str):
+    filename = _local_image_filename(url)
+    if not filename:
+        return
+    file_path = os.path.join(current_app.config["IMAGE_UPLOAD_FOLDER"], filename)
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as exc:
+        current_app.logger.warning("Failed to delete image file %s: %s", file_path, exc)
+
+
+def _save_uploaded_image_file(uploaded_file, prefix: str = "image"):
+    if not uploaded_file or not getattr(uploaded_file, "filename", ""):
+        return None
+
+    original_name = secure_filename(uploaded_file.filename or "")
+    ext = (original_name.rsplit(".", 1)[-1] if "." in original_name else "").lower()
+    if ext not in _IMAGE_UPLOAD_EXTENSIONS:
+        raise ValueError("unsupported_image_extension")
+
+    upload_folder = current_app.config["IMAGE_UPLOAD_FOLDER"]
+    os.makedirs(upload_folder, exist_ok=True)
+
+    stored_name = f"{prefix}_{uuid.uuid4().hex}.{ext}"
+    save_path = os.path.join(upload_folder, stored_name)
+    uploaded_file.save(save_path)
+    return url_for("serve_image", filename=stored_name)
+
+
+def _save_uploaded_image_urls(file_key: str, prefix: str):
+    uploaded_urls = []
+    for uploaded_file in request.files.getlist(file_key):
+        if not uploaded_file or not getattr(uploaded_file, "filename", ""):
+            continue
+        uploaded_urls.append(_save_uploaded_image_file(uploaded_file, prefix=prefix))
+    return uploaded_urls
+
 # Role guard decorator
 
 def role_required(*roles):
@@ -2838,10 +2887,19 @@ def manage_lesson_access(lesson_id):
 def new_subject():
     form = SubjectForm()
     if form.validate_on_submit():
+        banner_image_url = (form.banner_image_url.data or "").strip() or None
+        banner_image_file = form.banner_image_file.data
+        if banner_image_file and getattr(banner_image_file, "filename", ""):
+            try:
+                banner_image_url = _save_uploaded_image_file(banner_image_file, prefix="banner")
+            except ValueError:
+                flash("فقط ملفات الصور مسموحة للبانر.", "error")
+                return render_template("teacher/subject_form.html", form=form)
+
         subject = Subject(
             name=form.name.data,
             description=form.description.data,
-            banner_image_url=(form.banner_image_url.data or "").strip() or None,
+            banner_image_url=banner_image_url,
             requires_code=form.requires_code.data,
             created_by=current_user.id,
         )
@@ -3068,8 +3126,22 @@ def course_set_edit(course_set_id):
 
             q_text = (request.form.get("question_text") or "").strip() or None
             q_img = (request.form.get("question_image_url") or "").strip()
+            try:
+                q_upload = request.files.get("question_image_file")
+                if q_upload and getattr(q_upload, "filename", ""):
+                    q_img = _save_uploaded_image_file(q_upload, prefix="course_question")
+            except ValueError:
+                flash("فقط ملفات الصور مسموحة لصور السؤال.", "error")
+                return _edit_redirect("questions")
             a_text = (request.form.get("answer_text") or "").strip() or None
             a_img = (request.form.get("answer_image_url") or "").strip()
+            try:
+                a_upload = request.files.get("answer_image_file")
+                if a_upload and getattr(a_upload, "filename", ""):
+                    a_img = _save_uploaded_image_file(a_upload, prefix="course_answer")
+            except ValueError:
+                flash("فقط ملفات الصور مسموحة لصور الإجابة.", "error")
+                return _edit_redirect("questions")
 
             if not q_text and not q_img:
                 flash("أدخل نص السؤال أو رابط صورة السؤال على الأقل.", "error")
@@ -3138,8 +3210,22 @@ def course_set_edit(course_set_id):
 
             q_text = (request.form.get("question_text") or "").strip() or None
             q_img = (request.form.get("question_image_url") or "").strip()
+            try:
+                q_upload = request.files.get("question_image_file")
+                if q_upload and getattr(q_upload, "filename", ""):
+                    q_img = _save_uploaded_image_file(q_upload, prefix="course_question")
+            except ValueError:
+                flash("فقط ملفات الصور مسموحة لصور السؤال.", "error")
+                return _edit_redirect("questions")
             a_text = (request.form.get("answer_text") or "").strip() or None
             a_img = (request.form.get("answer_image_url") or "").strip()
+            try:
+                a_upload = request.files.get("answer_image_file")
+                if a_upload and getattr(a_upload, "filename", ""):
+                    a_img = _save_uploaded_image_file(a_upload, prefix="course_answer")
+            except ValueError:
+                flash("فقط ملفات الصور مسموحة لصور الإجابة.", "error")
+                return _edit_redirect("questions")
 
             if not q_text and not q_img:
                 flash("أدخل نص السؤال أو رابط صورة السؤال على الأقل.", "error")
@@ -3428,11 +3514,27 @@ def edit_subject(subject_id):
         return scope_response
     form = SubjectForm()
     if form.validate_on_submit():
+        banner_image_url = (form.banner_image_url.data or "").strip() or None
+        banner_image_file = form.banner_image_file.data
+        if banner_image_file and getattr(banner_image_file, "filename", ""):
+            try:
+                banner_image_url = _save_uploaded_image_file(banner_image_file, prefix="banner")
+            except ValueError:
+                flash("فقط ملفات الصور مسموحة للبانر.", "error")
+                form.name.data = subject.name
+                form.description.data = subject.description
+                form.banner_image_url.data = subject.banner_image_url
+                form.requires_code.data = subject.requires_code
+                return render_template("teacher/subject_form.html", form=form, subject=subject)
+
+        old_banner_url = subject.banner_image_url
         subject.name = form.name.data
         subject.description = form.description.data
-        subject.banner_image_url = (form.banner_image_url.data or "").strip() or None
+        subject.banner_image_url = banner_image_url
         subject.requires_code = form.requires_code.data
         subject.save()
+        if banner_image_file and getattr(banner_image_file, "filename", "") and old_banner_url != banner_image_url:
+            _delete_local_image_url(old_banner_url)
         flash("تم تحديث المادة بنجاح.", "success")
         return redirect(url_for("teacher.subject_detail", subject_id=subject.id))
     elif request.method == "GET":
@@ -4212,6 +4314,11 @@ def edit_test(test_id):
             question_id = request.form.get("question_id")
             text = (request.form.get("question_text") or "").strip()
             question_images = _parse_images(request.form.get("question_images"))
+            try:
+                question_images.extend(_save_uploaded_image_urls("question_images_files", prefix="test_question"))
+            except ValueError:
+                flash("فقط ملفات الصور مسموحة لصور السؤال.", "error")
+                return _edit_redirect("mcq")
             hint = (request.form.get("question_hint") or "").strip() or None
             difficulty = (request.form.get("difficulty") or "medium").strip().lower()
             if difficulty not in {"easy", "medium", "hard"}:
@@ -4223,6 +4330,13 @@ def edit_test(test_id):
             for i in range(1, 5):
                 choice_text = (request.form.get(f"choice_{i}") or "").strip()
                 choice_image = _normalize_image_url(request.form.get(f"choice_{i}_image"))
+                try:
+                    choice_image_upload = request.files.get(f"choice_{i}_image_file")
+                    if choice_image_upload and getattr(choice_image_upload, "filename", ""):
+                        choice_image = _save_uploaded_image_file(choice_image_upload, prefix=f"test_choice_{i}")
+                except ValueError:
+                    flash("فقط ملفات الصور مسموحة لصور الخيارات.", "error")
+                    return _edit_redirect("mcq")
                 if choice_text:
                     choices.append(Choice(text=choice_text, image_url=choice_image, is_correct=(correct_index == i)))
 
@@ -4302,6 +4416,16 @@ def edit_test(test_id):
             q_img = _normalize_image_url(request.form.get("interactive_question_image_url"))
             a_text = (request.form.get("interactive_answer_text") or "").strip() or None
             a_img = _normalize_image_url(request.form.get("interactive_answer_image_url"))
+            try:
+                q_upload = request.files.get("interactive_question_image_file")
+                if q_upload and getattr(q_upload, "filename", ""):
+                    q_img = _save_uploaded_image_file(q_upload, prefix="test_interactive_question")
+                a_upload = request.files.get("interactive_answer_image_file")
+                if a_upload and getattr(a_upload, "filename", ""):
+                    a_img = _save_uploaded_image_file(a_upload, prefix="test_interactive_answer")
+            except ValueError:
+                flash("فقط ملفات الصور مسموحة للصور التفاعلية.", "error")
+                return _edit_redirect("interactive")
             difficulty = (request.form.get("interactive_difficulty") or "medium").strip().lower()
             if difficulty not in {"easy", "medium", "hard"}:
                 difficulty = "medium"

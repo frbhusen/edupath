@@ -42,6 +42,10 @@ class SubjectForm(FlaskForm):
     name = StringField("الاسم", validators=[DataRequired(), Length(max=120)])
     description = TextAreaField("الوصف")
     banner_image_url = StringField("رابط بانر المادة (1600x900)", validators=[Optional(), Length(max=500)])
+    banner_image_file = FileField(
+        "رفع بانر المادة",
+        validators=[FileAllowed(['png', 'jpg', 'jpeg', 'webp', 'gif'], 'فقط ملفات الصور مسموحة!')],
+    )
     requires_code = BooleanField("يتطلب رمز تفعيل")
     submit = SubmitField("حفظ")
 

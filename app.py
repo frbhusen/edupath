@@ -398,6 +398,14 @@ def create_app():
             mimetype='video/mp4'
         )
 
+    @app.route('/media/images/<filename>')
+    @login_required
+    def serve_image(filename):
+        return send_from_directory(
+            app.config['IMAGE_UPLOAD_FOLDER'],
+            filename,
+        )
+
 
     return app
 

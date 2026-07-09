@@ -5,7 +5,7 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h2 class="h4 mb-3">المادة</h2>
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
           {{ form.hidden_tag() }}
           <div class="mb-3">
             {{ form.name.label(class="form-label") }}
@@ -19,6 +19,11 @@
             {{ form.banner_image_url.label(class="form-label") }}
             {{ form.banner_image_url(class="form-control", placeholder="Google Drive image URL") }}
             <div class="form-text">مقاس مقترح: 1600x900. سيتم عرضه بدون قص الحواف.</div>
+          </div>
+          <div class="mb-3">
+            {{ form.banner_image_file.label(class="form-label") }}
+            {{ form.banner_image_file(class="form-control", accept="image/*") }}
+            <div class="form-text">يمكن رفع الصورة مباشرة إلى الخادم بدل استخدام رابط خارجي.</div>
           </div>
           <div class="mb-3 form-check">
             {{ form.requires_code(class="form-check-input", id="subject_requires_code") }}

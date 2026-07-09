@@ -313,7 +313,7 @@
                       </div>
                     </form>
 
-                    <form method="post" id="questionForm">
+                    <form method="post" id="questionForm" enctype="multipart/form-data">
                       <input type="hidden" name="form_name" value="upsert_question" />
                       <input type="hidden" name="question_id" id="question_id" />
                       <div class="mb-3">
@@ -324,6 +324,11 @@
                       <div class="mb-3">
                         <label class="form-label">صور السؤال (رابط لكل سطر)</label>
                         <textarea class="form-control" id="question_images" name="question_images" rows="2" placeholder="https://..."></textarea>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">أو رفع صور السؤال</label>
+                        <input class="form-control" type="file" name="question_images_files" id="question_images_files" accept="image/*" multiple>
+                        <div class="form-text">يمكنك رفع أكثر من صورة وسيتم حفظها على الخادم.</div>
                       </div>
                       <div class="row g-3">
                         <div class="col-12 col-md-6">
@@ -471,7 +476,7 @@
           </div>
           <p class="section-note mb-3">صيغة جدول قابلة للتحرير السريع.</p>
 
-          <form method="post" class="mb-3">
+          <form method="post" class="mb-3" enctype="multipart/form-data">
             <input type="hidden" name="form_name" value="upsert_interactive_question" />
             <div class="row g-2">
               <div class="col-12">
@@ -482,6 +487,10 @@
                 <label class="form-label">رابط صورة السؤال</label>
                 <input class="form-control" name="interactive_question_image_url">
               </div>
+                      <div class="col-12 col-md-5">
+                        <label class="form-label">رفع صورة السؤال</label>
+                        <input class="form-control" type="file" name="interactive_question_image_file" accept="image/*">
+                      </div>
               <div class="col-12">
                 <label class="form-label">نص الإجابة (يدعم LaTeX)</label>
                 <textarea class="form-control" name="interactive_answer_text" rows="2" placeholder="اختياري"></textarea>
@@ -490,6 +499,10 @@
                 <label class="form-label">رابط صورة الإجابة</label>
                 <input class="form-control" name="interactive_answer_image_url">
               </div>
+                      <div class="col-12 col-md-5">
+                        <label class="form-label">رفع صورة الإجابة</label>
+                        <input class="form-control" type="file" name="interactive_answer_image_file" accept="image/*">
+                      </div>
               <div class="col-12 col-md-2">
                 <label class="form-label">المستوى</label>
                 <select class="form-select form-select-lg" name="interactive_difficulty" required>
@@ -503,7 +516,7 @@
           </form>
 
           {% if interactive_questions %}
-            <form method="post" id="interactiveBatchDeleteForm" class="mb-2">
+            <form method="post" id="interactiveBatchDeleteForm" class="mb-2" enctype="multipart/form-data">
               <input type="hidden" name="form_name" value="batch_delete_interactive_questions" />
               <input type="hidden" name="interactive_question_ids" id="interactiveBatchQuestionIds" />
               <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
@@ -535,15 +548,17 @@
                     </td>
                     <td class="fw-semibold">{{ loop.index }}</td>
                     <td>
-                      <form method="post">
+                      <form method="post" enctype="multipart/form-data">
                         <input type="hidden" name="form_name" value="upsert_interactive_question" />
                         <input type="hidden" name="interactive_question_id" value="{{ iq.id }}" />
                         <textarea class="form-control form-control-sm" name="interactive_question_text" rows="2" placeholder="نص السؤال">{{ iq.question_text or '' }}</textarea>
                         <input class="form-control form-control-sm mt-1" name="interactive_question_image_url" value="{{ iq.question_image_url or '' }}" placeholder="رابط صورة السؤال">
+                        <input class="form-control form-control-sm mt-1" type="file" name="interactive_question_image_file" accept="image/*">
                     </td>
                     <td>
                         <textarea class="form-control form-control-sm" name="interactive_answer_text" rows="2" placeholder="نص الإجابة">{{ iq.answer_text or '' }}</textarea>
                         <input class="form-control form-control-sm mt-1" name="interactive_answer_image_url" value="{{ iq.answer_image_url or '' }}" placeholder="رابط صورة الإجابة">
+                        <input class="form-control form-control-sm mt-1" type="file" name="interactive_answer_image_file" accept="image/*">
                     </td>
                     <td>
                         <select class="form-select form-select-sm" name="interactive_difficulty" required>
@@ -671,6 +686,28 @@
   const previewQuestion = document.getElementById('previewQuestion');
   const previewHint = document.getElementById('previewHint');
   const previewChoices = document.getElementById('previewChoices');
+
+  function bindImagePreview(inputId, targetSelector) {
+    const input = document.getElementById(inputId);
+    const target = document.querySelector(targetSelector);
+    if (!input || !target) return;
+
+    input.addEventListener('change', function () {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        if (event && event.target && typeof event.target.result === 'string') {
+          target.src = event.target.result;
+          target.classList.remove('d-none');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  bindImagePreview('question_image_file', '#new-question-preview');
+  bindImagePreview('answer_image_file', '#new-answer-preview');
 
   function getChoiceFields(){
     return Array.from(document.querySelectorAll('.choice-text'));

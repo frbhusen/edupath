@@ -208,7 +208,7 @@
         </div>
         <div class="card-body">
           <h5 class="card-title mb-3">إضافة سؤال جديد (تحريري أو اختيار من متعدد)</h5>
-          <form method="post" class="row g-2 mb-4">
+          <form method="post" class="row g-2 mb-4" enctype="multipart/form-data">
             <input type="hidden" name="action" value="add_question">
             <div class="col-12 col-md-4">
               <label class="form-label">نوع السؤال</label>
@@ -229,9 +229,17 @@
               <label class="form-label">رابط صورة السؤال</label>
               <input class="form-control" name="question_image_url" data-preview-target="new-question-preview" placeholder="https://...">
             </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">رفع صورة السؤال</label>
+              <input class="form-control" type="file" name="question_image_file" accept="image/*">
+            </div>
             <div class="col-12 col-lg-6 interactive-only-group new-interactive-group">
               <label class="form-label">رابط صورة الإجابة</label>
               <input class="form-control" name="answer_image_url" data-preview-target="new-answer-preview" placeholder="https://...">
+            </div>
+            <div class="col-12 col-lg-6 interactive-only-group new-interactive-group">
+              <label class="form-label">رفع صورة الإجابة</label>
+              <input class="form-control" type="file" name="answer_image_file" accept="image/*">
             </div>
             <div class="col-12 mcq-only-group new-mcq-group d-none">
               <div class="border rounded p-2 bg-light">
@@ -285,7 +293,7 @@
                 <div class="border rounded p-3">
                   {% set q_type = (q.question_type or 'interactive') %}
                   <div class="fw-semibold mb-2">السؤال {{ loop.index }} <span class="badge text-bg-light">{{ 'اختيار' if q_type == 'mcq' else 'تحريري' }}</span></div>
-                  <form method="post" class="row g-2">
+                  <form method="post" class="row g-2" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="update_question">
                     <input type="hidden" name="question_id" value="{{ q.id }}">
                     <div class="col-12 col-md-4">
@@ -306,10 +314,12 @@
                     <div class="col-12 col-lg-6">
                       <label class="form-label">صورة السؤال</label>
                       <input class="form-control" name="question_image_url" value="{{ q.question_image_url or '' }}" data-preview-target="q-preview-{{ q.id }}">
+                      <input class="form-control mt-1" type="file" name="question_image_file" accept="image/*">
                     </div>
                     <div class="col-12 col-lg-6 interactive-only-group q{{ q.id }}-interactive {% if q_type == 'mcq' %}d-none{% endif %}">
                       <label class="form-label">صورة الإجابة</label>
                       <input class="form-control" name="answer_image_url" value="{{ q.answer_image_url or '' }}" data-preview-target="a-preview-{{ q.id }}">
+                      <input class="form-control mt-1" type="file" name="answer_image_file" accept="image/*">
                     </div>
                     <div class="col-12 q{{ q.id }}-mcq {% if q_type != 'mcq' %}d-none{% endif %}">
                       <div class="border rounded p-2 bg-light">
@@ -405,7 +415,7 @@
         </div>
         <div class="card-body">
           <p class="text-muted small">أضف روابط أتمتة أو ملفات الموارد المرتبطة بالدورة.</p>
-          <form method="post" class="row g-3">
+          <form method="post" class="row g-3" enctype="multipart/form-data">
             <input type="hidden" name="action" value="update_set">
             <input type="hidden" name="title" value="{{ course_set.title }}">
             <input type="hidden" name="description" value="{{ course_set.description or '' }}">
@@ -481,6 +491,30 @@
 
       input.addEventListener('input', updatePreview);
       updatePreview();
+    });
+  })();
+
+  (function () {
+    const filePairs = [
+      ['question_image_file', '#new-question-preview'],
+      ['answer_image_file', '#new-answer-preview'],
+    ];
+    filePairs.forEach(([inputId, targetSelector]) => {
+      const input = document.getElementById(inputId);
+      const target = document.querySelector(targetSelector);
+      if (!input || !target) return;
+      input.addEventListener('change', function () {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          if (event && event.target && typeof event.target.result === 'string') {
+            target.src = event.target.result;
+            target.classList.remove('d-none');
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     });
   })();
 
