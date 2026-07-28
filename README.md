@@ -1,4 +1,18 @@
-# Study Platform (Flask)
+# EduPath – Study Platform
+
+## CV Description
+
+**EduPath** is a full-stack educational web application built with **Python (Flask)** and **MongoDB**. It provides a role-based learning environment where teachers can create and organize hierarchical course content (subjects → sections → lessons) and design multiple-choice quizzes, while students can browse material, sit tests, and track their scores. Key highlights include:
+
+- **Role-based access control** for students, teachers, and admins
+- **Activation-code system** for granular access management at subject, section, and lesson level
+- **MCQ test engine** with instant scoring and result history
+- **Custom test builder** allowing students to create personalised revision sets
+- **Deployed to the cloud** via Railway with Gunicorn as the production WSGI server
+
+> *Tech stack: Python · Flask · MongoDB (MongoEngine) · Flask-Login · Flask-WTF · Jinja2 · HTML/CSS · Railway*
+
+---
 
 A simple study platform where teachers manage subjects, sections, lessons, and MCQ tests; students take tests and see their marks.
 
