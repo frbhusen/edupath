@@ -9,7 +9,7 @@ from study_platform.models import (
     SubjectActivation,
     SubjectActivationCode,
 )
-from study_platform.student import DAILY_XP_SUBMITS_PER_ITEM
+from study_platform.xp import DAILY_XP_SUBMITS_PER_ITEM
 
 from .db_case import DBTestCase
 
