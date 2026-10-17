@@ -1,5 +1,3 @@
-from fileinput import filename
-
 from flask import Flask, render_template, session, request, redirect, url_for, flash, send_from_directory, g, jsonify
 from pathlib import Path
 from werkzeug.exceptions import NotFound
@@ -30,7 +28,7 @@ from redis.exceptions import AuthenticationError, ConnectionError, RedisError
 from .auth import auth_bp
 from .admin import admin_bp
 from .teacher import teacher_bp
-from .student import student_bp
+from .student import student_bp, _is_guest_free_lesson
 from .staff_activity import log_staff_activity_from_request
 
 
@@ -68,6 +66,8 @@ def create_app():
     _migrate_legacy_teacher_role_once(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
+    login_manager.login_message = "يرجى تسجيل الدخول للمتابعة. يمكنك تصفح الموقع بدون حساب، لكن الاختبارات تتطلب تسجيل الدخول."
+    login_manager.login_message_category = "warning"
 
     # Initialize cache using environment-driven config, but fall back to SimpleCache
     # when Redis is misconfigured or requires credentials that are not available.
@@ -368,7 +368,7 @@ def create_app():
                 logout_user()
                 session.clear()
                 # Preserve intended destination
-                flash('You were logged out because your account logged in on another device.', 'warning')
+                flash('تم تسجيل خروجك لأن حسابك سجّل الدخول من جهاز آخر.', 'warning')
                 return redirect(url_for('auth.login', next=request.path))
     
     @app.after_request
@@ -388,18 +388,34 @@ def create_app():
         log_staff_activity_from_request(response)
         return response
 
+    def _guest_can_open_lesson_media(field_name, filename):
+        # Guests may only stream the media of the free preview lesson
+        from .models import Lesson
+
+        lesson = Lesson.objects(**{field_name: filename}).first()
+        return bool(lesson) and _is_guest_free_lesson(lesson)
+
     @app.route('/media/videos/<filename>')
-    @login_required
     def serve_video(filename):
-        # Optional: Verify if the current_user has access to this specific video here
+        if not current_user.is_authenticated and not _guest_can_open_lesson_media("video_filename", filename):
+            return login_manager.unauthorized()
         return send_from_directory(
             app.config['VIDEO_UPLOAD_FOLDER'], 
             filename, 
             mimetype='video/mp4'
         )
 
+    @app.route('/media/audio/<filename>')
+    def serve_audio(filename):
+        if not current_user.is_authenticated and not _guest_can_open_lesson_media("audio_filename", filename):
+            return login_manager.unauthorized()
+        return send_from_directory(
+            app.config['AUDIO_UPLOAD_FOLDER'],
+            filename,
+        )
+
+    # Public: subject banners use these images and guests browse the subjects page
     @app.route('/media/images/<filename>')
-    @login_required
     def serve_image(filename):
         return send_from_directory(
             app.config['IMAGE_UPLOAD_FOLDER'],

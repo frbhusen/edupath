@@ -3481,10 +3481,10 @@ def take_test(test_id):
                     flash("قم بتفعيل المادة للوصول إلى هذا الاختبار.", "warning")
                     return redirect(url_for("student.activate_subject", subject_id=test.section.subject.id))
                 flash("قم بتفعيل القسم للوصول إلى هذا الاختبار.", "warning")
-                return redirect(url_for("student.activate_section", section_id=test.section_id))
+                return redirect(url_for("student.activate_section", section_id=test.section_id.id))
             else:
                 flash("قم بتفعيل القسم للوصول إلى هذا الاختبار.", "warning")
-                return redirect(url_for("student.activate_section", section_id=test.section_id))
+                return redirect(url_for("student.activate_section", section_id=test.section_id.id))
 
     interactive_questions = list(TestInteractiveQuestion.objects(test_id=test.id).order_by('created_at').all())
     test_resources = list(TestResource.objects(test_id=test.id).order_by('position').all())
@@ -3520,7 +3520,7 @@ def take_test(test_id):
         interactive_question_ids_raw = request.form.get("interactive_question_ids", "")
         if question_ids_raw:
             question_ids = [qid.strip() for qid in question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
-            questions = Question.objects(id__in=question_ids).all()
+            questions = Question.objects(id__in=question_ids, test_id=test.id).all()
             questions_by_id = {str(q.id): q for q in questions}
             ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
         else:
@@ -3622,7 +3622,7 @@ def take_test(test_id):
         selected_mcq = []
         selected_interactive = []
         if preset_question_ids:
-            questions_by_id = {str(q.id): q for q in Question.objects(id__in=preset_question_ids).all()}
+            questions_by_id = {str(q.id): q for q in Question.objects(id__in=preset_question_ids, test_id=test.id).all()}
             questions = [questions_by_id[qid] for qid in preset_question_ids if qid in questions_by_id]
             selected_count = len(questions)
             selected_mcq = questions
@@ -3774,7 +3774,7 @@ def activate_subject(subject_id):
             flash("رمز غير صحيح لهذه المادة.", "error")
             return render_template("student/activate_subject.html", subject=subject, form=form)
         if ac.is_used:
-            flash("This code has already been used.", "error")
+            flash("تم استخدام هذا الرمز مسبقاً.", "error")
             return render_template("student/activate_subject.html", subject=subject, form=form)
 
         # Backward compatibility: old per-student codes remain limited to their owner.
@@ -3814,7 +3814,7 @@ def activate_section(section_id):
             flash("رمز غير صحيح لهذا القسم.", "error")
             return render_template("student/activate_section.html", section=section, form=form)
         if ac.is_used:
-            flash("This code has already been used.", "error")
+            flash("تم استخدام هذا الرمز مسبقاً.", "error")
             return render_template("student/activate_section.html", section=section, form=form)
         # mark used and activate
         ac.is_used = True
