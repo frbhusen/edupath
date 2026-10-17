@@ -4,6 +4,7 @@ from urllib.parse import quote_plus
 from urllib.parse import urlsplit, urlunsplit
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DEV_SECRET_KEY = "dev-secret-key-change-me"
 
 
 def _env_truthy(name: str, default: bool = False) -> bool:
@@ -82,7 +83,7 @@ def _detect_cache_redis_url() -> str:
     return _build_redis_url_from_parts()
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
+    SECRET_KEY = os.environ.get("SECRET_KEY", DEV_SECRET_KEY)
     MONGODB_URI = os.environ.get("MONGODB_URI", "mongodb://localhost:27017/study_platform")
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").strip().lower() in {"1", "true", "yes", "on"}

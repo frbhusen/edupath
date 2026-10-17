@@ -14,3 +14,4 @@ python-bidi==0.4.2
 WeasyPrint
 Flask-WeasyPrint
 bleach==6.1.0
+Flask-Limiter==4.1.1

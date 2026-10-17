@@ -5,16 +5,15 @@ import math
 import secrets
 from urllib.parse import quote
 from datetime import datetime, timedelta
-import time
 from flask_login import login_required, current_user
 from bson import ObjectId
 from bson.dbref import DBRef
 from mongoengine.errors import DoesNotExist
 
-from .models import User, Subject, Section, Lesson, Test, TestResource, Question, Choice, Attempt, AttemptAnswer, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer, StudentFavoriteQuestion
+from .models import User, Subject, Section, Lesson, Test, TestResource, Question, Choice, Attempt, AttemptAnswer, ServedTest, TestInteractiveQuestion, AttemptInteractiveAnswer, ActivationCode, SectionActivation, SubjectActivation, SubjectActivationCode, CustomTestAttempt, CustomTestAnswer, StudentGamification, XPEvent, LessonCompletion, Assignment, AssignmentSubmission, AssignmentAttempt, StudyPlan, StudyPlanItem, DiscussionQuestion, DiscussionAnswer, Certificate, Duel, DuelAnswer, DuelStats, CourseSet, CourseQuestion, CourseAttempt, CourseAnswer, StudentFavoriteQuestion
 from .forms import ActivationForm, StudentProfileForm
 from .activation_utils import cascade_subject_activation, cascade_section_activation
-from .extensions import cache
+from .extensions import cache, limiter
 
 student_bp = Blueprint("student", __name__, template_folder="templates")
 
@@ -24,6 +23,10 @@ DUEL_PENDING_LIMIT_PER_CHALLENGER = 3
 DUEL_WAITING_JOIN_TIMEOUT_SECONDS = 300
 DUEL_PAIR_RECENT_LOCK_SECONDS = 45
 TEST_EXIT_XP_PENALTY = 25
+# How many submits of the same test / course per day still earn XP. Later
+# submits are graded as usual but give 0 XP, so repeating one test can't be
+# used to climb the leaderboard.
+DAILY_XP_SUBMITS_PER_ITEM = 3
 
 
 def _duel_role_allowed(user) -> bool:
@@ -422,6 +425,16 @@ def _load_attempt_settings(attempt):
         return {}
 
 
+def _activation_rate_key():
+    return f"activate:{current_user.id}"
+
+
+# Limits how many activation codes one account can try, so codes can't be guessed.
+_activation_limit = limiter.limit(
+    "10 per 10 minutes;30 per day", key_func=_activation_rate_key, methods=["POST"]
+)
+
+
 def _extract_attempt_question_ids(attempt):
     raw = getattr(attempt, "question_order_json", None)
     if raw:
@@ -497,6 +510,17 @@ def _update_badges(profile):
         badges.add("test_5")
 
     profile.badges = sorted(list(badges))
+
+
+def _daily_xp_limit_reached(model_cls, time_field: str, **filters) -> bool:
+    """True when the student already earned XP DAILY_XP_SUBMITS_PER_ITEM times today for this item."""
+    day_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    rewarded_today = model_cls.objects(
+        xp_earned__gt=0,
+        **{f"{time_field}__gte": day_start},
+        **filters,
+    ).count()
+    return rewarded_today >= DAILY_XP_SUBMITS_PER_ITEM
 
 
 def _award_xp_for_attempt(student_id, event_type: str, source_id: str, score: int, total: int, is_retake: bool = False):
@@ -736,29 +760,6 @@ def _leaderboard_payload_for_user(student_id, scope, page, per_page):
         "current_xp": current_xp,
         "current_certificates_count": current_certificates_count,
     }
-
-
-def _leaderboard_payload_signature(payload):
-    board = payload.get("leaderboard", {})
-    entries = board.get("entries", [])
-    signature_rows = tuple(
-        (
-            e.get("student_id"),
-            int(e.get("rank", 0)),
-            int(e.get("xp", 0)),
-            int(e.get("certificates_count", 0) or 0),
-        )
-        for e in entries
-    )
-    return (
-        board.get("scope"),
-        int(board.get("page", 1)),
-        int(board.get("per_page", 20)),
-        tuple(signature_rows),
-        payload.get("current_rank"),
-        int(payload.get("current_xp", 0) or 0),
-        int(payload.get("current_certificates_count", 0) or 0),
-    )
 
 
 def _build_leaderboard_page(page: int, per_page: int, scope: str = "all"):
@@ -1972,15 +1973,18 @@ def course_submit(course_set_id):
     earned_xp = score * xp_per_question
     if total > 0 and score == total:
         earned_xp *= 2
+    if _daily_xp_limit_reached(CourseAttempt, "created_at", student_id=current_user.id, course_set_id=course_set.id):
+        earned_xp = 0
     attempt.xp_earned = earned_xp
     attempt.save()
 
-    _award_flat_xp_once(
-        student_id=current_user.id,
-        event_type="interactive_course_submit",
-        source_id=str(attempt.id),
-        amount=earned_xp,
-    )
+    if earned_xp:
+        _award_flat_xp_once(
+            student_id=current_user.id,
+            event_type="interactive_course_submit",
+            source_id=str(attempt.id),
+            amount=earned_xp,
+        )
 
     return redirect(url_for("student.course_result", attempt_id=attempt.id))
 
@@ -2606,22 +2610,14 @@ def leaderboard_stream():
     scope = _normalize_leaderboard_scope(request.args.get("scope"))
     student_id = current_user.id if current_user.role == "student" else None
 
-    def event_stream():
-        last_sig = None
-        yield ": leaderboard-stream-open\n\n"
-        while True:
-            payload = _leaderboard_payload_for_user(student_id, scope, page, per_page)
-            sig = _leaderboard_payload_signature(payload)
-            if sig != last_sig:
-                last_sig = sig
-                data = json.dumps(payload, ensure_ascii=False)
-                yield f"event: leaderboard\n"
-                yield f"data: {data}\n\n"
-            else:
-                yield ": keepalive\n\n"
-            time.sleep(5)
+    # Kept only for pages opened before the leaderboard switched to polling.
+    # It sends one snapshot and closes; `retry` makes the browser reconnect in
+    # 15 s, so no worker is held open by an idle tab.
+    payload = _leaderboard_payload_for_user(student_id, scope, page, per_page)
+    data = json.dumps(payload, ensure_ascii=False)
+    body = f"retry: 15000\nevent: leaderboard\ndata: {data}\n\n"
 
-    response = Response(event_stream(), mimetype="text/event-stream")
+    response = Response(body, mimetype="text/event-stream")
     response.headers["Cache-Control"] = "no-cache"
     response.headers["X-Accel-Buffering"] = "no"
     return response
@@ -3504,6 +3500,18 @@ def take_test(test_id):
     retake_source_id = request.values.get("retake_source_id")
     retake_mode = request.values.get("retake_mode")
 
+    if preset_question_ids and current_user.role == "student":
+        # A preset question list is only allowed when repeating one of the
+        # student's own attempts, and only with that attempt's questions.
+        source_attempt = None
+        if retake_source_id and ObjectId.is_valid(str(retake_source_id)):
+            source_attempt = Attempt.objects(id=retake_source_id, student_id=current_user.id, test_id=test.id).first()
+        allowed_ids = set(_extract_attempt_question_ids(source_attempt)) if source_attempt else set()
+        preset_question_ids = [qid for qid in preset_question_ids if qid in allowed_ids]
+        if not preset_question_ids:
+            retake_source_id = None
+            retake_mode = None
+
     if selected_count is None and total_questions_available == 0 and interactive_questions:
         selected_count = 0
 
@@ -3515,37 +3523,35 @@ def take_test(test_id):
     selected_by_level = (easy_count + medium_count + hard_count) > 0
 
     if request.method == "POST":
-        # Evaluate answers
-        question_ids_raw = request.form.get("question_ids", "")
-        interactive_question_ids_raw = request.form.get("interactive_question_ids", "")
-        if question_ids_raw:
-            question_ids = [qid.strip() for qid in question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
-            questions = Question.objects(id__in=question_ids, test_id=test.id).all()
-            questions_by_id = {str(q.id): q for q in questions}
-            ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
-        else:
-            ordered_questions = list(test.questions)
+        # Grade exactly the questions that were served for this sitting. The
+        # question lists in the form are ignored so they can't be edited.
+        serve_token = (request.form.get("serve_token") or "").strip()
+        served = None
+        if serve_token:
+            served = ServedTest.objects(
+                token=serve_token, test_id=test.id, student_id=current_user.id, used=False
+            ).modify(set__used=True, new=True)
+        if not served:
+            flash("انتهت صلاحية هذا الاختبار أو تم تسليمه مسبقاً. ابدأ الاختبار من جديد.", "warning")
+            return redirect(url_for("student.take_test", test_id=test.id))
 
-        ordered_interactive_questions = list(interactive_questions)
-        if interactive_question_ids_raw:
-            interactive_question_ids = [qid.strip() for qid in interactive_question_ids_raw.split(",") if ObjectId.is_valid(qid.strip())]
-            interactive_q_map = {
-                str(iq.id): iq
-                for iq in TestInteractiveQuestion.objects(id__in=interactive_question_ids, test_id=test.id).all()
-            }
-            ordered_interactive_questions = [interactive_q_map[qid] for qid in interactive_question_ids if qid in interactive_q_map]
+        question_ids = list(served.question_ids or [])
+        questions_by_id = {str(q.id): q for q in Question.objects(id__in=question_ids, test_id=test.id).all()} if question_ids else {}
+        ordered_questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
 
-        settings_payload = {
-            "count": _to_int(request.form.get("count"), len(ordered_questions) + len(ordered_interactive_questions)),
-            "easy": _to_int(request.form.get("easy"), 0),
-            "medium": _to_int(request.form.get("medium"), 0),
-            "hard": _to_int(request.form.get("hard"), 0),
-        }
+        interactive_question_ids = list(served.interactive_question_ids or [])
+        interactive_q_map = {
+            str(iq.id): iq
+            for iq in TestInteractiveQuestion.objects(id__in=interactive_question_ids, test_id=test.id).all()
+        } if interactive_question_ids else {}
+        ordered_interactive_questions = [interactive_q_map[qid] for qid in interactive_question_ids if qid in interactive_q_map]
 
-        is_retake = False
-        if retake_source_id and ObjectId.is_valid(str(retake_source_id)):
-            source = Attempt.objects(id=retake_source_id, student_id=current_user.id).first()
-            is_retake = bool(source)
+        try:
+            settings_payload = json.loads(served.selection_settings_json or "{}")
+        except (TypeError, ValueError):
+            settings_payload = {}
+
+        is_retake = bool(served.is_retake)
 
         question_order = [str(q.id) for q in ordered_questions]
         interactive_total = len(ordered_interactive_questions)
@@ -3556,6 +3562,7 @@ def take_test(test_id):
             student_id=current_user.id,
             score=0,
             total=total,
+            started_at=served.created_at,
             question_order_json=json.dumps(question_order),
             selection_settings_json=json.dumps(settings_payload),
             is_retake=is_retake,
@@ -3598,14 +3605,16 @@ def take_test(test_id):
             ).save()
 
         attempt.score = score
-        earned_xp, _ = _award_xp_for_attempt(
-            student_id=current_user.id,
-            event_type="test_submit",
-            source_id=str(attempt.id),
-            score=score,
-            total=total,
-            is_retake=is_retake,
-        )
+        earned_xp = 0
+        if not _daily_xp_limit_reached(Attempt, "submitted_at", student_id=current_user.id, test_id=test.id):
+            earned_xp, _ = _award_xp_for_attempt(
+                student_id=current_user.id,
+                event_type="test_submit",
+                source_id=str(attempt.id),
+                score=score,
+                total=total,
+                is_retake=is_retake,
+            )
         attempt.xp_earned = earned_xp
         attempt.save()
         flash(f"حصلت على {score}/{total}", "success")
@@ -3700,6 +3709,29 @@ def take_test(test_id):
         level = (getattr(q, "difficulty", "medium") or "medium").lower()
         return level if level in {"easy", "medium", "hard"} else "medium"
 
+    serve_token = ""
+    if question_ids_str or interactive_question_ids_str:
+        is_retake_sitting = bool(
+            retake_source_id
+            and ObjectId.is_valid(str(retake_source_id))
+            and Attempt.objects(id=retake_source_id, student_id=current_user.id).first()
+        )
+        serve_token = secrets.token_hex(16)
+        ServedTest(
+            token=serve_token,
+            test_id=test.id,
+            student_id=current_user.id,
+            question_ids=[qid for qid in question_ids_str.split(",") if qid],
+            interactive_question_ids=[qid for qid in interactive_question_ids_str.split(",") if qid],
+            selection_settings_json=json.dumps({
+                "count": selected_count or 0,
+                "easy": easy_count,
+                "medium": medium_count,
+                "hard": hard_count,
+            }),
+            is_retake=is_retake_sitting,
+        ).save()
+
     available_easy = len([q for q in test.questions if _norm_level(q) == "easy"]) + len([iq for iq in interactive_questions if _norm_level(iq) == "easy"])
     available_medium = len([q for q in test.questions if _norm_level(q) == "medium"]) + len([iq for iq in interactive_questions if _norm_level(iq) == "medium"])
     available_hard = len([q for q in test.questions if _norm_level(q) == "hard"]) + len([iq for iq in interactive_questions if _norm_level(iq) == "hard"])
@@ -3723,6 +3755,7 @@ def take_test(test_id):
         time_limit_seconds=time_limit_seconds,
         test_resources=test_resources,
         exit_token=secrets.token_hex(8) if selected_count else "",
+        serve_token=serve_token,
         retake_source_id=retake_source_id,
         retake_mode=retake_mode,
     )
@@ -3762,6 +3795,7 @@ def abandon_test(test_id):
 
 @student_bp.route("/subjects/<subject_id>/activate", methods=["GET", "POST"])
 @login_required
+@_activation_limit
 def activate_subject(subject_id):
     subject = Subject.objects(id=subject_id).first()
     if not subject:
@@ -3788,11 +3822,17 @@ def activate_subject(subject_id):
             flash("المادة مفعلة بالفعل لهذا الحساب.", "info")
             return redirect(url_for("student.subject_detail", subject_id=subject.id))
 
-        # mark used and activate
-        ac.is_used = True
-        ac.used_at = datetime.utcnow()
-        ac.student_id = current_user.id
-        ac.save()
+        # Claim the code in one atomic step so two people submitting the same
+        # code at the same moment can't both activate with it.
+        claimed = SubjectActivationCode.objects(id=ac.id, is_used=False).modify(
+            set__is_used=True,
+            set__used_at=datetime.utcnow(),
+            set__student_id=current_user.id,
+            new=True,
+        )
+        if not claimed:
+            flash("تم استخدام هذا الرمز مسبقاً.", "error")
+            return render_template("student/activate_subject.html", subject=subject, form=form)
         SubjectActivation(subject_id=subject.id, student_id=current_user.id).save()
         cascade_subject_activation(subject, current_user.id)
         flash("تم تفعيل المادة بالكامل!", "success")
@@ -3802,6 +3842,7 @@ def activate_subject(subject_id):
 
 @student_bp.route("/sections/<section_id>/activate", methods=["GET", "POST"])
 @login_required
+@_activation_limit
 def activate_section(section_id):
     section = Section.objects(id=section_id).first()
     if not section:
@@ -3816,10 +3857,14 @@ def activate_section(section_id):
         if ac.is_used:
             flash("تم استخدام هذا الرمز مسبقاً.", "error")
             return render_template("student/activate_section.html", section=section, form=form)
-        # mark used and activate
-        ac.is_used = True
-        ac.used_at = datetime.utcnow()
-        ac.save()
+        claimed = ActivationCode.objects(id=ac.id, is_used=False).modify(
+            set__is_used=True,
+            set__used_at=datetime.utcnow(),
+            new=True,
+        )
+        if not claimed:
+            flash("تم استخدام هذا الرمز مسبقاً.", "error")
+            return render_template("student/activate_section.html", section=section, form=form)
         existing = SectionActivation.objects(section_id=section.id, student_id=current_user.id, active=True).first()
         if not existing:
             SectionActivation(section_id=section.id, student_id=current_user.id).save()
@@ -5378,14 +5423,16 @@ def custom_test_submit(attempt_id):
     attempt.score = score
     attempt.total = total
     attempt.status = "submitted"
-    earned_xp, _ = _award_xp_for_attempt(
-        student_id=current_user.id,
-        event_type="custom_test_submit",
-        source_id=str(attempt.id),
-        score=score,
-        total=total,
-        is_retake=bool(attempt.is_retake),
-    )
+    earned_xp = 0
+    if not _daily_xp_limit_reached(CustomTestAttempt, "created_at", student_id=current_user.id):
+        earned_xp, _ = _award_xp_for_attempt(
+            student_id=current_user.id,
+            event_type="custom_test_submit",
+            source_id=str(attempt.id),
+            score=score,
+            total=total,
+            is_retake=bool(attempt.is_retake),
+        )
     attempt.xp_earned = earned_xp
     attempt.save()
     return redirect(url_for("student.custom_test_result", attempt_id=attempt.id))

@@ -135,9 +135,9 @@ class StudentProfileForm(FlaskForm):
 
 
 class ActivationForm(FlaskForm):
-    code = StringField("رمز التفعيل", validators=[DataRequired(), Length(min=6, max=6)])
+    code = StringField("رمز التفعيل", validators=[DataRequired(), Length(min=6, max=12)])
     submit = SubmitField("تفعيل")
 
 class LessonActivationForm(FlaskForm):
-    code = StringField("رمز تفعيل الدرس", validators=[DataRequired(), Length(min=6, max=6)])
+    code = StringField("رمز تفعيل الدرس", validators=[DataRequired(), Length(min=6, max=12)])
     submit = SubmitField("تفعيل الدرس")

@@ -10,6 +10,7 @@ from bson import ObjectId
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from weasyprint import HTML
+import secrets
 import uuid
 import bleach
 try:
@@ -38,14 +39,22 @@ from .account_cleanup import delete_user_with_related_data
 teacher_bp = Blueprint("teacher", __name__, template_folder="templates")
 
 
-def _generate_unique_code(model_cls, length: int = 6) -> str:
-    """Generate a unique activation code for the given model class."""
-    import random
-    import string
+# Activation-code alphabet: no 0/O or 1/I, so printed codes are easy to type.
+_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-    code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+def _generate_unique_code(model_cls, length: int = 8) -> str:
+    """Generate a unique activation code for the given model class.
+
+    Uses `secrets` (not `random`) so codes can't be predicted. Codes made
+    before this change are 6 characters and keep working.
+    """
+    def _new_code():
+        return ''.join(secrets.choice(_CODE_ALPHABET) for _ in range(length))
+
+    code_value = _new_code()
     while model_cls.objects(code=code_value).first():
-        code_value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+        code_value = _new_code()
     return code_value
 
 

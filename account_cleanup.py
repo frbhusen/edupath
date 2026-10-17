@@ -7,6 +7,7 @@ from .models import (
     Attempt,
     AttemptAnswer,
     AttemptTextAnswer,
+    ServedTest,
     CustomTestAttempt,
     CustomTestAnswer,
     SectionActivation,
@@ -66,6 +67,7 @@ def delete_user_with_related_data(user: User) -> dict:
         AttemptTextAnswer.objects(attempt_id__in=regular_attempt_ids).delete()
         Attempt.objects(id__in=regular_attempt_ids).delete()
         summary["regular_attempts"] = len(regular_attempt_ids)
+    ServedTest.objects(student_id=uid).delete()
 
     custom_attempt_ids = [a.id for a in CustomTestAttempt.objects(student_id=uid).only("id").all()]
     if custom_attempt_ids:

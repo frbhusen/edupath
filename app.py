@@ -1,6 +1,7 @@
 from flask import Flask, render_template, session, request, redirect, url_for, flash, send_from_directory, g, jsonify
 from pathlib import Path
 from werkzeug.exceptions import NotFound
+import os
 import time
 from urllib.parse import urlsplit
 
@@ -18,8 +19,8 @@ if load_dotenv:
     env_path = Path(__file__).resolve().parent.parent / ".env"
     load_dotenv(dotenv_path=env_path, override=False)
 
-from .config import Config
-from .extensions import login_manager, init_mongo, cache
+from .config import Config, DEV_SECRET_KEY
+from .extensions import login_manager, init_mongo, cache, limiter
 from flask_login import current_user, logout_user, login_required
 from bson import ObjectId
 from redis import Redis
@@ -58,9 +59,17 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     try:
-        app.logger.setLevel('DEBUG')
+        # DEBUG logs every request; keep production logs at INFO unless asked.
+        app.logger.setLevel(os.environ.get("LOG_LEVEL", "INFO").upper())
     except Exception:
         pass
+
+    if app.config.get("SECRET_KEY") == DEV_SECRET_KEY and not app.config.get("TESTING"):
+        # With the public placeholder key anyone can forge a login cookie.
+        app.logger.critical(
+            "SECRET_KEY is not set: using the development placeholder. "
+            "Set SECRET_KEY in the environment (.env) before serving real users."
+        )
 
     init_mongo(app)
     _migrate_legacy_teacher_role_once(app)
@@ -96,6 +105,21 @@ def create_app():
     else:
         app.logger.info("Cache backend: %s", cache_type or "SimpleCache")
         cache.init_app(app)
+
+    # Rate limits share Redis with the cache when it is reachable, so the
+    # limits hold across all Gunicorn workers; otherwise each worker counts
+    # on its own.
+    if not app.config.get("RATELIMIT_STORAGE_URI"):
+        redis_ok = str(app.config.get("CACHE_TYPE") or "").lower() == "rediscache" and app.config.get("CACHE_REDIS_URL")
+        app.config["RATELIMIT_STORAGE_URI"] = app.config["CACHE_REDIS_URL"] if redis_ok else "memory://"
+    app.config.setdefault("RATELIMIT_SWALLOW_ERRORS", True)
+    limiter.init_app(app)
+
+    @app.errorhandler(429)
+    def too_many_requests(_exc):
+        flash("محاولات كثيرة خلال وقت قصير. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى.", "error")
+        target = request.path if request.method == "POST" else url_for("index")
+        return redirect(target), 303
 
     if Compress is not None:
         Compress(app)
@@ -361,7 +385,7 @@ def create_app():
             from .models import User
             db_user = User.objects(id=current_user.id).first()
             db_token = getattr(db_user, 'current_session_token', None) if db_user else None
-            app.logger.debug(f"Single-device check: endpoint={request.endpoint}, path={request.path}, token={token}, db_token={db_token}, user_id={current_user.id}")
+            app.logger.debug(f"Single-device check: endpoint={request.endpoint}, path={request.path}, user_id={current_user.id}")
             if not token or not db_token or token != db_token:
                 # Invalidate this session because another device has logged in
                 app.logger.debug("Token mismatch detected; logging out current session.")

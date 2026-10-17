@@ -3,7 +3,7 @@ import secrets
 from urllib.parse import urlsplit
 from flask_login import login_user, logout_user, current_user
 
-from .extensions import login_manager
+from .extensions import login_manager, limiter
 from bson import ObjectId
 from .models import User
 from .forms import RegisterForm, LoginForm
@@ -67,7 +67,15 @@ def register():
                 flash("حدث خطأ أثناء التسجيل، يرجى المحاولة مرة أخرى.", "error")
     return render_template("auth/register.html", form=form)
 
+def _login_rate_key():
+    # Per account name, so one person guessing a password is slowed down
+    # without blocking everyone who shares the server's IP.
+    who = (request.form.get("username_or_phone") or "").strip().lower()
+    return f"login:{who}"
+
+
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per 10 minutes", key_func=_login_rate_key, methods=["POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
