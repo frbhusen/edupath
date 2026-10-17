@@ -4,13 +4,14 @@ Flask-Login==0.6.3
 Flask-WTF==1.2.1
 email_validator==2.2.0
 pymongo==4.6.0
-gunicorn
+gunicorn==26.2.0
 Flask-Caching==2.1.0
 redis==5.2.1
 Flask-Compress==1.17
 fpdf2==2.8.2
 arabic-reshaper==3.0.0
 python-bidi==0.4.2
-WeasyPrint
-Flask-WeasyPrint
+WeasyPrint==70.0
+Flask-WeasyPrint==1.2.0
 bleach==6.1.0
+Flask-Limiter==4.1.1

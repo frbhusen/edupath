@@ -404,6 +404,33 @@ class TestInteractiveQuestion(Document):
     }
 
 
+class ServedTest(Document):
+    """Questions handed to a student for one sitting of a test.
+
+    Grading reads the question list from here instead of from the submitted
+    form, so a student cannot choose which questions get graded.
+    """
+    id = ObjectIdField(primary_key=True, default=ObjectId)
+    token = StringField(required=True, max_length=64, unique=True)
+    test_id = ReferenceField(Test, required=True)
+    student_id = ReferenceField(User, required=True)
+    question_ids = ListField(StringField(max_length=24), default=list)
+    interactive_question_ids = ListField(StringField(max_length=24), default=list)
+    selection_settings_json = StringField(null=True)
+    is_retake = BooleanField(default=False)
+    used = BooleanField(default=False)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'served_tests',
+        'indexes': [
+            ('student_id', 'test_id'),
+            # Unsubmitted sittings are dropped after two days.
+            {'fields': ['created_at'], 'expireAfterSeconds': 2 * 24 * 3600},
+        ]
+    }
+
+
 class Attempt(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     test_id = ReferenceField(Test, required=True)
@@ -1009,7 +1036,7 @@ class LessonActivationCode(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     lesson_id = ReferenceField(Lesson, required=True)
     student_id = ReferenceField(User, required=True)
-    code = StringField(unique=True, required=True, max_length=6)
+    code = StringField(unique=True, required=True, max_length=12)
     created_at = DateTimeField(default=datetime.utcnow)
     used_at = DateTimeField(null=True)
     is_used = BooleanField(default=False, required=True)
@@ -1046,7 +1073,7 @@ class ActivationCode(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     section_id = ReferenceField(Section, required=True)
     student_id = ReferenceField(User, required=True)
-    code = StringField(unique=True, required=True, max_length=6)
+    code = StringField(unique=True, required=True, max_length=12)
     created_at = DateTimeField(default=datetime.utcnow)
     used_at = DateTimeField(null=True)
     is_used = BooleanField(default=False, required=True)
@@ -1083,7 +1110,7 @@ class SubjectActivationCode(Document):
     id = ObjectIdField(primary_key=True, default=ObjectId)
     subject_id = ReferenceField(Subject, required=True)
     student_id = ReferenceField(User, null=True)
-    code = StringField(unique=True, required=True, max_length=6)
+    code = StringField(unique=True, required=True, max_length=12)
     code_price_syp = IntField(default=0, required=True)
     created_at = DateTimeField(default=datetime.utcnow)
     used_at = DateTimeField(null=True)

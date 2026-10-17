@@ -229,7 +229,6 @@
     const perPage = Number(list.dataset.perPage || 20);
     const scope = list.dataset.scope || 'all';
     const endpoint = "{{ url_for('student.leaderboard_data') }}" + `?page=${page}&per_page=${perPage}&scope=${scope}`;
-    const streamEndpoint = "{{ url_for('student.leaderboard_stream') }}" + `?page=${page}&per_page=${perPage}&scope=${scope}`;
     const certificatesBaseUrl = "{{ url_for('student.leaderboard_student_certificates', student_id='__student_id__') }}";
 
     const scopeSelect = document.getElementById('scope-select');
@@ -313,34 +312,13 @@
       }
     }
 
-    let pollTimer = null;
-    function startPollingFallback() {
-      if (pollTimer) return;
-      pollTimer = setInterval(pullUpdates, 15000);
-    }
-
-    if (window.EventSource) {
-      const source = new EventSource(streamEndpoint);
-      source.addEventListener('leaderboard', (event) => {
-        try {
-          const data = JSON.parse(event.data || '{}');
-          if (!data || !data.ok) return;
-          refreshList(data);
-        } catch (err) {
-          // Keep stream alive even if one payload fails to parse.
-        }
-      });
-
-      source.onerror = function() {
-        startPollingFallback();
-      };
-
-      window.addEventListener('beforeunload', () => {
-        source.close();
-      });
-    } else {
-      startPollingFallback();
-    }
+    // Plain polling: a held-open stream would tie up one server worker per open tab.
+    setInterval(() => {
+      if (document.visibilityState === 'visible') pullUpdates();
+    }, 15000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') pullUpdates();
+    });
   })();
 </script>
 {% endblock %}
