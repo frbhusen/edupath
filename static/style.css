@@ -903,6 +903,12 @@ table {
   color: var(--brand-ink);
   transition: all 0.15s ease;
 }
+/* The page is RTL but Bootstrap's LTR build puts the select arrow on the right,
+   on top of the text. Move it to the left and reserve room for it. */
+[dir="rtl"] .form-select {
+  background-position: left 0.75rem center;
+  padding-left: 2.25rem;
+}
 .form-control:hover,
 .form-select:hover {
   border-color: var(--brand-primary);
@@ -1630,4 +1636,76 @@ mjx-container,
     padding: 0.7rem 0.8rem;
     font-size: 0.9rem;
   }
+}
+/* Dark mode: page-level styles that hard-code light card backgrounds.
+   Without these, light text from the dark theme lands on white boxes. */
+[data-theme="dark"] .hero-premium {
+  background: linear-gradient(135deg, #1e293b 0%, #172554 100%);
+  border-right-color: var(--brand-primary);
+}
+[data-theme="dark"] .guest-wrapper .feature-card,
+[data-theme="dark"] .wrong-stat,
+[data-theme="dark"] .wrong-top-item,
+[data-theme="dark"] .wrong-question-card,
+[data-theme="dark"] .wrong-group-head,
+[data-theme="dark"] .flow-node,
+[data-theme="dark"] .leaderboard-row,
+[data-theme="dark"] .meta-chip {
+  background: var(--brand-surface);
+  border-color: var(--brand-border);
+  color: var(--brand-ink);
+}
+[data-theme="dark"] .wrong-stat .value,
+[data-theme="dark"] .rank-col {
+  color: var(--brand-primary);
+}
+[data-theme="dark"] .leaderboard-row.top-1 {
+  background: linear-gradient(90deg, #3b2f0b, var(--brand-surface));
+}
+[data-theme="dark"] .leaderboard-row.top-2 {
+  background: linear-gradient(90deg, #2b3445, var(--brand-surface));
+}
+[data-theme="dark"] .leaderboard-row.top-3 {
+  background: linear-gradient(90deg, #3b2617, var(--brand-surface));
+}
+[data-theme="dark"] .badge-chip {
+  background: #3b2f0b;
+  border-color: #a16207;
+}
+[data-theme="dark"] .xp-pill {
+  background: #172554;
+  border-color: #1e40af;
+  color: #bfdbfe;
+}
+[data-theme="dark"] .leaderboard-wrap {
+  --bg-1: #1e293b;
+  --bg-2: #0f2a24;
+  --accent-soft: #1e3a8a;
+}
+[data-theme="dark"] .leaderboard-hero {
+  border-color: var(--brand-border);
+}
+[data-theme="dark"] .interactive-panel {
+  background: var(--brand-surface);
+  border-color: var(--brand-border);
+}
+[data-theme="dark"] .interactive-panel-title {
+  color: var(--brand-muted);
+}
+[data-theme="dark"] .interactive-image-frame {
+  border-color: var(--brand-border);
+}
+[data-theme="dark"] .leaderboard-wrap .chip:not(.success) {
+  background: var(--brand-surface);
+  border-color: var(--brand-border);
+  color: var(--brand-ink);
+}
+[data-theme="dark"] .hero-premium .text-dark {
+  color: var(--brand-ink) !important;
+}
+[data-theme="dark"] .flow-label {
+  color: var(--brand-muted);
+}
+[data-theme="dark"] .flow-value {
+  color: var(--brand-primary);
 }

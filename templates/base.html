@@ -73,7 +73,7 @@
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-      integrity="sha512-T2ZyXj0Rz1K1Hn8q3gqD6G3b4H7rX3gY8gqX1kQWmG6hQYt9t4L0R7E9V3fYQ1n9f2+0vX2t2bM0tJ2Z6i8A=="
+      integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     />
@@ -89,6 +89,20 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='footer.css') }}"
     />
+    <script>
+      // Apply the saved theme before first paint so dark mode doesn't flash light.
+      // data-bs-theme makes Bootstrap's own components (muted text, cards,
+      // close buttons, tables, forms) follow the same theme.
+      function applyTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.setAttribute("data-bs-theme", theme);
+      }
+      try {
+        applyTheme(localStorage.getItem("theme") || "light");
+      } catch (e) {
+        applyTheme("light");
+      }
+    </script>
     <style>
       .preserve-format {
         white-space: pre-wrap;
@@ -196,20 +210,23 @@
             class="brand-logo"
           />
           <span>EduPath</span>
-          <button
-                id="theme-toggle"
-                class="btn btn-outline-secondary btn-sm rounded-circle"
-              >
-                🌗
-              </button>
         </a>
+        <button
+          id="theme-toggle"
+          type="button"
+          class="btn btn-outline-secondary btn-sm rounded-circle me-auto ms-2"
+          aria-label="تبديل الوضع الليلي"
+          title="تبديل الوضع الليلي"
+        >
+          🌗
+        </button>
 
         <button
           class="navbar-toggler"
           type="button"
           aria-controls="navbarNav"
           aria-expanded="false"
-          aria-label="Toggle navigation"
+          aria-label="فتح القائمة"
           onclick="toggleNav(event)"
         >
           <span class="bi bi-person-circle"></span>
@@ -315,6 +332,30 @@
                   <i class="bi bi-star drawer-nav-icon"></i> الأسئلة المفضلة
                 </a>
               </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'leaderboard' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.leaderboard') }}"
+                >
+                  <i class="bi bi-trophy drawer-nav-icon"></i> لوحة الصدارة
+                </a>
+              </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'duel' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.duels_home') }}"
+                >
+                  <i class="bi bi-controller drawer-nav-icon"></i> التحديات الودية
+                </a>
+              </li>
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'assignment' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.assignments') }}"
+                >
+                  <i class="bi bi-clipboard-check drawer-nav-icon"></i> الواجبات
+                </a>
+              </li>
 
               <div class="drawer-divider"></div>
 
@@ -357,6 +398,20 @@
               </li>
               {% endif %} {% endif %}
 
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if request.endpoint == 'notifications_inbox' %}active{% endif %}"
+                  href="{{ url_for('notifications_inbox') }}"
+                >
+                  <i class="bi bi-bell drawer-nav-icon"></i> الإشعارات
+                  {% if unread_notifications_count and unread_notifications_count > 0 %}
+                  <span class="badge text-bg-danger rounded-pill ms-auto"
+                    >{{ unread_notifications_count }}</span
+                  >
+                  {% endif %}
+                </a>
+              </li>
+
               <div class="drawer-divider"></div>
 
               <li class="drawer-nav-item">
@@ -370,6 +425,14 @@
               </li>
 
               {% else %}
+              <li class="drawer-nav-item">
+                <a
+                  class="drawer-nav-link {% if 'subject' in request.endpoint %}active{% endif %}"
+                  href="{{ url_for('student.subjects') }}"
+                >
+                  <i class="bi bi-book drawer-nav-icon"></i> المواد الدراسية
+                </a>
+              </li>
               <li class="drawer-nav-item">
                 <a
                   class="drawer-nav-link"
@@ -415,7 +478,8 @@
                 class="btn btn-soft-notification btn-sm drawer-focus-btn"
                 href="{{ url_for('notifications_inbox') }}"
               >
-                <span class="icon">🔔</span><span></span> {% if
+                <span class="icon" aria-hidden="true">🔔</span
+                ><span class="visually-hidden">الإشعارات</span> {% if
                 unread_notifications_count and unread_notifications_count > 0 %}
                 <span class="badge text-bg-danger"
                   >{{ unread_notifications_count }}</span
@@ -471,6 +535,26 @@
                 >تسجيل الخروج</a
               >
             </li>
+            {% else %}
+            <li class="nav-item">
+              <a
+                class="btn btn-outline-light btn-sm"
+                href="{{ url_for('student.subjects') }}"
+                >المواد الدراسية</a
+              >
+            </li>
+            <li class="nav-item">
+              <a
+                class="btn btn-outline-light btn-sm"
+                href="{{ url_for('auth.register') }}"
+                >إنشاء حساب</a
+              >
+            </li>
+            <li class="nav-item">
+              <a class="btn btn-light btn-sm fw-bold" href="{{ url_for('auth.login') }}"
+                >تسجيل الدخول</a
+              >
+            </li>
             {%endif %}
           </ul>
         </div>
@@ -483,7 +567,18 @@
       get_flashed_messages(with_categories=true) %} {% if messages %} {% for
       category, message in messages %} {% set bs = 'danger' if category ==
       'error' else category %}
-      <div class="alert alert-{{ bs }}" role="alert">{{ message }}</div>
+      <div
+        class="alert alert-{{ bs }} alert-dismissible flash-message"
+        role="alert"
+      >
+        {{ message }}
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="alert"
+          aria-label="إغلاق"
+        ></button>
+      </div>
       {% endfor %} {% endif %} {% endwith %} {% block content %}{% endblock %}
     </main>
 
@@ -499,7 +594,7 @@
             <button
               type="button"
               class="btn-close"
-              aria-label="Close"
+              aria-label="إغلاق"
               onclick="hideDuelInviteToast()"
             ></button>
           </div>
@@ -530,14 +625,12 @@
           <div class="d-flex justify-content-between align-items-start mb-2">
             <div>
               <h6 class="mb-0" id="globalNotificationTitle">إشعار</h6>
-              <div class="small text-muted" id="globalNotificationType">
-                note
-              </div>
+              <div class="small text-muted" id="globalNotificationType"></div>
             </div>
             <button
               type="button"
               class="btn-close"
-              aria-label="Close"
+              aria-label="إغلاق"
               onclick="hideGlobalNotificationToast()"
             ></button>
           </div>
@@ -632,11 +725,11 @@
             <ul
               class="text-center justify-content-center align-content-center align-items-md-start m-0 p-0"
             >
-              <a href="#" class="link-light">
-                <li class="m-1 list-inline-item">
-                  <span class="fa-stack fa-lg"
+              <li class="m-1 list-inline-item">
+                <a href="#" class="link-light" aria-label="فيسبوك">
+                  <span class="d-inline-flex"
                     ><svg
-                      class="bi bi-facebook fa-stack-1x fa-inverse"
+                      class="bi bi-facebook"
                       xmlns="http://www.w3.org/2000/svg"
                       width="1em"
                       height="1em"
@@ -648,13 +741,13 @@
                       ></path>
                     </svg>
                   </span>
-                </li>
-              </a>
-              <a href="https://www.instagram.com/edupath.sy" class="link-light">
-                <li class="m-1 list-inline-item">
-                  <span class="fa-stack fa-lg"
+                </a>
+              </li>
+              <li class="m-1 list-inline-item">
+                <a href="https://www.instagram.com/edupath.sy" class="link-light" aria-label="إنستغرام">
+                  <span class="d-inline-flex"
                     ><svg
-                      class="bi bi-instagram fa-stack-1x fa-inverse"
+                      class="bi bi-instagram"
                       xmlns="http://www.w3.org/2000/svg"
                       width="1em"
                       height="1em"
@@ -666,13 +759,13 @@
                       ></path>
                     </svg>
                   </span>
-                </li>
-              </a>
-              <a href="#" class="link-light">
-                <li class="m-1 list-inline-item">
-                  <span class="fa-stack fa-lg"
+                </a>
+              </li>
+              <li class="m-1 list-inline-item">
+                <a href="#" class="link-light" aria-label="واتساب">
+                  <span class="d-inline-flex"
                     ><svg
-                      class="bi bi-whatsapp fa-stack-1x fa-inverse"
+                      class="bi bi-whatsapp"
                       xmlns="http://www.w3.org/2000/svg"
                       width="1em"
                       height="1em"
@@ -684,8 +777,8 @@
                       ></path>
                     </svg>
                   </span>
-                </li>
-              </a>
+                </a>
+              </li>
             </ul>
           </div>
         </div>
@@ -736,7 +829,7 @@
     </svg>
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jK8Gk5fucs5l7Hc"
+      integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
       crossorigin="anonymous"
     ></script>
     <script
@@ -856,7 +949,8 @@
       });
 
       window.addEventListener('load', function() {
-        const alerts = document.querySelectorAll('.alert');
+        // Only auto-hide flash messages; alerts inside page content must stay visible.
+        const alerts = document.querySelectorAll('.flash-message');
         if (!alerts.length) return;
         setTimeout(() => {
           alerts.forEach((alert) => {
@@ -1144,6 +1238,13 @@
           return false;
         }
 
+        const notificationTypeLabels = {
+          note: 'ملاحظة',
+          info: 'معلومة',
+          success: 'نجاح',
+          warning: 'تنبيه',
+          urgent: 'عاجل',
+        };
         function styleByTemplate(templateType) {
           cardEl.classList.remove('border-warning', 'border-success', 'border-danger', 'border-info', 'border-secondary');
           if (templateType === 'warning') cardEl.classList.add('border-warning');
@@ -1162,7 +1263,7 @@
           currentItem = item;
           currentRecipientId = item.recipient_id || null;
           titleEl.textContent = item.title || 'إشعار';
-          typeEl.textContent = item.template_type || 'note';
+          typeEl.textContent = notificationTypeLabels[item.template_type] || notificationTypeLabels.note;
           bodyEl.textContent = item.body || '';
           styleByTemplate(item.template_type || 'note');
           toastEl.style.display = 'block';
@@ -1244,17 +1345,14 @@
       document.addEventListener("DOMContentLoaded", function () {
         const themeToggle = document.getElementById("theme-toggle");
 
-        // Check local storage for user preference, default to light
-        const currentTheme = localStorage.getItem("theme") || "light";
-        document.documentElement.setAttribute("data-theme", currentTheme);
-
+        if (!themeToggle) return;
         // Toggle event
         themeToggle.addEventListener("click", (e) => {
           e.preventDefault();
           let theme = document.documentElement.getAttribute("data-theme");
           let switchToTheme = theme === "dark" ? "light" : "dark";
 
-          document.documentElement.setAttribute("data-theme", switchToTheme);
+          applyTheme(switchToTheme);
           localStorage.setItem("theme", switchToTheme); // Save preference
         });
       });

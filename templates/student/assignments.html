@@ -53,7 +53,7 @@
                   </div>
                 {% endif %}
               {% elif item.status != 'completed' %}
-                <form method="post" action="{{ url_for('student.complete_assignment', assignment_id=a.id) }}" class="sticky-mobile-actions">
+                <form method="post" action="{{ url_for('student.complete_assignment', assignment_id=a.id) }}">
                   <div class="mb-2">
                     <textarea class="form-control form-control-sm" rows="2" name="note" placeholder="ملاحظة التسليم (اختياري)"></textarea>
                   </div>

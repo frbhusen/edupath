@@ -5,7 +5,7 @@
       <div>
         <h2 class="h4 mb-1">{{ section.title }}</h2>
       </div>
-      <div class="d-flex gap-2 flex-wrap sticky-mobile-actions">
+      <div class="d-flex gap-2 flex-wrap">
         {% if section_requires_code and not section_open %}
         <a
           class="btn btn-info btn-sm"
@@ -76,7 +76,7 @@
               </div>
             </div>
             <div class="text-muted small mb-2">درس</div>
-            <div class="mt-auto d-flex justify-content-start align-items-center sticky-mobile-actions">
+            <div class="mt-auto d-flex justify-content-start align-items-center">
               {% if locked %}
               {% if current_user.is_authenticated and current_user.role == 'student' %}
               <span class="text-muted small">&nbsp;</span>
@@ -148,7 +148,7 @@
               {% endfor %}
             </div>
             {% endif %}
-            <div class="mt-auto d-flex justify-content-start align-items-center gap-2 sticky-mobile-actions">
+            <div class="mt-auto d-flex justify-content-start align-items-center gap-2">
               <span class="chip">MCQ</span>
               {% if locked %}
               {% if current_user.is_authenticated and current_user.role == 'student' %}

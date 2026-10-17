@@ -2,7 +2,7 @@
 {% block content %}
 <div class="dashboard-hero mb-3 d-flex justify-content-between align-items-center">
   <div>
-    <h1 class="h4 mb-1">Discussion / Q&A</h1>
+    <h1 class="h4 mb-1">النقاش والأسئلة</h1>
     <p class="mb-0">مناقشات وأسئلة درس: {{ lesson.title }}</p>
   </div>
   <div class="d-flex gap-2">
@@ -48,7 +48,7 @@
           </div>
           <div class="mb-3" style="white-space: pre-wrap;">{{ q.body }}</div>
 
-          <form method="post" class="mb-3 sticky-mobile-actions">
+          <form method="post" class="mb-3">
             <input type="hidden" name="action" value="add_answer">
             <input type="hidden" name="question_id" value="{{ q.id }}">
             <div class="input-group d-grid">

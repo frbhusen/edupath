@@ -20,7 +20,7 @@
       <a
         class="btn btn-cta btn-sm"
         href="{{ url_for('student.lesson_discussion', lesson_id=lesson.id) }}"
-        >Discussion / Q&A</a
+        >النقاش والأسئلة</a
       >
       {% if current_user.role == 'student' and certificate %}
       <a
@@ -351,11 +351,10 @@ lesson_full_custom_test_enabled %}
       skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"],
     },
     startup: {
-      typeset: false,
+      typeset: true,
     },
   };
 </script>
-<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
 <script
   id="MathJax-script"
   async
